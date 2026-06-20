@@ -1272,7 +1272,7 @@ window.MduplicateNote=function(){
   MshowToast('ノートを複製しました');
 };
 let MndTimer=null;
-var MnoteMedia=[];
+window.MnoteMedia=window.MnoteMedia||[];var MnoteMedia=window.MnoteMedia;
 window.MhandleNoteFile=function(input){
   Array.from(input.files).forEach(file=>{
     if(file.size>10*1024*1024){MshowToast('10MB以下にしてください');return;}
@@ -1288,6 +1288,7 @@ window.MhandleNoteFile=function(input){
   });input.value='';
 };
 window.MrenderNoteMediaPreview=function(){
+  if(typeof MnoteMedia==='undefined')window.MnoteMedia=[];
   const bar=document.getElementById('mnd-media-preview');if(!bar)return;
   if(!MnoteMedia.length){bar.style.display='none';bar.innerHTML='';return;}
   bar.style.display='flex';
