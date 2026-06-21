@@ -865,11 +865,13 @@ mark{background:rgba(154,106,0,0.2);color:var(--myellow);border-radius:2px;}
 <!-- モーダル群 -->
 <div class="mmodal-bg" id="mnm">
   <div class="mmodal">
-    <div style="padding:16px 20px;border-bottom:1px solid #eeeef4;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
-      <h3 style="margin:0;font-size:15px;font-weight:700;color:#111122;">新規ノート</h3>
-      <div style="display:flex;gap:8px;">
-        <button class="mbg2btn" onclick="MCM('mnm')" style="padding:6px 14px;font-size:13px;">キャンセル</button>
-        <button class="mbp" onclick="MsaveNote()" style="padding:6px 14px;font-size:13px;">保存</button>
+    <div style="padding:16px 20px 12px;border-bottom:1px solid #eeeef4;flex-shrink:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0;">
+        <h3 style="margin:0;font-size:15px;font-weight:700;color:#111122;">新規ノート</h3>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          <button onclick="MCM('mnm')" style="padding:7px 16px;font-size:13px;font-weight:600;border:1px solid #ccccdd;border-radius:7px;background:#fff;color:#555;cursor:pointer;font-family:inherit;">キャンセル</button>
+          <button onclick="MsaveNote()" style="padding:7px 16px;font-size:13px;font-weight:700;border:none;border-radius:7px;background:#2563EB;color:#fff;cursor:pointer;font-family:inherit;">保存</button>
+        </div>
       </div>
     </div>
     <div class="mmodal-scroll">
