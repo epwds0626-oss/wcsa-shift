@@ -680,7 +680,7 @@ mark{background:rgba(154,106,0,0.2);color:var(--myellow);border-radius:2px;}
 .mmodal-bg{display:none;position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;}
 .mmodal-bg.mopen{display:flex;}
 .mmodal{background:#ffffff;border:1px solid #ccccdd;border-radius:14px;padding:24px;width:440px;max-width:95vw;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.18);}
-.mmodal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:#111122;padding:24px 24px 0;flex-shrink:0;}
+.mmodal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:#111122;}
 .mfield{margin-bottom:11px;}
 .mfield label{display:block;font-size:12px;font-weight:600;color:#444466;margin-bottom:5px;}
 .mfield input,.mfield textarea,.mfield select{width:100%;padding:9px 12px;border:1.5px solid #ccccdd;border-radius:7px;font-size:13px;color:#111122;background:#ffffff;outline:none;font-family:inherit;-webkit-appearance:none;appearance:none;}
@@ -864,7 +864,6 @@ mark{background:rgba(154,106,0,0.2);color:var(--myellow);border-radius:2px;}
 <div class="mmodal-bg" id="mnm">
   <div class="mmodal">
     <h3>新規ノート</h3>
-    <div style="padding:0 24px 24px;overflow-y:auto;">
     <div class="mfield"><label>タイトル</label>
       <div style="display:flex;gap:6px;align-items:center;">
         <input id="mnm-t" placeholder="タイトル" style="flex:1;">
@@ -884,7 +883,6 @@ mark{background:rgba(154,106,0,0.2);color:var(--myellow);border-radius:2px;}
     <div class="mmac">
       <button class="mbg2btn" onclick="MCM('mnm')">キャンセル</button>
       <button class="mbp" onclick="MsaveNote()">保存</button>
-    </div>
     </div>
   </div>
 </div>
