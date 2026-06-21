@@ -165,20 +165,20 @@ nav{display:flex;gap:2px}
 @keyframes hcard-in{from{opacity:0;transform:translateY(28px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}
 @keyframes hgreet-in{from{opacity:0;transform:translateY(-12px);}to{opacity:1;transform:translateY(0);}}
 @keyframes hpulse{0%,100%{box-shadow:0 0 0 0 rgba(232,200,74,0);}50%{box-shadow:0 0 0 8px rgba(232,200,74,0.08);}}
-.hcard{border-radius:18px;padding:26px 22px;cursor:pointer;position:relative;overflow:hidden;transition:transform .18s,box-shadow .18s;border:1px solid rgba(255,255,255,0.07);}
+.hcard{border-radius:18px;padding:26px 22px;cursor:pointer;position:relative;overflow:hidden;transition:transform .18s,box-shadow .18s;border:1px solid rgba(255,255,255,0.15);}
 .hcard:hover{transform:translateY(-4px) scale(1.02);}
 .hcard:active{transform:scale(0.97);}
 .hcard-icon{font-size:38px;margin-bottom:12px;display:block;}
 .hcard-title{font-size:17px;font-weight:800;letter-spacing:1px;margin-bottom:5px;}
-.hcard-sub{font-size:12px;opacity:0.65;margin-bottom:12px;}
-.hcard-meta{font-size:11px;opacity:0.55;display:flex;flex-direction:column;gap:3px;}
+.hcard-sub{font-size:12px;color:rgba(255,255,255,0.8);margin-bottom:12px;}
+.hcard-meta{font-size:11px;color:rgba(255,255,255,0.7);display:flex;flex-direction:column;gap:3px;}
 .hbadge{display:inline-flex;align-items:center;justify-content:center;background:#e84a6a;color:#fff;font-size:10px;font-weight:700;min-width:20px;height:20px;border-radius:10px;padding:0 5px;margin-left:6px;vertical-align:middle;}
 .hcard-glow{position:absolute;top:-40px;right:-40px;width:120px;height:120px;border-radius:50%;opacity:0.12;pointer-events:none;}
 </style>
 <div style="max-width:560px;margin:0 auto;padding:30px 18px 40px;">
   <!-- グリーティング -->
   <div id="home-greet" style="animation:hgreet-in 0.6s ease forwards;margin-bottom:28px;text-align:center;">
-    <div id="home-greet-text" style="font-size:20px;font-weight:700;color:#111122;margin-bottom:6px;"></div>
+    <div id="home-greet-text" style="font-size:20px;font-weight:700;color:#1a1a2e;margin-bottom:6px;"></div>
     <div id="home-date-text" style="font-size:13px;color:#555577;"></div>
   </div>
   <!-- 4カード -->
@@ -186,7 +186,7 @@ nav{display:flex;gap:2px}
 
     <!-- 本店シフト -->
     <div class="hcard" id="hcard-shift-enya" onclick="homeOpenShift(0)"
-      style="background:linear-gradient(135deg,#1a1a10 0%,#2a2a0a 100%);">
+      style="background:linear-gradient(135deg,#2a2a18 0%,#3a3a12 100%);">
       <div class="hcard-glow" style="background:#e8c84a;"></div>
       <span class="hcard-icon">📅</span>
       <div class="hcard-title" style="color:#e8c84a;">本店シフト</div>
@@ -198,7 +198,7 @@ nav{display:flex;gap:2px}
 
     <!-- マルコシフト -->
     <div class="hcard" id="hcard-shift-marco" onclick="homeOpenShift(1)"
-      style="background:linear-gradient(135deg,#0a1525 0%,#0a1a30 100%);">
+      style="background:linear-gradient(135deg,#152035 0%,#152540 100%);">
       <div class="hcard-glow" style="background:#4a9ee8;"></div>
       <span class="hcard-icon">📅</span>
       <div class="hcard-title" style="color:#4a9ee8;">マルコシフト</div>
@@ -210,7 +210,7 @@ nav{display:flex;gap:2px}
 
     <!-- 本店Musubu -->
     <div class="hcard" id="hcard-musubu-enya" onclick="homeOpenMusubu('enya')"
-      style="background:linear-gradient(135deg,#0a1a20 0%,#0a2a1a 100%);">
+      style="background:linear-gradient(135deg,#102530 0%,#103520 100%);">
       <div class="hcard-glow" style="background:#4ae8a0;"></div>
       <span class="hcard-icon">💬</span>
       <div class="hcard-title" style="color:#4ae8a0;">本店 Musubu</div>
@@ -222,7 +222,7 @@ nav{display:flex;gap:2px}
 
     <!-- マルコMusubu -->
     <div class="hcard" id="hcard-musubu-marco" onclick="homeOpenMusubu('marco')"
-      style="background:linear-gradient(135deg,#1a0a1a 0%,#2a0a2a 100%);">
+      style="background:linear-gradient(135deg,#25102a 0%,#35103a 100%);">
       <div class="hcard-glow" style="background:#c084fc;"></div>
       <span class="hcard-icon">💬</span>
       <div class="hcard-title" style="color:#c084fc;">マルコ Musubu</div>
@@ -677,17 +677,17 @@ nav{display:flex;gap:2px}
 mark{background:rgba(154,106,0,0.2);color:var(--myellow);border-radius:2px;}
 /* モーダル */
 .mempty{text-align:center;padding:40px 0;color:var(--mtext3);font-size:13px;}
-.mmodal-bg{display:none;position:absolute;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;}
+.mmodal-bg{display:none;position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;}
 .mmodal-bg.mopen{display:flex;}
-.mmodal{background:var(--mbg2);border:1px solid var(--mborder);border-radius:12px;padding:22px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.6);}
-.mmodal h3{font-size:15px;font-weight:700;margin-bottom:15px;color:var(--mtext);}
+.mmodal{background:#ffffff;border:1px solid #ccccdd;border-radius:14px;padding:24px;width:440px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.18);}
+.mmodal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:#111122;}
 .mfield{margin-bottom:11px;}
-.mfield label{display:block;font-size:12px;font-weight:600;color:var(--mtext2);margin-bottom:4px;}
-.mfield input,.mfield textarea,.mfield select{width:100%;padding:8px 11px;border:1px solid var(--mborder);border-radius:7px;font-size:13px;color:var(--mtext);background:var(--mbg3);outline:none;font-family:inherit;-webkit-appearance:none;appearance:none;}
-.mfield input:focus,.mfield textarea:focus,.mfield select:focus{border-color:var(--mac);}
+.mfield label{display:block;font-size:12px;font-weight:600;color:#444466;margin-bottom:5px;}
+.mfield input,.mfield textarea,.mfield select{width:100%;padding:9px 12px;border:1.5px solid #ccccdd;border-radius:7px;font-size:13px;color:#111122;background:#ffffff;outline:none;font-family:inherit;-webkit-appearance:none;appearance:none;}
+.mfield input:focus,.mfield textarea:focus,.mfield select:focus{border-color:#2563EB;box-shadow:0 0 0 3px rgba(37,99,235,0.1);}
 .mfield select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238888aa' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;}
-.mfield select option{background:#1a1a26;color:#e8e8f0;}
-.mmac{display:flex;justify-content:flex-end;gap:8px;margin-top:15px;}
+.mfield select option{background:#ffffff;color:#111122;}
+.mmac{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid #eeeef4;}
 .mtoast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:var(--myellow);color:#0a0a0f;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
 .mtoast.mshow{opacity:1;}
 .muser-name-bar{padding:0 12px 10px;}
