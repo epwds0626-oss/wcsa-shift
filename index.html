@@ -160,7 +160,7 @@ nav{display:flex;gap:2px}
 </header>
 
 <!-- ホーム画面オーバーレイ -->
-<div id="home-screen" style="display:none;position:fixed;inset:0;background:#05061a;z-index:300;overflow-y:auto;">
+<div id="home-screen" style="display:none;position:fixed;inset:0;background:#f0f0f6;z-index:300;overflow-y:auto;">
 <style>
 @keyframes hcard-in{from{opacity:0;transform:translateY(28px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}
 @keyframes hgreet-in{from{opacity:0;transform:translateY(-12px);}to{opacity:1;transform:translateY(0);}}
@@ -424,7 +424,7 @@ nav{display:flex;gap:2px}
 <style>
 #musubu-wrapper {
   min-height: 0;
-  background: #0a0a0f;
+  background: #ffffff;
   -webkit-overflow-scrolling: touch;
 }
 #musubu-app {
@@ -434,7 +434,7 @@ nav{display:flex;gap:2px}
   display: flex !important;
   -webkit-flex-direction: row;
   flex-direction: row;
-  background: #0a0a0f;
+  background: #ffffff;
   -webkit-overflow-scrolling: touch;
   overflow: hidden;
 }
@@ -450,7 +450,7 @@ nav{display:flex;gap:2px}
 </style>
 
 <!-- ログイン画面 -->
-<div id="mlogin-screen" style="display:none;position:absolute;inset:0;background:#05061a;z-index:200;align-items:center;justify-content:center;flex-direction:column;">
+<div id="mlogin-screen" style="display:none;position:absolute;inset:0;background:#f0f0f6;z-index:200;align-items:center;justify-content:center;flex-direction:column;">
 
 <style>
 @keyframes msplash-fade-in{from{opacity:0;transform:scale(0.7) translateY(30px);}to{opacity:1;transform:scale(1) translateY(0);}}
@@ -500,24 +500,24 @@ nav{display:flex;gap:2px}
       </g>
     </svg>
   </div>
-  <div id="msplash-sub" style="font-size:22px;font-weight:900;letter-spacing:5px;color:#e8c84a;">MUSUBU</div>
-  <div id="msplash-tagline" style="font-size:12px;color:#8888aa;letter-spacing:2px;">えんやどっと丸・パスタのマルコ</div>
+  <div id="msplash-sub" style="font-size:22px;font-weight:900;letter-spacing:5px;color:#9a6a00;">MUSUBU</div>
+  <div id="msplash-tagline" style="font-size:12px;color:#444466;letter-spacing:2px;">えんやどっと丸・パスタのマルコ</div>
 </div>
 
 <!-- ログイン画面 -->
 <div id="mlogin-card" style="width:340px;max-width:92vw;">
   <div style="text-align:center;margin-bottom:22px;">
-    <div style="font-size:22px;font-weight:900;letter-spacing:4px;color:#e8c84a;margin-bottom:5px;">MUSUBU</div>
-    <div style="font-size:12px;color:#8888aa;">あなたの名前を選択してください</div>
+    <div style="font-size:22px;font-weight:900;letter-spacing:4px;color:#9a6a00;margin-bottom:5px;">MUSUBU</div>
+    <div style="font-size:12px;color:#444466;">あなたの名前を選択してください</div>
   </div>
-  <div style="background:#12121a;border:1px solid #2a2a3a;border-radius:14px;padding:20px 24px;">
+  <div style="background:#f4f4f8;border:1px solid #ccccdd;border-radius:14px;padding:20px 24px;">
     <div id="mlogin-staff-list" style="display:flex;flex-direction:column;gap:7px;max-height:380px;overflow-y:auto;"></div>
   </div>
 </div>
 
 </div>
 <style>
-#musubu-app{display:flex;height:100%;min-height:0;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif;font-size:14px;--mac:#2563EB;--macl:rgba(37,99,235,0.15);--mact:#60a5fa;--mbg:#0a0a0f;--mbg2:#12121a;--mbg3:#1a1a26;--mtext:#e8e8f0;--mtext2:#8888aa;--mtext3:#55557a;--mborder:#2a2a3a;--mgreen:#4ae8a0;--mred:#e84a6a;--myellow:#e8c84a;--mblue:#4a9ee8;--mpurple:#c084fc;}
+#musubu-app{display:flex;height:100%;min-height:0;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif;font-size:14px;--mac:#2563EB;--macl:rgba(37,99,235,0.15);--mact:#60a5fa;--mbg:#ffffff;--mbg2:#f4f4f8;--mbg3:#e8e8f0;--mtext:#111122;--mtext2:#444466;--mtext3:#777799;--mborder:#ccccdd;--mgreen:#006b3a;--mred:#c0001a;--myellow:#9a6a00;--mblue:#1a5fa0;--mpurple:#6b2fa0;}
 #msb{width:220px;min-width:220px;height:100%;background:var(--mbg2);border-right:1px solid var(--mborder);display:flex;flex-direction:column;overflow:hidden;}
 #mmain{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;min-height:0;background:var(--mbg);}
 .msb-top{padding:14px 12px 10px;border-bottom:1px solid var(--mborder);}
@@ -555,7 +555,7 @@ nav{display:flex;gap:2px}
 .mnnum{font-size:11px;color:var(--mtext3);font-weight:700;white-space:nowrap;margin-top:2px;}
 .mntitle{font-size:13px;font-weight:600;flex:1;line-height:1.4;color:var(--mtext);}
 .mtag{font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap;}
-.mto{background:rgba(37,99,235,0.2);color:#60a5fa;}.mtr{background:rgba(74,232,160,0.15);color:#4ae8a0;}.mts{background:rgba(232,74,106,0.15);color:#e84a6a;}.mta{background:rgba(232,200,74,0.15);color:#e8c84a;}.mtp{background:rgba(192,132,252,0.15);color:#c084fc;}
+.mto{background:rgba(37,99,235,0.15);color:#1a4fa0;}.mtr{background:rgba(0,107,58,0.12);color:#006b3a;}.mts{background:rgba(192,0,26,0.12);color:#c0001a;}.mta{background:rgba(154,106,0,0.12);color:#9a6a00;}.mtp{background:rgba(107,47,160,0.12);color:#6b2fa0;}
 .mnprev{font-size:12px;color:var(--mtext2);line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .mnfooter{margin-top:7px;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--mtext3);flex-wrap:wrap;}
 .mpin-ico{cursor:pointer;padding:1px 4px;border-radius:3px;font-size:12px;}
@@ -597,7 +597,7 @@ nav{display:flex;gap:2px}
 .mbub{padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.55;max-width:72%;}
 .mbub.mo{background:var(--mbg3);border-radius:4px 12px 12px 12px;color:var(--mtext);}
 .mbub.mm{background:var(--mac);color:#fff;border-radius:12px 12px 4px 12px;}
-.mpinned-msg{border-left:3px solid var(--myellow);background:rgba(232,200,74,0.05);padding:8px 12px;border-radius:0 8px 8px 0;margin-bottom:10px;font-size:12px;color:var(--mtext2);}
+.mpinned-msg{border-left:3px solid var(--myellow);background:rgba(154,106,0,0.07);padding:8px 12px;border-radius:0 8px 8px 0;margin-bottom:10px;font-size:12px;color:var(--mtext2);}
 .mmsg-del,.mmsg-pin{background:none;border:none;cursor:pointer;color:var(--mtext3);font-size:11px;padding:2px 5px;opacity:0;transition:opacity .1s;font-family:inherit;}
 .mmg:hover .mmsg-del,.mmg:hover .mmsg-pin{opacity:1;}
 .mmsg-del:hover{color:var(--mred);}
@@ -638,7 +638,7 @@ nav{display:flex;gap:2px}
 .mttxt.mdone{text-decoration:line-through;color:var(--mtext3);}
 .mtav{width:24px;height:24px;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .mtdb{font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap;}
-.mdok{background:rgba(74,232,160,0.15);color:var(--mgreen);}.mdw{background:rgba(232,200,74,0.15);color:var(--myellow);}.mdov{background:rgba(232,74,106,0.15);color:var(--mred);}.mddn{background:var(--mbg3);color:var(--mtext3);}
+.mdok{background:rgba(0,107,58,0.12);color:var(--mgreen);}.mdw{background:rgba(154,106,0,0.12);color:var(--myellow);}.mdov{background:rgba(192,0,26,0.12);color:var(--mred);}.mddn{background:var(--mbg3);color:var(--mtext3);}
 .mtask-del{background:none;border:none;cursor:pointer;color:var(--mtext3);font-size:13px;padding:2px 6px;opacity:0;font-family:inherit;}
 .mtr2:hover .mtask-del{opacity:1;}
 .mtask-del:hover{color:var(--mred);}
@@ -671,10 +671,10 @@ nav{display:flex;gap:2px}
 .msearch-result-type{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-bottom:5px;display:inline-block;}
 .msrt-note{background:rgba(37,99,235,0.2);color:#60a5fa;}
 .msrt-task{background:rgba(74,232,160,0.15);color:var(--mgreen);}
-.msrt-notice{background:rgba(232,200,74,0.15);color:var(--myellow);}
+.msrt-notice{background:rgba(154,106,0,0.12);color:var(--myellow);}
 .msearch-result-title{font-size:13px;font-weight:600;color:var(--mtext);margin-bottom:3px;}
 .msearch-result-prev{font-size:12px;color:var(--mtext2);}
-mark{background:rgba(232,200,74,0.3);color:var(--myellow);border-radius:2px;}
+mark{background:rgba(154,106,0,0.2);color:var(--myellow);border-radius:2px;}
 /* モーダル */
 .mempty{text-align:center;padding:40px 0;color:var(--mtext3);font-size:13px;}
 .mmodal-bg{display:none;position:absolute;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;}
@@ -988,7 +988,7 @@ function MrenderLoginList(){
   if(!staff.length){list.innerHTML='<div style="color:var(--mtext3);text-align:center;padding:20px;">読み込み中...</div>';return;}
   list.innerHTML=staff.map(s=>{
     const av=MgetAV(s);
-    return`<button onclick="MloginAs('${s}')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--mbg3);border:1px solid var(--mborder);border-radius:8px;cursor:pointer;color:var(--mtext);font-size:14px;font-weight:500;font-family:inherit;text-align:left;transition:border-color .1s;" onmouseover="this.style.borderColor='#2563EB'" onmouseout="this.style.borderColor='#2a2a3a'">
+    return`<button onclick="MloginAs('${s}')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--mbg3);border:1px solid var(--mborder);border-radius:8px;cursor:pointer;color:var(--mtext);font-size:14px;font-weight:500;font-family:inherit;text-align:left;transition:border-color .1s;" onmouseover="this.style.borderColor='#2563EB'" onmouseout="this.style.borderColor='#ccccdd'">
       <div style="width:32px;height:32px;border-radius:50%;background:${av.bg};color:${av.c};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${s.slice(0,1)}</div>
       <span>${s}</span>
     </button>`;
@@ -1707,7 +1707,7 @@ function switchMode(mode) {
     document.getElementById('modeShift').className = 'shop-btn';
     document.getElementById('modeShift').style.cssText = '';
     document.getElementById('modeMusubu').className = 'shop-btn active';
-    document.getElementById('modeMusubu').style.cssText = 'background:var(--accent);color:#0a0a0f';
+    document.getElementById('modeMusubu').style.cssText = 'background:var(--accent);color:#ffffff';
     if (typeof initMusubu === 'function') initMusubu();
   } else {
     if (musubuWrapper) musubuWrapper.style.display = 'none';
@@ -1718,7 +1718,7 @@ function switchMode(mode) {
     if (headerNav) headerNav.style.display = '';
     if (pdfBtn) pdfBtn.style.display = '';
     document.getElementById('modeShift').className = 'shop-btn active';
-    document.getElementById('modeShift').style.cssText = 'background:var(--accent);color:#0a0a0f';
+    document.getElementById('modeShift').style.cssText = 'background:var(--accent);color:#ffffff';
     document.getElementById('modeMusubu').className = 'shop-btn';
     document.getElementById('modeMusubu').style.cssText = '';
     showPage('calendar');
