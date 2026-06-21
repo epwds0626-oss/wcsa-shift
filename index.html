@@ -679,15 +679,15 @@ mark{background:rgba(154,106,0,0.2);color:var(--myellow);border-radius:2px;}
 .mempty{text-align:center;padding:40px 0;color:var(--mtext3);font-size:13px;}
 .mmodal-bg{display:none;position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;}
 .mmodal-bg.mopen{display:flex;}
-.mmodal{background:#ffffff;border:1px solid #ccccdd;border-radius:14px;padding:24px;width:440px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.18);}
-.mmodal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:#111122;}
+.mmodal{background:#ffffff;border:1px solid #ccccdd;border-radius:14px;padding:24px;width:440px;max-width:95vw;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.18);}
+.mmodal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:#111122;padding:24px 24px 0;flex-shrink:0;}
 .mfield{margin-bottom:11px;}
 .mfield label{display:block;font-size:12px;font-weight:600;color:#444466;margin-bottom:5px;}
 .mfield input,.mfield textarea,.mfield select{width:100%;padding:9px 12px;border:1.5px solid #ccccdd;border-radius:7px;font-size:13px;color:#111122;background:#ffffff;outline:none;font-family:inherit;-webkit-appearance:none;appearance:none;}
 .mfield input:focus,.mfield textarea:focus,.mfield select:focus{border-color:#2563EB;box-shadow:0 0 0 3px rgba(37,99,235,0.1);}
 .mfield select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238888aa' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;}
 .mfield select option{background:#ffffff;color:#111122;}
-.mmac{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid #eeeef4;}
+.mmac{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid #eeeef4;position:sticky;bottom:0;background:#fff;padding-bottom:4px;}
 .mtoast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:var(--myellow);color:#0a0a0f;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
 .mtoast.mshow{opacity:1;}
 .muser-name-bar{padding:0 12px 10px;}
@@ -864,6 +864,7 @@ mark{background:rgba(154,106,0,0.2);color:var(--myellow);border-radius:2px;}
 <div class="mmodal-bg" id="mnm">
   <div class="mmodal">
     <h3>新規ノート</h3>
+    <div style="padding:0 24px 24px;overflow-y:auto;">
     <div class="mfield"><label>タイトル</label>
       <div style="display:flex;gap:6px;align-items:center;">
         <input id="mnm-t" placeholder="タイトル" style="flex:1;">
@@ -883,6 +884,7 @@ mark{background:rgba(154,106,0,0.2);color:var(--myellow);border-radius:2px;}
     <div class="mmac">
       <button class="mbg2btn" onclick="MCM('mnm')">キャンセル</button>
       <button class="mbp" onclick="MsaveNote()">保存</button>
+    </div>
     </div>
   </div>
 </div>
