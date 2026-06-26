@@ -18,11 +18,11 @@
 body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Yu Gothic',sans-serif;font-size:14px;min-height:100vh}
 header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.98);border-bottom:1px solid var(--border);display:flex;flex-direction:column;padding:0;}
 .header-row1{display:flex;align-items:center;padding:0 16px;height:48px;border-bottom:1px solid rgba(0,0,0,0.06);}
-.header-row2{display:flex;align-items:center;padding:0 16px;height:40px;gap:6px;border-top:1px solid rgba(0,0,0,0.04);}
+.header-row2{display:flex;align-items:center;padding:4px 12px;min-height:40px;gap:5px;border-top:1px solid rgba(0,0,0,0.04);overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
 .home-btn{background:none;border:1px solid var(--border);color:var(--text2);padding:5px 10px;border-radius:7px;cursor:pointer;font-size:14px;font-family:inherit;line-height:1;transition:all .15s;}
 .home-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--accent);}
-.shop-switch{display:flex;background:var(--surface2);border-radius:8px;padding:3px;gap:2px;}
-.shop-btn{padding:5px 12px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:transparent;color:var(--text2);font-family:inherit;transition:all .15s;letter-spacing:.02em;}
+.shop-switch{display:flex;background:var(--surface2);border-radius:8px;padding:3px;gap:2px;flex-shrink:0;}
+.shop-btn{padding:5px 10px;font-size:11px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:transparent;color:var(--text2);font-family:inherit;transition:all .15s;letter-spacing:.02em;white-space:nowrap;}
 .shop-btn:hover{color:var(--text);}
 .shop-btn.active{background:#fff;color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.10);}
 .home-btn:hover{background:var(--surface2);color:var(--text);}
@@ -30,7 +30,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.98);borde
 .logo-accent{color:var(--accent);}
 .logo small{color:var(--text2);font-size:8px;letter-spacing:3px;display:block;margin-top:-2px;font-weight:500;text-transform:uppercase;}
 nav{display:flex;gap:2px}
-.nav-btn{background:none;border:none;color:var(--text2);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit}
+.nav-btn{background:none;border:none;color:var(--text2);padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;white-space:nowrap;}
 .nav-btn:hover{color:var(--text);background:var(--surface2)}
 .nav-btn.active{color:var(--accent);background:rgba(176,125,0,0.12)}
 .pdf-btn{background:rgba(176,125,0,0.12);border:1px solid rgba(176,125,0,0.4);color:var(--accent);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit;line-height:1;}
@@ -167,7 +167,7 @@ nav{display:flex;gap:2px}
       <button class="shop-btn active" id="modeShift" onclick="switchMode('shift')" style="background:var(--accent);color:#0a0a0f">シフト</button>
       <button class="shop-btn" id="modeMusubu" onclick="switchMode('musubu')">Musubu</button>
     </div>
-    <nav style="margin-left:auto;">
+    <nav style="margin-left:auto;flex-shrink:0;">
       <button class="nav-btn active" id="nav0" onclick="showPage('calendar')">カレンダー</button>
       <button class="nav-btn" id="nav1" onclick="showPage('wish')">希望</button>
       <button class="nav-btn" id="nav2" onclick="showPage('admin')">管理者</button>
