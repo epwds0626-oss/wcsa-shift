@@ -2482,22 +2482,17 @@ function decodeCSVBuffer(buf) {
 }
 
 function parseCSV(text, sep) {
-  // BOM除去
   text = text.replace(/^\uFEFF/, '');
   var lines = text.split(/\r?\n/);
   return lines.filter(function(l){ return l.trim(); }).map(function(l) {
-    // 簡易TSVパース（引用符考慮）
-    var cols = [];
-    var cur = '';
-    var inQ = false;
-    for (var i = 0; i < l.length; i++) {
-      var c = l[i];
-      if (c === '"') { inQ = !inQ; }
-      else if (c === sep && !inQ) { cols.push(cur.trim()); cur = ''; }
-      else { cur += c; }
-    }
-    cols.push(cur.trim());
-    return cols;
+    // タブで分割してから各フィールドの前後引用符を除去
+    return l.split(sep).map(function(f) {
+      f = f.trim();
+      if (f.charAt(0) === '"' && f.charAt(f.length - 1) === '"') {
+        f = f.slice(1, -1);
+      }
+      return f.trim();
+    });
   });
 }
 
