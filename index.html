@@ -2289,10 +2289,13 @@ function renderChallenge(fixedShopKey) {
   var csvBtn = document.getElementById('ch-csv-import-btn');
   if (csvBtn) csvBtn.style.display = adminUnlocked ? 'block' : 'none';
 
-  // Firebase リアルタイム購読
-  if (chListeners[shopKey]) {
-    db.ref('challenge/' + shopKey).off('value', chListeners[shopKey]);
-  }
+  // Firebase リアルタイム購読 — 既存リスナーを全部切ってから登録
+  Object.keys(chListeners).forEach(function(key) {
+    if (chListeners[key]) {
+      db.ref('challenge/' + key).off('value', chListeners[key]);
+      chListeners[key] = null;
+    }
+  });
   chListeners[shopKey] = db.ref('challenge/' + shopKey).on('value', function(snap) {
     var d = snap.val() || {};
     updateChallengUI(d, shopKey);
@@ -2300,6 +2303,8 @@ function renderChallenge(fixedShopKey) {
 }
 
 function updateChallengUI(d, shopKey) {
+  // UIが存在しない場合（別ページ表示中など）はスキップ
+  if (!document.getElementById('ch-big-current')) return;
   var isMarco = shopKey === 'marco';
   // === BIG ===
   var bigCurrent = d.big_current || 0;
@@ -2547,9 +2552,6 @@ function parseCSV(text, sep) { return parseCSVAuto(text, sep); }
 
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
-  console.log('[CSV] shopKey:', shopKey, 'isMarco:', isMarco);
-  console.log('[CSV] salesFile:', !!results.salesFile, 'itemFile:', !!results.itemFile);
-  console.log('[CSV] marcoSalesFile:', !!results.marcoSalesFile, 'marcoItemFile:', !!results.marcoItemFile);
   var hasData = results.salesFile || results.itemFile || results.marcoSalesFile || results.marcoItemFile;
   if (!hasData) {
     alert('対応するCSVが見つかりませんでした。');
