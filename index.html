@@ -513,7 +513,7 @@ nav{display:flex;gap:2px}
 
 
   <!-- ===== 水道光熱費グラフ ===== -->
-  <div class="ch-section" style="margin-top:24px">
+  <div class="ch-section" id="ch-utility-graph" style="margin-top:24px;display:none">
     <div class="ch-section-title">💡 水道光熱費 前年比較</div>
     <div class="ch-card" style="padding:12px">
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">同月比較（棒グラフ）</div>
@@ -2301,6 +2301,9 @@ function renderChallenge(fixedShopKey) {
   });
   var csvBtn = document.getElementById('ch-csv-import-btn');
   if (csvBtn) csvBtn.style.display = adminUnlocked ? 'block' : 'none';
+
+  var utilGraph = document.getElementById('ch-utility-graph');
+  if (utilGraph) utilGraph.style.display = isEnya ? 'block' : 'none';
 
   // Firebase リアルタイム購読 — 既存リスナーを全部切ってから登録
   Object.keys(chListeners).forEach(function(key) {
