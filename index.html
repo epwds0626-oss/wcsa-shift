@@ -2525,11 +2525,22 @@ function parseCSVAuto(text, sep) {
   text = text.replace(/^\uFEFF/, '');
   var lines = text.split(/\r?\n/);
   return lines.filter(function(l){ return l.trim(); }).map(function(l) {
-    return l.split(sep).map(function(f) {
-      f = f.trim();
-      if (f.charAt(0) === '"' && f.charAt(f.length-1) === '"') f = f.slice(1,-1);
-      return f.trim();
-    });
+    var cols = [];
+    var cur = '';
+    var inQ = false;
+    for (var i = 0; i < l.length; i++) {
+      var c = l[i];
+      if (c === '"') {
+        inQ = !inQ; // 引用符はスキップ（curに追加しない）
+      } else if (c === sep && !inQ) {
+        cols.push(cur.trim());
+        cur = '';
+      } else {
+        cur += c;
+      }
+    }
+    cols.push(cur.trim());
+    return cols;
   });
 }
 
