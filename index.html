@@ -2703,6 +2703,26 @@ function processCsvResults(results, shopKey) {
   });
 }
 
+function openPdfMobile(src) {
+  // base64データの場合はBlobに変換してから開く（iOS対応）
+  if (src.startsWith('data:application/pdf;base64,')) {
+    try {
+      var b64 = src.split(',')[1];
+      var binary = atob(b64);
+      var bytes = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      var blob = new Blob([bytes], { type: 'application/pdf' });
+      var url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch(e) {
+      // fallback: そのまま開く
+      window.open(src, '_blank');
+    }
+  } else {
+    window.open(src, '_blank');
+  }
+}
+
 function showToast(msg) {
   var t = document.createElement('div');
   t.textContent = msg;
@@ -2784,7 +2804,7 @@ function renderReportList(shop, reports) {
         '</div>' +
       '</div>' +
       '<div class="ch-report-item-body" id="ch-report-body-' + shop + '_' + i + '">' +
-        '<button class="ch-pdf-open-btn" onclick="window.open(\'' + safeUrl + '\',\'_blank\')">📄 PDFを開く（全画面・ピンチズーム対応）</button>' +
+        '<button class="ch-pdf-open-btn" onclick="openPdfMobile(\'' + safeUrl + '\')">📄 PDFを開く（全画面・ピンチズーム対応）</button>' +
         '<iframe class="ch-report-iframe" src="' + safeUrl + '#toolbar=1&view=FitH" loading="lazy"></iframe>' +
       '</div>' +
     '</div>';
