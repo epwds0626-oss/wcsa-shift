@@ -182,7 +182,16 @@ nav{display:flex;gap:2px}
 .ch-report-item-date{font-size:11px;color:var(--text2)}
 .ch-report-item-body{display:none;border-top:1px solid var(--border)}
 .ch-report-item-body.open{display:block}
-.ch-report-iframe{width:100%;height:75vh;border:none;background:#fff}
+.ch-report-iframe{width:100%;height:80vh;border:none;background:#fff}
+.ch-pdf-open-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;font-size:14px;font-weight:700;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit}
+@media (max-width: 768px) {
+  .ch-report-iframe{display:none}
+  .ch-pdf-open-btn{display:flex}
+}
+@media (min-width: 769px) {
+  .ch-pdf-open-btn{display:none}
+  .ch-report-iframe{display:block}
+}
 .ch-upload-area{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:12px}
 .ch-upload-area:hover{border-color:var(--accent)}
 .ch-upload-area input{display:none}
@@ -2453,26 +2462,67 @@ function handleCsvImport(event) {
   if (!files.length) return;
 
   var shopKey = getChShopKey();
-  var results = { salesFile: null, itemFile: null };
+  // 本店: salesFile(UTF-16 TSV) + itemFile(UTF-16 TSV)
+  // マルコ: marcoSalesFile(CP932 CSV 年間売上) + marcoItemFile(Shift_JIS CSV aggregateMenu)
+  var results = { salesFile: null, itemFile: null, marcoSalesFile: null, marcoItemFile: null };
   var pending = files.length;
 
   files.forEach(function(file) {
     var reader = new FileReader();
     reader.onload = function(e) {
       var buf = e.target.result;
-      var text = decodeCSVBuffer(buf);
-      var rows = parseCSV(text, '\t');
-      if (rows.length < 2) { pending--; if (!pending) processCsvResults(results, shopKey); return; }
+      var arr = new Uint8Array(buf);
 
-      var header = rows[0];
-      // 売上実績CSV判定（「当年実績」列がある）
-      if (header.indexOf('当年実績') !== -1) {
-        results.salesFile = rows;
+      // エンコーディング判定
+      var isUtf16LE = arr[0] === 0xFF && arr[1] === 0xFE;
+      var isUtf16BE = arr[0] === 0xFE && arr[1] === 0xFF;
+
+      if (isUtf16LE || isUtf16BE) {
+        // 本店系（UTF-16）
+        var text = new TextDecoder(isUtf16LE ? 'utf-16le' : 'utf-16be').decode(buf);
+        var rows = parseCSVAuto(text, '\t');
+        if (rows.length >= 2) {
+          var header = rows[0];
+          if (header.indexOf('当年実績') !== -1) results.salesFile = rows;
+          if (header.indexOf('商品名') !== -1 && header.indexOf('売上数量') !== -1) results.itemFile = rows;
+        }
+      } else {
+        // マルコ系（CP932 / Shift_JIS）→ TextDecoderで直接デコード
+        var textRaw;
+        try {
+          textRaw = new TextDecoder('shift_jis').decode(buf);
+        } catch(e) {
+          textRaw = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+        }
+        var rows2 = parseCSVAuto(textRaw, ',');
+        if (rows2.length < 2) { pending--; if (!pending) processCsvResults(results, shopKey); return; }
+
+        var firstCell = rows2[0][0] || '';
+        // 年間売上CSV判定（「年間売上」タイトル or 「対象月」ヘッダー）
+        if (firstCell.indexOf('年間売上') !== -1 || firstCell.indexOf('対象月') !== -1) {
+          results.marcoSalesFile = rows2;
+        } else {
+          // 対象月行を探す
+          for (var k = 0; k < Math.min(rows2.length, 5); k++) {
+            if (rows2[k][0] && rows2[k][0].indexOf('対象月') !== -1) {
+              results.marcoSalesFile = rows2;
+              break;
+            }
+            if (rows2[k][0] && rows2[k][0].indexOf('ABC') !== -1) {
+              results.marcoItemFile = rows2;
+              break;
+            }
+          }
+        }
+        // aggregateMenu判定（ABC列がある）
+        for (var m = 0; m < Math.min(rows2.length, 10); m++) {
+          if (rows2[m][0] === 'ABC' || rows2[m][0] === 'A' || rows2[m][0] === 'B' || rows2[m][0] === 'C') {
+            results.marcoItemFile = rows2;
+            break;
+          }
+        }
       }
-      // 品目別CSV判定（「商品名」「売上数量」列がある）
-      if (header.indexOf('商品名') !== -1 && header.indexOf('売上数量') !== -1) {
-        results.itemFile = rows;
-      }
+
       pending--;
       if (!pending) processCsvResults(results, shopKey);
     };
@@ -2482,36 +2532,31 @@ function handleCsvImport(event) {
 
 function decodeCSVBuffer(buf) {
   var arr = new Uint8Array(buf);
-  // UTF-16 LE BOM check
-  if (arr[0] === 0xFF && arr[1] === 0xFE) {
-    return new TextDecoder('utf-16le').decode(buf);
-  }
-  // UTF-16 BE BOM check
-  if (arr[0] === 0xFE && arr[1] === 0xFF) {
-    return new TextDecoder('utf-16be').decode(buf);
-  }
-  // UTF-8 BOM or plain
+  if (arr[0] === 0xFF && arr[1] === 0xFE) return new TextDecoder('utf-16le').decode(buf);
+  if (arr[0] === 0xFE && arr[1] === 0xFF) return new TextDecoder('utf-16be').decode(buf);
   return new TextDecoder('utf-8').decode(buf);
 }
 
-function parseCSV(text, sep) {
+function parseCSVAuto(text, sep) {
   text = text.replace(/^\uFEFF/, '');
   var lines = text.split(/\r?\n/);
   return lines.filter(function(l){ return l.trim(); }).map(function(l) {
-    // タブで分割してから各フィールドの前後引用符を除去
     return l.split(sep).map(function(f) {
       f = f.trim();
-      if (f.charAt(0) === '"' && f.charAt(f.length - 1) === '"') {
-        f = f.slice(1, -1);
-      }
+      if (f.charAt(0) === '"' && f.charAt(f.length-1) === '"') f = f.slice(1,-1);
       return f.trim();
     });
   });
 }
 
+// 後方互換
+function parseCSV(text, sep) { return parseCSVAuto(text, sep); }
+
 function processCsvResults(results, shopKey) {
-  if (!results.salesFile && !results.itemFile) {
-    alert('対応するCSVが見つかりませんでした。\n売上実績CSVと品目別CSVを選択してください。');
+  var isMarco = shopKey === 'marco';
+  var hasData = results.salesFile || results.itemFile || results.marcoSalesFile || results.marcoItemFile;
+  if (!hasData) {
+    alert('対応するCSVが見つかりませんでした。');
     return;
   }
 
@@ -2520,7 +2565,7 @@ function processCsvResults(results, shopKey) {
   var ts = now.getFullYear() + '/' + (now.getMonth()+1) + '/' + now.getDate() + ' ' +
            String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
-  // === 売上実績CSV ===
+  // ===== 本店: 売上実績CSV (UTF-16 TSV) =====
   if (results.salesFile) {
     var sRows = results.salesFile;
     var sHeader = sRows[0];
@@ -2529,57 +2574,117 @@ function processCsvResults(results, shopKey) {
       if (sRows[i][0] === 'TOTAL') { totalRow = sRows[i]; break; }
     }
     if (totalRow) {
-      var idxSales   = sHeader.indexOf('当年実績');
-      var idxLySales = sHeader.indexOf('前年実績');
-      var idxCust    = sHeader.indexOf('当年客数');
-      var idxAvg     = sHeader.indexOf('当年客単');
-      var idxLyAvg   = sHeader.indexOf('前年客単');
-
-      if (idxSales  !== -1) upd.big_current    = parseInt(totalRow[idxSales].replace(/,/g,'')) || 0;
-      if (idxLySales!== -1) upd.big_base       = parseInt(totalRow[idxLySales].replace(/,/g,'')) || 0;
-      if (idxCust   !== -1) upd.mission_total  = parseInt(totalRow[idxCust].replace(/,/g,'')) || 0;
-      if (idxAvg    !== -1) upd.spot_current   = parseInt(totalRow[idxAvg].replace(/,/g,'')) || 0;
-      if (idxLyAvg  !== -1) upd.spot_base      = parseInt(totalRow[idxLyAvg].replace(/,/g,'')) || 0;
-      upd.big_updated  = ts;
-      upd.spot_updated = ts;
+      var iS  = sHeader.indexOf('当年実績');
+      var iLS = sHeader.indexOf('前年実績');
+      var iC  = sHeader.indexOf('当年客数');
+      var iA  = sHeader.indexOf('当年客単');
+      var iLA = sHeader.indexOf('前年客単');
+      if (iS  !== -1) upd.big_current   = parseInt(totalRow[iS].replace(/,/g,''))  || 0;
+      if (iLS !== -1) upd.big_base      = parseInt(totalRow[iLS].replace(/,/g,'')) || 0;
+      if (iC  !== -1) upd.mission_total = parseInt(totalRow[iC].replace(/,/g,''))  || 0;
+      if (iA  !== -1) upd.spot_current  = parseInt(totalRow[iA].replace(/,/g,''))  || 0;
+      if (iLA !== -1) upd.spot_base     = parseInt(totalRow[iLA].replace(/,/g,'')) || 0;
+      upd.big_updated = ts; upd.spot_updated = ts;
     }
   }
 
-  // === 品目別CSV（デザート集計）===
+  // ===== 本店: 品目別CSV (UTF-16 TSV) =====
   if (results.itemFile) {
     var iRows = results.itemFile;
     var iHeader = iRows[0];
     var idxName = iHeader.indexOf('商品名');
     var idxQty  = iHeader.indexOf('売上数量');
     var idxCat2 = iHeader.indexOf('カテゴリ2');
-
     var dessertTotal = 0;
     for (var j = 1; j < iRows.length; j++) {
       var row = iRows[j];
       if (!row[idxName]) continue;
-      var name = row[idxName].replace(/\u3000/g,' ').replace(/\s+/g,' ').trim();
-      var cat2 = idxCat2 !== -1 ? row[idxCat2] : '';
-
-      // カテゴリ「デザート」OR 商品名マッチ
-      var isDessert = cat2 === 'デザート';
-      if (!isDessert) {
-        isDessert = DESSERT_NAMES.some(function(t) {
-          return name.replace(/\s/g,'').indexOf(t.replace(/\u3000/g,'').replace(/\s/g,'')) !== -1;
-        });
-      }
-      if (isDessert) {
-        var qty = parseInt((row[idxQty] || '0').replace(/,/g,'')) || 0;
-        dessertTotal += qty;
-      }
+      var name = row[idxName].replace(/\u3000/g,' ').trim();
+      var isDessert = (idxCat2 !== -1 && row[idxCat2] === 'デザート') ||
+        DESSERT_NAMES.some(function(t){ return name.replace(/\s/g,'').indexOf(t.replace(/\u3000/g,'').replace(/\s/g,'')) !== -1; });
+      if (isDessert) dessertTotal += parseInt((row[idxQty]||'0').replace(/,/g,'')) || 0;
     }
     upd.mission_dessert = dessertTotal;
     upd.mission_updated = ts;
   }
 
-  if (!db) { alert('Firebase未接続です'); return; }
+  // ===== マルコ: 年間売上CSV =====
+  if (results.marcoSalesFile) {
+    var mRows = results.marcoSalesFile;
+    // 「対象月」ヘッダー行を探す
+    var mHeaderIdx = -1;
+    for (var h = 0; h < mRows.length; h++) {
+      if (mRows[h][0] === '対象月') { mHeaderIdx = h; break; }
+    }
+    if (mHeaderIdx !== -1) {
+      var mHeader = mRows[mHeaderIdx];
+      var idxPureSales = mHeader.indexOf('純売上(税込)');
+      var idxMale      = mHeader.indexOf('男');
+      var idxFemale    = mHeader.indexOf('女');
 
+      // 最新月（合計行の手前）と前月を取得
+      var dataRows = [];
+      for (var d = mHeaderIdx + 1; d < mRows.length; d++) {
+        var r = mRows[d];
+        if (r[0] && r[0] !== '合計' && r[0].indexOf('年') !== -1) dataRows.push(r);
+      }
+      if (dataRows.length >= 1) {
+        var curRow  = dataRows[dataRows.length - 1];
+        var prevRow = dataRows.length >= 2 ? dataRows[dataRows.length - 2] : null;
+
+        var curSales = idxPureSales !== -1 ? parseInt(curRow[idxPureSales].replace(/,/g,''))  || 0 : 0;
+        var curMale  = idxMale   !== -1 ? parseInt(curRow[idxMale].replace(/,/g,''))   || 0 : 0;
+        var curFemale= idxFemale !== -1 ? parseInt(curRow[idxFemale].replace(/,/g,'')) || 0 : 0;
+        var curCust  = curMale + curFemale;
+        var curAvg   = curCust > 0 ? Math.round(curSales / curCust) : 0;
+
+        upd.big_current   = curSales;
+        upd.mission_total = curCust;
+        upd.spot_current  = curAvg;
+        upd.big_updated   = ts;
+        upd.spot_updated  = ts;
+
+        if (prevRow) {
+          var prevSales  = idxPureSales !== -1 ? parseInt(prevRow[idxPureSales].replace(/,/g,''))  || 0 : 0;
+          var prevMale   = idxMale   !== -1 ? parseInt(prevRow[idxMale].replace(/,/g,''))   || 0 : 0;
+          var prevFemale = idxFemale !== -1 ? parseInt(prevRow[idxFemale].replace(/,/g,'')) || 0 : 0;
+          var prevCust   = prevMale + prevFemale;
+          var prevAvg    = prevCust > 0 ? Math.round(prevSales / prevCust) : 0;
+          upd.big_base  = prevSales;
+          upd.spot_base = prevAvg;
+        }
+      }
+    }
+  }
+
+  // ===== マルコ: aggregateMenu CSV =====
+  if (results.marcoItemFile) {
+    var aRows = results.marcoItemFile;
+    // ヘッダー行を探す（ABC,商品名...）
+    var aHeaderIdx = -1;
+    for (var ah = 0; ah < aRows.length; ah++) {
+      if (aRows[ah][0] === 'ABC') { aHeaderIdx = ah; break; }
+    }
+    if (aHeaderIdx !== -1) {
+      var aHeader  = aRows[aHeaderIdx];
+      var aNName   = aHeader.indexOf('商品名');
+      var aNQty    = aHeader.indexOf('出数');
+      var MARCO_DESSERT = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ'];
+      var mDessert = 0;
+      for (var ar = aHeaderIdx + 1; ar < aRows.length; ar++) {
+        var aRow = aRows[ar];
+        if (!aRow[aNName]) continue;
+        var aName = aRow[aNName].replace(/\u3000/g,' ').trim();
+        var isD = MARCO_DESSERT.some(function(t){ return aName.indexOf(t) !== -1; });
+        if (isD) mDessert += parseInt((aRow[aNQty]||'0').replace(/,/g,'')) || 0;
+      }
+      upd.mission_dessert = mDessert;
+      upd.mission_updated = ts;
+    }
+  }
+
+  if (!db) { alert('Firebase未接続です'); return; }
   db.ref('challenge/' + shopKey).update(upd).then(function() {
-    // 成功トースト
     showToast('✅ CSVから更新しました');
   }).catch(function(e) {
     alert('Firebase書き込みエラー: ' + e.message);
@@ -2654,6 +2759,7 @@ function renderReportList(shop, reports) {
   listEl.style.display = 'block';
 
   listEl.innerHTML = reports.map(function(r, i) {
+    var safeUrl = escHtml(r.url);
     return '<div class="ch-report-item">' +
       '<div class="ch-report-item-header" onclick="toggleReportBody(\'' + shop + '_' + i + '\')">' +
         '<div>' +
@@ -2666,7 +2772,8 @@ function renderReportList(shop, reports) {
         '</div>' +
       '</div>' +
       '<div class="ch-report-item-body" id="ch-report-body-' + shop + '_' + i + '">' +
-        '<iframe class="ch-report-iframe" src="' + escHtml(r.url) + '" loading="lazy"></iframe>' +
+        '<button class="ch-pdf-open-btn" onclick="window.open(\'' + safeUrl + '\',\'_blank\')">📄 PDFを開く（全画面・ピンチズーム対応）</button>' +
+        '<iframe class="ch-report-iframe" src="' + safeUrl + '#toolbar=1&view=FitH" loading="lazy"></iframe>' +
       '</div>' +
     '</div>';
   }).join('');
