@@ -2302,6 +2302,19 @@ function checkAdminPass() {
 // ===== CHALLENGE =====
 var chListeners = {};
 
+function getMonthKey() {
+  var now = new Date();
+  return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+}
+
+function getChRef(shopKey) {
+  return db.ref('challenge/' + shopKey + '/' + getMonthKey());
+}
+
+function getIncRef(shopKey) {
+  return db.ref('incentive/' + shopKey + '/' + getMonthKey());
+}
+
 function getChShopKey() {
   return currentShop === 0 ? 'enya' : 'marco';
 }
@@ -2355,15 +2368,18 @@ function renderChallenge(fixedShopKey) {
 
   // Firebase リアルタイム購読 — 既存リスナーを全部切ってから登録
   Object.keys(chListeners).forEach(function(key) {
-    if (chListeners[key]) {
-      db.ref('challenge/' + key).off('value', chListeners[key]);
-      chListeners[key] = null;
+    if (chListeners[key] && chListeners[key].ref) {
+      chListeners[key].ref.off('value', chListeners[key].fn);
     }
+    chListeners[key] = null;
   });
-  chListeners[shopKey] = db.ref('challenge/' + shopKey).on('value', function(snap) {
+  var chRef = getChRef(shopKey);
+  var chFn = function(snap) {
     var d = snap.val() || {};
     updateChallengUI(d, shopKey);
-  });
+  };
+  chRef.on('value', chFn);
+  chListeners[shopKey] = { ref: chRef, fn: chFn };
 }
 
 function updateChallengUI(d, shopKey) {
@@ -2505,7 +2521,7 @@ function saveChallengeData(type) {
     upd = { spot_current: sc, spot_base: sb, spot_updated: ts };
   }
 
-  db.ref('challenge/' + shopKey).update(upd).then(function() {
+  getChRef(shopKey).update(upd).then(function() {
     // Firebase onValue が自動で画面更新するので何もしなくてOK
   });
 }
@@ -2558,7 +2574,7 @@ function handleIncentiveCsv(event) {
     var now = new Date();
     var ts = now.getFullYear() + '/' + (now.getMonth()+1) + '/' + now.getDate();
 
-    db.ref('incentive/' + shopKey).set({
+    getIncRef(shopKey).set({
       staff: staff,
       updated: ts
     }).then(function() {
@@ -2643,7 +2659,7 @@ function renderIncentive(shopKey) {
 
   // Firebaseから勤怠データ取得
   if (!db) return;
-  db.ref('incentive/' + shopKey).once('value', function(snap) {
+  getIncRef(shopKey).once('value', function(snap) {
     var d = snap.val();
     var poolEl   = document.getElementById('ch-inc-pool');
     var noteEl   = document.getElementById('ch-inc-note');
@@ -2927,7 +2943,7 @@ function processCsvResults(results, shopKey) {
   }
 
   if (!db) { alert('Firebase未接続です'); return; }
-  db.ref('challenge/' + shopKey).update(upd).then(function() {
+  getChRef(shopKey).update(upd).then(function() {
     showToast('✅ CSVから更新しました');
     renderChallenge(shopKey);
   }).catch(function(e) {
