@@ -2679,10 +2679,7 @@ function processCsvResults(results, shopKey) {
   }
 
   if (!db) { alert('Firebase未接続です'); return; }
-  // 既存データをクリアしてから書き込む（誤データ上書き防止）
-  db.ref('challenge/' + shopKey).remove().then(function() {
-    return db.ref('challenge/' + shopKey).update(upd);
-  }).then(function() {
+  db.ref('challenge/' + shopKey).update(upd).then(function() {
     showToast('✅ CSVから更新しました');
     renderChallenge(shopKey);
   }).catch(function(e) {
