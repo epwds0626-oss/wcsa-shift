@@ -394,7 +394,15 @@ nav{display:flex;gap:2px}
   <!-- ===== チャレンジタブ ===== -->
   <div id="chtab-content-challenge">
     <div class="page-header" style="margin-bottom:16px;margin-top:12px">
-      <div class="page-title" style="font-size:20px">🏆 <span id="chPageShopName">本店</span> <span style="font-size:14px;font-weight:500;color:var(--text2)" id="chPageMonth"></span></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="page-title" style="font-size:18px">🏆 <span id="chPageShopName">本店</span></div>
+        <!-- 月切替ナビ -->
+        <div style="display:flex;align-items:center;gap:4px;background:var(--surface2);border-radius:8px;padding:3px 6px">
+          <button onclick="chMonthStep(-1)" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text2);padding:2px 4px">‹</button>
+          <span id="chPageMonth" style="font-size:13px;font-weight:700;color:var(--text);min-width:80px;text-align:center"></span>
+          <button id="chMonthNext" onclick="chMonthStep(1)" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text2);padding:2px 4px">›</button>
+        </div>
+      </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn btn-s" style="font-size:11px;padding:5px 12px" onclick="renderChallenge(getChShopKey())">🔄 更新</button>
         <div id="ch-csv-import-btn" style="display:none">
@@ -2048,6 +2056,7 @@ function switchMode(mode, shopIdx) {
     document.getElementById('modeChallenge').style.cssText = 'background:var(--accent);color:#0a0a0f';
     // タブをチャレンジにリセット
     switchChTab('challenge');
+    chMonthOffset = 0;
     var chShopKey = (shopIdx !== undefined ? shopIdx : currentShop) === 0 ? 'enya' : 'marco';
     renderChallenge(chShopKey);
 
@@ -2083,6 +2092,7 @@ function switchShop(idx) {
   // チャレンジモード中なら再レンダー
   var chBtn = document.getElementById('modeChallenge');
   if (chBtn && chBtn.classList.contains('active')) {
+    chMonthOffset = 0; // 店舗切替時は今月に戻す
     renderChallenge(SHOPS[idx].dbKey === 'wcsa' ? 'enya' : 'marco');
   }
   // Reload data from Firebase for this shop
@@ -2301,10 +2311,19 @@ function checkAdminPass() {
 
 // ===== CHALLENGE =====
 var chListeners = {};
+var chMonthOffset = 0; // 0=今月, -1=先月, -2=2ヶ月前
 
-function getMonthKey() {
+function getMonthKey(offset) {
   var now = new Date();
-  return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  var d = new Date(now.getFullYear(), now.getMonth() + (offset || chMonthOffset), 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function chMonthStep(dir) {
+  var newOffset = chMonthOffset + dir;
+  if (newOffset > 0) return; // 未来には進めない
+  chMonthOffset = newOffset;
+  renderChallenge(getChShopKey());
 }
 
 function getChRef(shopKey) {
@@ -2335,10 +2354,21 @@ function renderChallenge(fixedShopKey) {
   }
   var shopName = shopKey === 'enya' ? '本店' : 'マルコ';
   var now = new Date();
-  var monthStr = now.getFullYear() + '年' + (now.getMonth()+1) + '月';
+  var d = new Date(now.getFullYear(), now.getMonth() + chMonthOffset, 1);
+  var monthStr = d.getFullYear() + '年' + (d.getMonth() + 1) + '月';
+  var isCurrentMonth = chMonthOffset === 0;
 
   document.getElementById('chPageShopName').textContent = shopName;
   document.getElementById('chPageMonth').textContent = monthStr;
+  // 今月なら「›」ボタンを非活性
+  var nextBtn = document.getElementById('chMonthNext');
+  if (nextBtn) {
+    nextBtn.style.opacity = isCurrentMonth ? '0.3' : '1';
+    nextBtn.style.pointerEvents = isCurrentMonth ? 'none' : 'auto';
+  }
+  // 過去月は CSV更新ボタンを非表示
+  var csvBtn = document.getElementById('ch-csv-import-btn');
+  if (csvBtn) csvBtn.style.display = (adminUnlocked && isCurrentMonth) ? 'block' : 'none';
 
   // 本店は前年比、マルコは前月比
   var isEnya = shopKey === 'enya';
@@ -2355,13 +2385,12 @@ function renderChallenge(fixedShopKey) {
   var spotBaseLabelEl = document.getElementById('ch-spot-base-label');
   if (spotBaseLabelEl) spotBaseLabelEl.textContent = spotBaseLabel;
 
-  // 管理者編集フォーム表示切替
+  // 管理者編集フォーム表示切替（今月のみ）
+  var showAdmin = adminUnlocked && isCurrentMonth;
   ['big','mission','spot'].forEach(function(k) {
     var el = document.getElementById('ch-' + k + '-edit');
-    if (el) el.style.display = adminUnlocked ? 'flex' : 'none';
+    if (el) el.style.display = showAdmin ? 'flex' : 'none';
   });
-  var csvBtn = document.getElementById('ch-csv-import-btn');
-  if (csvBtn) csvBtn.style.display = adminUnlocked ? 'block' : 'none';
 
   var utilGraph = document.getElementById('ch-utility-graph');
   if (utilGraph) utilGraph.style.display = isEnya ? 'block' : 'none';
