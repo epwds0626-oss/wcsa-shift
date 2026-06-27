@@ -2266,7 +2266,7 @@ function renderChallenge(fixedShopKey) {
   var bigTitleEl = document.getElementById('ch-big-title');
   if (bigTitleEl) bigTitleEl.textContent = bigTitleText;
   var spotTitleEl = document.getElementById('ch-spot-title');
-  if (spotTitleEl) spotTitleEl.innerHTML = '客単価 ' + (isEnya ? '前年比' : '前月比') + ' <strong style="color:var(--accent3)">+10%</strong> チャレンジ';
+  if (spotTitleEl) spotTitleEl.innerHTML = '客単価 ' + (isEnya ? '前年比 <strong style="color:var(--accent3)">+10%</strong> チャレンジ' : '前月比 <strong style="color:var(--accent3)">プラス</strong> チャレンジ');
   var bigBaseLabelEl = document.getElementById('ch-big-base-label');
   if (bigBaseLabelEl) bigBaseLabelEl.textContent = bigBaseLabel;
   var spotBaseLabelEl = document.getElementById('ch-spot-base-label');
@@ -2286,11 +2286,12 @@ function renderChallenge(fixedShopKey) {
   }
   chListeners[shopKey] = db.ref('challenge/' + shopKey).on('value', function(snap) {
     var d = snap.val() || {};
-    updateChallengUI(d);
+    updateChallengUI(d, shopKey);
   });
 }
 
-function updateChallengUI(d) {
+function updateChallengUI(d, shopKey) {
+  var isMarco = shopKey === 'marco';
   // === BIG ===
   var bigCurrent = d.big_current || 0;
   var bigBase = d.big_base || 0;
@@ -2372,25 +2373,32 @@ function updateChallengUI(d) {
   // === SPOT (客単価) ===
   var sCurrent = d.spot_current || 0;
   var sBase = d.spot_base || 0;
-  var sTarget = sBase > 0 ? Math.round(sBase * 1.1) : 0;
-  // 前年比アップ率で表示（目標+10%超え）
+  var sTarget = sBase > 0 ? Math.round(sBase * (isMarco ? 1.0 : 1.1)) : 0;
+  // アップ率で表示（マルコ:前月比プラスで達成、本店:前年比+10%で達成）
   var sUpRate = sBase > 0 ? Math.round((sCurrent - sBase) / sBase * 1000) / 10 : 0;
-  var sAchieved = sUpRate >= 10;
-  var sBarPct = sBase > 0 ? Math.min(Math.max(sUpRate / 10 * 100, 0), 100) : 0;
+  var sThreshold = isMarco ? 0 : 10;
+  var sAchieved = sUpRate > sThreshold || (isMarco && sUpRate >= 0 && sBase > 0);
+  var sBarPct = sBase > 0 ? Math.min(Math.max(isMarco ? (sUpRate > 0 ? 100 : Math.max(0, (sUpRate + 10) / 10 * 100)) : sUpRate / 10 * 100, 0), 100) : 0;
+  var sGoalLabel = isMarco ? '前月比アップ' : '前年比アップ';
+  var sGoalText  = isMarco ? '前月比プラス' : '前年比+10%';
 
   document.getElementById('ch-spot-current').textContent = fmtYen(sCurrent);
-  document.getElementById('ch-spot-target').textContent = fmtYen(sTarget);
+  document.getElementById('ch-spot-target').textContent = isMarco ? '前月超え' : fmtYen(sTarget);
   document.getElementById('ch-spot-pct').textContent = (sUpRate >= 0 ? '+' : '') + sUpRate + '%';
   var sLabelEl = document.getElementById('ch-spot-pct').nextElementSibling;
-  if (sLabelEl) sLabelEl.textContent = '前年比アップ';
+  if (sLabelEl) sLabelEl.textContent = sGoalLabel;
   document.getElementById('ch-spot-bar').style.width = sBarPct + '%';
-  document.getElementById('ch-spot-bar').style.background = sAchieved ? '#006b3a' : sUpRate >= 7 ? 'var(--accent)' : 'var(--accent3)';
+  document.getElementById('ch-spot-bar').style.background = sAchieved ? '#006b3a' : sUpRate >= (isMarco ? -3 : 7) ? 'var(--accent)' : 'var(--accent3)';
   var sRemainEl = document.getElementById('ch-spot-remain');
   if (sAchieved) {
     sRemainEl.innerHTML = '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>';
   } else if (sBase > 0) {
-    var sGap = (10 - sUpRate).toFixed(1);
-    sRemainEl.innerHTML = '目標+10%まで あと <strong>+' + sGap + '%</strong>（¥' + fmtYen(sTarget - sCurrent) + '）';
+    if (isMarco) {
+      sRemainEl.innerHTML = '前月（¥' + fmtYen(sBase) + '）を超えれば達成 あと <strong>¥' + fmtYen(Math.max(0, sBase - sCurrent + 1)) + '</strong>';
+    } else {
+      var sGap = (10 - sUpRate).toFixed(1);
+      sRemainEl.innerHTML = '目標+10%まで あと <strong>+' + sGap + '%</strong>（¥' + fmtYen(sTarget - sCurrent) + '）';
+    }
   } else {
     sRemainEl.textContent = '基準値を入力してください';
   }
