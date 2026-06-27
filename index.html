@@ -2757,10 +2757,10 @@ function renderReportTab(shop) {
     if (adminUnlocked) {
       adminTools.innerHTML =
         '<label class="ch-upload-area" style="margin:0;padding:8px 14px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent);border:1px solid var(--accent);cursor:pointer">' +
-        '📎 PDFを追加' +
-        '<input type="file" accept="application/pdf" onchange="uploadReport(event,\'' + shop + '\')">' +
+        '📷 画像を追加（JPEG/PNG）' +
+        '<input type="file" accept="image/jpeg,image/png,image/jpg" onchange="uploadReport(event,\'' + shop + '\')" style="display:none">' +
         '</label>';
-      if (hint) hint.textContent = '管理者：上のボタンからPDFをアップロードしてください';
+      if (hint) hint.textContent = '管理者：上のボタンから週次レポートの画像をアップロードしてください';
     } else {
       adminTools.innerHTML = '';
       if (hint) hint.textContent = '';
@@ -2804,8 +2804,7 @@ function renderReportList(shop, reports) {
         '</div>' +
       '</div>' +
       '<div class="ch-report-item-body" id="ch-report-body-' + shop + '_' + i + '">' +
-        '<button class="ch-pdf-open-btn" onclick="openPdfMobile(\'' + safeUrl + '\')">📄 PDFを開く（全画面・ピンチズーム対応）</button>' +
-        '<iframe class="ch-report-iframe" src="' + safeUrl + '#toolbar=1&view=FitH" loading="lazy"></iframe>' +
+        '<img src="' + safeUrl + '" style="width:100%;display:block;border-radius:0 0 12px 12px" loading="lazy">' +
       '</div>' +
     '</div>';
   }).join('');
@@ -2824,14 +2823,12 @@ function uploadReport(event, shop) {
   if (!file) return;
   if (!db) return;
 
-  // PDFをbase64に変換してFirebaseに保存
   var reader = new FileReader();
   reader.onload = function(e) {
-    var base64 = e.target.result; // data:application/pdf;base64,...
+    var base64 = e.target.result; // data:image/jpeg;base64,...
     var now = new Date();
     var dateLabel = now.getFullYear() + '/' + (now.getMonth()+1) + '/' + now.getDate();
-    // ファイル名からタイトル生成
-    var title = file.name.replace(/\.pdf$/i, '').replace(/_/g,' ');
+    var title = file.name.replace(/\.(jpg|jpeg|png)$/i, '').replace(/_/g,' ');
     var key = db.ref('reports/' + shop).push().key;
     db.ref('reports/' + shop + '/' + key).set({
       title: title,
