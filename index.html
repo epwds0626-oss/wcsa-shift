@@ -134,6 +134,59 @@ nav{display:flex;gap:2px}
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ===== CHALLENGE PAGE ===== */
+.ch-section{margin-bottom:20px}
+.ch-section-title{font-size:11px;font-weight:700;letter-spacing:3px;color:var(--accent);padding:4px 0 4px 10px;border-left:3px solid var(--accent);margin-bottom:12px}
+.ch-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 18px 14px;margin-bottom:10px;position:relative;overflow:hidden}
+.ch-card-label{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text2);margin-bottom:6px;text-transform:uppercase}
+.ch-card-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:12px;line-height:1.3}
+.ch-bar-wrap{background:var(--surface2);border-radius:100px;height:14px;overflow:hidden;margin-bottom:8px;position:relative}
+.ch-bar{height:100%;border-radius:100px;transition:width 0.8s cubic-bezier(.4,0,.2,1);min-width:4px;position:relative}
+.ch-bar::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.25) 50%,transparent 100%);animation:ch-shimmer 2s infinite;}
+@keyframes ch-shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
+.ch-nums{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--text2);margin-bottom:4px}
+.ch-current{font-size:22px;font-weight:900;color:var(--text)}
+.ch-current span{font-size:12px;font-weight:500;color:var(--text2);margin-left:2px}
+.ch-pct{font-size:28px;font-weight:900;line-height:1}
+.ch-remain{font-size:12px;color:var(--text2);margin-top:2px}
+.ch-remain strong{color:var(--accent3)}
+.ch-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.ch-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:1px}
+.ch-badge-big{background:rgba(176,125,0,0.15);color:var(--accent);border:1px solid rgba(176,125,0,0.3)}
+.ch-badge-week{background:rgba(26,95,160,0.12);color:var(--accent2);border:1px solid rgba(26,95,160,0.25)}
+.ch-badge-spot{background:rgba(192,0,26,0.1);color:var(--accent3);border:1px solid rgba(192,0,26,0.2)}
+.ch-glow{position:absolute;top:-30px;right:-30px;width:100px;height:100px;border-radius:50%;opacity:0.06;pointer-events:none}
+.ch-status-ok{color:#006b3a;font-weight:700;font-size:12px}
+.ch-status-warn{color:var(--accent3);font-weight:700;font-size:12px}
+.ch-update-row{display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap;align-items:flex-end}
+.ch-inp{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-family:inherit;font-size:13px;outline:none;width:140px}
+.ch-inp:focus{border-color:var(--accent)}
+.ch-update-label{font-size:10px;color:var(--text2);margin-bottom:3px}
+.ch-lastupdate{font-size:10px;color:var(--text2);margin-top:6px}
+.ch-complete-badge{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#006b3a,#009955);color:#fff;padding:4px 12px;border-radius:100px;font-size:11px;font-weight:700;letter-spacing:1px;animation:ch-pop 0.4s ease}
+@keyframes ch-pop{0%{transform:scale(0.8)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
+
+/* ===== CHALLENGE TABS ===== */
+.ch-tab-bar{display:flex;gap:4px;padding:10px 16px 0;background:var(--bg);border-bottom:2px solid var(--border);position:sticky;top:0;z-index:10;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+.ch-tab{background:none;border:none;border-bottom:3px solid transparent;padding:8px 14px;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s;margin-bottom:-2px}
+.ch-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.ch-tab:hover{color:var(--text)}
+
+/* ===== REPORT TAB ===== */
+.ch-report-wrap{padding:4px 0}
+.ch-report-empty{text-align:center;padding:60px 20px;color:var(--text2)}
+.ch-report-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.ch-report-item-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;gap:8px}
+.ch-report-item-title{font-size:14px;font-weight:700;color:var(--text)}
+.ch-report-item-date{font-size:11px;color:var(--text2)}
+.ch-report-item-body{display:none;border-top:1px solid var(--border)}
+.ch-report-item-body.open{display:block}
+.ch-report-iframe{width:100%;height:75vh;border:none;background:#fff}
+.ch-upload-area{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:12px}
+.ch-upload-area:hover{border-color:var(--accent)}
+.ch-upload-area input{display:none}
+
 </style>
 </head>
 <body>
@@ -166,6 +219,7 @@ nav{display:flex;gap:2px}
     <div class="shop-switch" style="margin-left:6px">
       <button class="shop-btn active" id="modeShift" onclick="switchMode('shift')" style="background:var(--accent);color:#0a0a0f">シフト</button>
       <button class="shop-btn" id="modeMusubu" onclick="switchMode('musubu')">Musubu</button>
+      <button class="shop-btn" id="modeChallenge" onclick="switchMode('challenge', currentShop)">🏆</button>
     </div>
     <nav style="margin-left:auto;flex-shrink:0;">
       <button class="nav-btn active" id="nav0" onclick="showPage('calendar')">カレンダー</button>
@@ -311,6 +365,177 @@ nav{display:flex;gap:2px}
 </div>
 
 <!-- ADMIN LOCK -->
+<!-- CHALLENGE -->
+<div class="page" id="page-challenge">
+
+  <!-- タブバー -->
+  <div class="ch-tab-bar">
+    <button class="ch-tab active" id="chtab-challenge" onclick="switchChTab('challenge')">🏆 チャレンジ</button>
+    <button class="ch-tab" id="chtab-enya" onclick="switchChTab('enya')">📊 本店</button>
+    <button class="ch-tab" id="chtab-marco" onclick="switchChTab('marco')">📊 マルコ</button>
+  </div>
+
+  <!-- ===== チャレンジタブ ===== -->
+  <div id="chtab-content-challenge">
+    <div class="page-header" style="margin-bottom:16px;margin-top:12px">
+      <div class="page-title" style="font-size:20px">🏆 <span id="chPageShopName">本店</span> <span style="font-size:14px;font-weight:500;color:var(--text2)" id="chPageMonth"></span></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-s" style="font-size:11px;padding:5px 12px" onclick="renderChallenge(getChShopKey())">🔄 更新</button>
+        <div id="ch-csv-import-btn" style="display:none">
+          <label style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;border:1px solid var(--accent);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">
+            📂 CSVから更新
+            <input type="file" accept=".csv" multiple style="display:none" onchange="handleCsvImport(event)">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="ch-section">
+      <div class="ch-section-title">🔴 MONTHLY BIG CHALLENGE</div>
+      <div class="ch-card" id="ch-big-card">
+        <div class="ch-glow" id="ch-big-glow" style="background:var(--accent)"></div>
+        <div class="ch-top">
+          <div>
+            <div class="ch-card-label">月間売上（税込）</div>
+            <div class="ch-card-title" id="ch-big-title">前年比 120% 達成チャレンジ</div>
+          </div>
+          <div class="ch-badge ch-badge-big" id="ch-big-status-badge">TEAM</div>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px">
+          <div>
+            <div style="font-size:10px;color:var(--text2);margin-bottom:2px">今月実績</div>
+            <div class="ch-current">¥<span id="ch-big-current">0</span><span>円</span></div>
+          </div>
+          <div style="font-size:18px;color:var(--border)">／</div>
+          <div>
+            <div style="font-size:10px;color:var(--text2);margin-bottom:2px">目標</div>
+            <div class="ch-current" style="color:var(--accent)">¥<span id="ch-big-target">0</span><span>円</span></div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div class="ch-pct" id="ch-big-pct" style="color:var(--accent)">0%</div>
+            <div style="font-size:10px;color:var(--text2)">達成率</div>
+          </div>
+        </div>
+        <div class="ch-bar-wrap"><div class="ch-bar" id="ch-big-bar" style="width:0%;background:var(--accent)"></div></div>
+        <div class="ch-remain" id="ch-big-remain">目標まで <strong>¥—</strong></div>
+        <div class="ch-lastupdate" id="ch-big-lastupdate"></div>
+        <div class="ch-update-row" id="ch-big-edit" style="display:none">
+          <div><div class="ch-update-label">今月実績（税込）</div><input class="ch-inp" type="number" id="ch-big-inp-current" placeholder="例: 2500000"></div>
+          <div><div class="ch-update-label" id="ch-big-base-label">比較基準（前年同月）</div><input class="ch-inp" type="number" id="ch-big-inp-base" placeholder="例: 2200000"></div>
+          <button class="btn btn-y" onclick="saveChallengeData('big')">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ch-section">
+      <div class="ch-section-title">🟡 MONTHLY MISSION</div>
+      <div class="ch-card" id="ch-mission-card">
+        <div class="ch-glow" style="background:var(--accent2)"></div>
+        <div class="ch-top">
+          <div>
+            <div class="ch-card-label">デザート出数率</div>
+            <div class="ch-card-title">デザート注文率 <strong style="color:var(--accent2)">30%</strong> 超えチャレンジ</div>
+          </div>
+          <div class="ch-badge ch-badge-week">TEAM</div>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px">
+          <div>
+            <div style="font-size:10px;color:var(--text2);margin-bottom:2px">デザート注文数</div>
+            <div class="ch-current"><span id="ch-mission-dessert">0</span><span>食</span></div>
+          </div>
+          <div style="font-size:18px;color:var(--border)">／</div>
+          <div>
+            <div style="font-size:10px;color:var(--text2);margin-bottom:2px">総客数</div>
+            <div class="ch-current"><span id="ch-mission-total">0</span><span>人</span></div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div class="ch-pct" id="ch-mission-pct" style="color:var(--accent2)">0%</div>
+            <div style="font-size:10px;color:var(--text2)">出数率</div>
+          </div>
+        </div>
+        <div class="ch-bar-wrap"><div class="ch-bar" id="ch-mission-bar" style="width:0%;background:var(--accent2)"></div></div>
+        <div class="ch-remain" id="ch-mission-remain">目標 <strong>30%</strong> まで <strong id="ch-mission-gap">—%</strong></div>
+        <div class="ch-lastupdate" id="ch-mission-lastupdate"></div>
+        <div class="ch-update-row" id="ch-mission-edit" style="display:none">
+          <div><div class="ch-update-label">デザート注文数（今月）</div><input class="ch-inp" type="number" id="ch-mission-inp-dessert" placeholder="例: 180"></div>
+          <div><div class="ch-update-label">総客数（今月）</div><input class="ch-inp" type="number" id="ch-mission-inp-total" placeholder="例: 520"></div>
+          <button class="btn btn-y" onclick="saveChallengeData('mission')">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ch-section">
+      <div class="ch-section-title">🟢 SPOT CHALLENGE</div>
+      <div class="ch-card" id="ch-spot-card">
+        <div class="ch-glow" style="background:var(--accent3)"></div>
+        <div class="ch-top">
+          <div>
+            <div class="ch-card-label">客単価</div>
+            <div class="ch-card-title" id="ch-spot-title">客単価 前年比 <strong style="color:var(--accent3)">+10%</strong> チャレンジ</div>
+          </div>
+          <div class="ch-badge ch-badge-spot">PERSONAL</div>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px">
+          <div>
+            <div style="font-size:10px;color:var(--text2);margin-bottom:2px">今月平均客単価</div>
+            <div class="ch-current">¥<span id="ch-spot-current">0</span></div>
+          </div>
+          <div style="font-size:18px;color:var(--border)">／</div>
+          <div>
+            <div style="font-size:10px;color:var(--text2);margin-bottom:2px">目標単価</div>
+            <div class="ch-current" style="color:var(--accent3)">¥<span id="ch-spot-target">0</span></div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div class="ch-pct" id="ch-spot-pct" style="color:var(--accent3)">0%</div>
+            <div style="font-size:10px;color:var(--text2)">達成率</div>
+          </div>
+        </div>
+        <div class="ch-bar-wrap"><div class="ch-bar" id="ch-spot-bar" style="width:0%;background:var(--accent3)"></div></div>
+        <div class="ch-remain" id="ch-spot-remain"></div>
+        <div class="ch-lastupdate" id="ch-spot-lastupdate"></div>
+        <div class="ch-update-row" id="ch-spot-edit" style="display:none">
+          <div><div class="ch-update-label">今月平均客単価（税込）</div><input class="ch-inp" type="number" id="ch-spot-inp-current" placeholder="例: 1150"></div>
+          <div><div class="ch-update-label" id="ch-spot-base-label">比較基準（前年同月）</div><input class="ch-inp" type="number" id="ch-spot-inp-base" placeholder="例: 1050"></div>
+          <button class="btn btn-y" onclick="saveChallengeData('spot')">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 本店レポートタブ ===== -->
+  <div id="chtab-content-enya" style="display:none">
+    <div class="page-header" style="margin-bottom:16px;margin-top:12px">
+      <div class="page-title" style="font-size:20px">📊 本店 週次レポート</div>
+      <div style="display:flex;gap:8px;align-items:center" id="ch-enya-admin-tools"></div>
+    </div>
+    <div id="ch-report-enya-wrap" class="ch-report-wrap">
+      <div class="ch-report-empty" id="ch-report-enya-empty">
+        <div style="font-size:40px;margin-bottom:12px">📄</div>
+        <div style="font-size:14px;color:var(--text2);margin-bottom:6px">レポートがまだ登録されていません</div>
+        <div style="font-size:12px;color:var(--text2)" id="ch-enya-hint"></div>
+      </div>
+      <div id="ch-report-enya-list" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ===== マルコレポートタブ ===== -->
+  <div id="chtab-content-marco" style="display:none">
+    <div class="page-header" style="margin-bottom:16px;margin-top:12px">
+      <div class="page-title" style="font-size:20px">📊 マルコ 週次レポート</div>
+      <div style="display:flex;gap:8px;align-items:center" id="ch-marco-admin-tools"></div>
+    </div>
+    <div id="ch-report-marco-wrap" class="ch-report-wrap">
+      <div class="ch-report-empty" id="ch-report-marco-empty">
+        <div style="font-size:40px;margin-bottom:12px">📄</div>
+        <div style="font-size:14px;color:var(--text2);margin-bottom:6px">レポートがまだ登録されていません</div>
+        <div style="font-size:12px;color:var(--text2)" id="ch-marco-hint"></div>
+      </div>
+      <div id="ch-report-marco-list" style="display:none"></div>
+    </div>
+  </div>
+
+</div>
+
 <div class="page" id="page-admin-lock">
   <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;gap:20px">
     <div style="font-size:52px">🔐</div>
@@ -1696,10 +1921,17 @@ var SHOPS = [
 ];
 var currentShop = 0;
 
-function switchMode(mode) {
+function switchMode(mode, shopIdx) {
   var musubuWrapper = document.getElementById('musubu-wrapper');
   var headerNav = document.querySelector('nav');
   var pdfBtn = document.querySelector('.pdf-btn');
+
+  // 全モードボタンをリセット
+  ['modeShift','modeMusubu','modeChallenge'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.className = 'shop-btn'; el.style.cssText = ''; }
+  });
+
   if (mode === 'musubu') {
     if (musubuWrapper) {
       var header = document.getElementById('main-header');
@@ -1712,7 +1944,6 @@ function switchMode(mode) {
       musubuWrapper.style.height = (window.innerHeight - hh) + 'px';
       musubuWrapper.style.zIndex = '50';
       musubuWrapper.style.display = 'block';
-      // iPad/Safari: レイアウト強制再計算
       musubuWrapper.style.webkitTransform = 'translateZ(0)';
       setTimeout(function() {
         var app = document.getElementById('musubu-app');
@@ -1726,25 +1957,43 @@ function switchMode(mode) {
     document.getElementById('page-wish').style.display = 'none';
     document.getElementById('page-admin').style.display = 'none';
     document.getElementById('page-admin-lock').style.display = 'none';
+    document.getElementById('page-challenge').style.display = 'none';
     if (headerNav) headerNav.style.display = 'none';
     if (pdfBtn) pdfBtn.style.display = 'none';
-    document.getElementById('modeShift').className = 'shop-btn';
-    document.getElementById('modeShift').style.cssText = '';
     document.getElementById('modeMusubu').className = 'shop-btn active';
     document.getElementById('modeMusubu').style.cssText = 'background:var(--accent);color:#ffffff';
     if (typeof initMusubu === 'function') initMusubu();
+
+  } else if (mode === 'challenge') {
+    if (musubuWrapper) musubuWrapper.style.display = 'none';
+    document.getElementById('page-calendar').style.display = 'none';
+    document.getElementById('page-wish').style.display = 'none';
+    document.getElementById('page-admin').style.display = 'none';
+    document.getElementById('page-admin-lock').style.display = 'none';
+    document.getElementById('page-challenge').style.display = 'block';
+    document.getElementById('page-challenge').classList.add('active');
+    if (headerNav) headerNav.style.display = 'none';
+    if (pdfBtn) pdfBtn.style.display = 'none';
+    document.getElementById('modeChallenge').className = 'shop-btn active';
+    document.getElementById('modeChallenge').style.cssText = 'background:var(--accent);color:#0a0a0f';
+    // タブをチャレンジにリセット
+    switchChTab('challenge');
+    var chShopKey = (shopIdx !== undefined ? shopIdx : currentShop) === 0 ? 'enya' : 'marco';
+    renderChallenge(chShopKey);
+
   } else {
+    // shift
     if (musubuWrapper) musubuWrapper.style.display = 'none';
     document.getElementById('page-calendar').style.display = '';
     document.getElementById('page-wish').style.display = '';
     document.getElementById('page-admin').style.display = '';
     document.getElementById('page-admin-lock').style.display = '';
+    document.getElementById('page-challenge').style.display = 'none';
+    document.getElementById('page-challenge').classList.remove('active');
     if (headerNav) headerNav.style.display = '';
     if (pdfBtn) pdfBtn.style.display = '';
     document.getElementById('modeShift').className = 'shop-btn active';
     document.getElementById('modeShift').style.cssText = 'background:var(--accent);color:#ffffff';
-    document.getElementById('modeMusubu').className = 'shop-btn';
-    document.getElementById('modeMusubu').style.cssText = '';
     showPage('calendar');
   }
 }
@@ -1761,6 +2010,11 @@ function switchShop(idx) {
   // Update logo subtitle
   var small = document.querySelector('.logo small');
   if (small) small.textContent = SHOPS[idx].name === '本店' ? 'SHIFT MANAGEMENT' : 'PASTA MARCO';
+  // チャレンジモード中なら再レンダー
+  var chBtn = document.getElementById('modeChallenge');
+  if (chBtn && chBtn.classList.contains('active')) {
+    renderChallenge(SHOPS[idx].dbKey === 'wcsa' ? 'enya' : 'marco');
+  }
   // Reload data from Firebase for this shop
   loadS();
 }
@@ -1942,7 +2196,8 @@ function showPage(p) {
   var i;
   for (i = 0; i < pages.length; i++) {
     document.getElementById('page-' + pages[i]).classList.remove('active');
-    document.getElementById('nav' + i).classList.remove('active');
+    var nb = document.getElementById('nav' + i);
+    if (nb) nb.classList.remove('active');
   }
   document.getElementById('page-admin-lock').classList.remove('active');
 
@@ -1954,7 +2209,7 @@ function showPage(p) {
 
   document.getElementById('page-' + p).classList.add('active');
   for (i = 0; i < pages.length; i++) {
-    if (pages[i] === p) document.getElementById('nav' + i).classList.add('active');
+    if (pages[i] === p) { var nb2 = document.getElementById('nav' + i); if(nb2) nb2.classList.add('active'); }
   }
   if (p === 'calendar') renderCal();
   if (p === 'wish') renderWishPage();
@@ -1972,6 +2227,489 @@ function checkAdminPass() {
   } else {
     document.getElementById('passError').style.display = 'block';
   }
+}
+
+// ===== CHALLENGE =====
+var chListeners = {};
+
+function getChShopKey() {
+  return currentShop === 0 ? 'enya' : 'marco';
+}
+
+function fmtYen(n) {
+  if (!n && n !== 0) return '—';
+  return Number(n).toLocaleString('ja-JP');
+}
+
+function renderChallenge(fixedShopKey) {
+  var shopKey = fixedShopKey || getChShopKey();
+  // dbが未初期化なら初期化してから進む
+  if (!db) { initFirebase(); }
+  if (!db) {
+    // それでもnullなら300ms後にリトライ（shopKey固定）
+    setTimeout(function(){ renderChallenge(shopKey); }, 300);
+    return;
+  }
+  var shopName = shopKey === 'enya' ? '本店' : 'マルコ';
+  var now = new Date();
+  var monthStr = now.getFullYear() + '年' + (now.getMonth()+1) + '月';
+
+  document.getElementById('chPageShopName').textContent = shopName;
+  document.getElementById('chPageMonth').textContent = monthStr;
+
+  // 本店は前年比、マルコは前月比
+  var isEnya = shopKey === 'enya';
+  var bigBaseLabel = isEnya ? '比較基準（前年同月）' : '比較基準（前月）';
+  var spotBaseLabel = isEnya ? '比較基準（前年同月）' : '比較基準（前月）';
+  var bigTitleText = isEnya ? '前年比 120% 達成チャレンジ' : '前月比 120% 達成チャレンジ';
+
+  var bigTitleEl = document.getElementById('ch-big-title');
+  if (bigTitleEl) bigTitleEl.textContent = bigTitleText;
+  var spotTitleEl = document.getElementById('ch-spot-title');
+  if (spotTitleEl) spotTitleEl.innerHTML = '客単価 ' + (isEnya ? '前年比' : '前月比') + ' <strong style="color:var(--accent3)">+10%</strong> チャレンジ';
+  var bigBaseLabelEl = document.getElementById('ch-big-base-label');
+  if (bigBaseLabelEl) bigBaseLabelEl.textContent = bigBaseLabel;
+  var spotBaseLabelEl = document.getElementById('ch-spot-base-label');
+  if (spotBaseLabelEl) spotBaseLabelEl.textContent = spotBaseLabel;
+
+  // 管理者編集フォーム表示切替
+  ['big','mission','spot'].forEach(function(k) {
+    var el = document.getElementById('ch-' + k + '-edit');
+    if (el) el.style.display = adminUnlocked ? 'flex' : 'none';
+  });
+  var csvBtn = document.getElementById('ch-csv-import-btn');
+  if (csvBtn) csvBtn.style.display = adminUnlocked ? 'block' : 'none';
+
+  // Firebase リアルタイム購読
+  if (chListeners[shopKey]) {
+    db.ref('challenge/' + shopKey).off('value', chListeners[shopKey]);
+  }
+  chListeners[shopKey] = db.ref('challenge/' + shopKey).on('value', function(snap) {
+    var d = snap.val() || {};
+    updateChallengUI(d);
+  });
+}
+
+function updateChallengUI(d) {
+  // === BIG ===
+  var bigCurrent = d.big_current || 0;
+  var bigBase = d.big_base || 0;
+  var bigTarget = bigBase > 0 ? Math.round(bigBase * 1.2) : 0;
+  var bigPct = bigTarget > 0 ? Math.round(bigCurrent / bigTarget * 100) : 0;
+  var bigBarPct = Math.min(bigPct, 100);
+
+  document.getElementById('ch-big-current').textContent = fmtYen(bigCurrent);
+  document.getElementById('ch-big-target').textContent = fmtYen(bigTarget);
+  document.getElementById('ch-big-pct').textContent = bigPct + '%';
+  document.getElementById('ch-big-bar').style.width = bigBarPct + '%';
+  document.getElementById('ch-big-bar').style.background = bigPct >= 100 ? '#006b3a' : bigPct >= 80 ? 'var(--accent)' : 'var(--accent3)';
+
+  var bigRemain = bigTarget - bigCurrent;
+  var bigRemainEl = document.getElementById('ch-big-remain');
+  if (bigPct >= 100) {
+    bigRemainEl.innerHTML = '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>';
+  } else if (bigTarget > 0) {
+    bigRemainEl.innerHTML = '目標まで <strong>¥' + fmtYen(bigRemain) + '</strong>';
+  } else {
+    bigRemainEl.textContent = '基準値を入力してください';
+  }
+  if (d.big_updated) {
+    document.getElementById('ch-big-lastupdate').textContent = '最終更新: ' + d.big_updated;
+  }
+  var bigStatusBadge = document.getElementById('ch-big-status-badge');
+  if (bigPct >= 100) {
+    bigStatusBadge.textContent = '✅ 達成';
+    bigStatusBadge.className = 'ch-badge';
+    bigStatusBadge.style.cssText = 'background:rgba(0,107,58,0.15);color:#006b3a;border:1px solid rgba(0,107,58,0.3)';
+  } else if (bigPct >= 80) {
+    bigStatusBadge.textContent = '🔥 あと少し';
+    bigStatusBadge.className = 'ch-badge ch-badge-big';
+    bigStatusBadge.style.cssText = '';
+  } else {
+    bigStatusBadge.textContent = 'TEAM';
+    bigStatusBadge.className = 'ch-badge ch-badge-big';
+    bigStatusBadge.style.cssText = '';
+  }
+  if (d.big_current && document.getElementById('ch-big-inp-current')) {
+    document.getElementById('ch-big-inp-current').value = d.big_current;
+  }
+  if (d.big_base && document.getElementById('ch-big-inp-base')) {
+    document.getElementById('ch-big-inp-base').value = d.big_base;
+  }
+
+  // === MISSION (デザート出数率) ===
+  var mDessert = d.mission_dessert || 0;
+  var mTotal = d.mission_total || 0;
+  var mPct = mTotal > 0 ? Math.round(mDessert / mTotal * 1000) / 10 : 0; // 小数1桁
+  var mBarPct = Math.min(mPct / 30 * 100, 100);
+  var mGap = Math.max(0, 30 - mPct).toFixed(1);
+
+  document.getElementById('ch-mission-dessert').textContent = mDessert;
+  document.getElementById('ch-mission-total').textContent = mTotal;
+  document.getElementById('ch-mission-pct').textContent = mPct.toFixed(1) + '%';
+  document.getElementById('ch-mission-bar').style.width = mBarPct + '%';
+  document.getElementById('ch-mission-bar').style.background = mPct >= 30 ? '#006b3a' : mPct >= 24 ? 'var(--accent2)' : 'var(--accent3)';
+  document.getElementById('ch-mission-gap').textContent = mGap + '%';
+  var mRemainEl = document.getElementById('ch-mission-remain');
+  if (mPct >= 30) {
+    mRemainEl.innerHTML = '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>';
+  } else if (mTotal > 0) {
+    var neededDessert = Math.ceil(mTotal * 0.3) - mDessert;
+    mRemainEl.innerHTML = '目標30%まで <strong>' + mGap + '%</strong>（あと <strong>' + neededDessert + '食</strong>）';
+  } else {
+    mRemainEl.textContent = '客数を入力してください';
+  }
+  if (d.mission_updated) {
+    document.getElementById('ch-mission-lastupdate').textContent = '最終更新: ' + d.mission_updated;
+  }
+  if (d.mission_dessert && document.getElementById('ch-mission-inp-dessert')) {
+    document.getElementById('ch-mission-inp-dessert').value = d.mission_dessert;
+  }
+  if (d.mission_total && document.getElementById('ch-mission-inp-total')) {
+    document.getElementById('ch-mission-inp-total').value = d.mission_total;
+  }
+
+  // === SPOT (客単価) ===
+  var sCurrent = d.spot_current || 0;
+  var sBase = d.spot_base || 0;
+  var sTarget = sBase > 0 ? Math.round(sBase * 1.1) : 0;
+  var sPct = sTarget > 0 ? Math.round(sCurrent / sTarget * 100) : 0;
+  var sBarPct = Math.min(sPct, 100);
+
+  document.getElementById('ch-spot-current').textContent = fmtYen(sCurrent);
+  document.getElementById('ch-spot-target').textContent = fmtYen(sTarget);
+  document.getElementById('ch-spot-pct').textContent = sPct + '%';
+  document.getElementById('ch-spot-bar').style.width = sBarPct + '%';
+  document.getElementById('ch-spot-bar').style.background = sPct >= 100 ? '#006b3a' : sPct >= 80 ? 'var(--accent)' : 'var(--accent3)';
+  var sRemainEl = document.getElementById('ch-spot-remain');
+  if (sPct >= 100) {
+    sRemainEl.innerHTML = '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>';
+  } else if (sTarget > 0) {
+    sRemainEl.innerHTML = '目標まで <strong>¥' + fmtYen(sTarget - sCurrent) + '</strong>';
+  } else {
+    sRemainEl.textContent = '基準値を入力してください';
+  }
+  if (d.spot_updated) {
+    document.getElementById('ch-spot-lastupdate').textContent = '最終更新: ' + d.spot_updated;
+  }
+  if (d.spot_current && document.getElementById('ch-spot-inp-current')) {
+    document.getElementById('ch-spot-inp-current').value = d.spot_current;
+  }
+  if (d.spot_base && document.getElementById('ch-spot-inp-base')) {
+    document.getElementById('ch-spot-inp-base').value = d.spot_base;
+  }
+}
+
+function saveChallengeData(type) {
+  if (!db) return;
+  var shopKey = getChShopKey();
+  var now = new Date();
+  var ts = now.getFullYear() + '/' + (now.getMonth()+1) + '/' + now.getDate() + ' ' +
+            String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  var upd = {};
+
+  if (type === 'big') {
+    var c = parseInt(document.getElementById('ch-big-inp-current').value) || 0;
+    var b = parseInt(document.getElementById('ch-big-inp-base').value) || 0;
+    upd = { big_current: c, big_base: b, big_updated: ts };
+  } else if (type === 'mission') {
+    var des = parseInt(document.getElementById('ch-mission-inp-dessert').value) || 0;
+    var tot = parseInt(document.getElementById('ch-mission-inp-total').value) || 0;
+    upd = { mission_dessert: des, mission_total: tot, mission_updated: ts };
+  } else if (type === 'spot') {
+    var sc = parseInt(document.getElementById('ch-spot-inp-current').value) || 0;
+    var sb = parseInt(document.getElementById('ch-spot-inp-base').value) || 0;
+    upd = { spot_current: sc, spot_base: sb, spot_updated: ts };
+  }
+
+  db.ref('challenge/' + shopKey).update(upd).then(function() {
+    // Firebase onValue が自動で画面更新するので何もしなくてOK
+  });
+}
+
+// ===== CSV IMPORT =====
+var DESSERT_NAMES = [
+  '後付けセットデザート','セットデザート','後付バニラアイス','後付デザート二種',
+  'バニラアイス','セットデザート 二種盛','本日のおまかせデザート　2種盛',
+  '本日のおまかせデザート2種盛','ベイクドショコラ','フレンチトースト','後付ショコラ'
+];
+
+function handleCsvImport(event) {
+  var files = Array.from(event.target.files);
+  event.target.value = '';
+  if (!files.length) return;
+
+  var shopKey = getChShopKey();
+  var results = { salesFile: null, itemFile: null };
+  var pending = files.length;
+
+  files.forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var buf = e.target.result;
+      var text = decodeCSVBuffer(buf);
+      var rows = parseCSV(text, '\t');
+      if (rows.length < 2) { pending--; if (!pending) processCsvResults(results, shopKey); return; }
+
+      var header = rows[0];
+      // 売上実績CSV判定（「当年実績」列がある）
+      if (header.indexOf('当年実績') !== -1) {
+        results.salesFile = rows;
+      }
+      // 品目別CSV判定（「商品名」「売上数量」列がある）
+      if (header.indexOf('商品名') !== -1 && header.indexOf('売上数量') !== -1) {
+        results.itemFile = rows;
+      }
+      pending--;
+      if (!pending) processCsvResults(results, shopKey);
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function decodeCSVBuffer(buf) {
+  var arr = new Uint8Array(buf);
+  // UTF-16 LE BOM check
+  if (arr[0] === 0xFF && arr[1] === 0xFE) {
+    return new TextDecoder('utf-16le').decode(buf);
+  }
+  // UTF-16 BE BOM check
+  if (arr[0] === 0xFE && arr[1] === 0xFF) {
+    return new TextDecoder('utf-16be').decode(buf);
+  }
+  // UTF-8 BOM or plain
+  return new TextDecoder('utf-8').decode(buf);
+}
+
+function parseCSV(text, sep) {
+  // BOM除去
+  text = text.replace(/^\uFEFF/, '');
+  var lines = text.split(/\r?\n/);
+  return lines.filter(function(l){ return l.trim(); }).map(function(l) {
+    // 簡易TSVパース（引用符考慮）
+    var cols = [];
+    var cur = '';
+    var inQ = false;
+    for (var i = 0; i < l.length; i++) {
+      var c = l[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === sep && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    cols.push(cur.trim());
+    return cols;
+  });
+}
+
+function processCsvResults(results, shopKey) {
+  if (!results.salesFile && !results.itemFile) {
+    alert('対応するCSVが見つかりませんでした。\n売上実績CSVと品目別CSVを選択してください。');
+    return;
+  }
+
+  var upd = {};
+  var now = new Date();
+  var ts = now.getFullYear() + '/' + (now.getMonth()+1) + '/' + now.getDate() + ' ' +
+           String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+  // === 売上実績CSV ===
+  if (results.salesFile) {
+    var sRows = results.salesFile;
+    var sHeader = sRows[0];
+    var totalRow = null;
+    for (var i = 1; i < sRows.length; i++) {
+      if (sRows[i][0] === 'TOTAL') { totalRow = sRows[i]; break; }
+    }
+    if (totalRow) {
+      var idxSales   = sHeader.indexOf('当年実績');
+      var idxLySales = sHeader.indexOf('前年実績');
+      var idxCust    = sHeader.indexOf('当年客数');
+      var idxAvg     = sHeader.indexOf('当年客単');
+      var idxLyAvg   = sHeader.indexOf('前年客単');
+
+      if (idxSales  !== -1) upd.big_current    = parseInt(totalRow[idxSales].replace(/,/g,'')) || 0;
+      if (idxLySales!== -1) upd.big_base       = parseInt(totalRow[idxLySales].replace(/,/g,'')) || 0;
+      if (idxCust   !== -1) upd.mission_total  = parseInt(totalRow[idxCust].replace(/,/g,'')) || 0;
+      if (idxAvg    !== -1) upd.spot_current   = parseInt(totalRow[idxAvg].replace(/,/g,'')) || 0;
+      if (idxLyAvg  !== -1) upd.spot_base      = parseInt(totalRow[idxLyAvg].replace(/,/g,'')) || 0;
+      upd.big_updated  = ts;
+      upd.spot_updated = ts;
+    }
+  }
+
+  // === 品目別CSV（デザート集計）===
+  if (results.itemFile) {
+    var iRows = results.itemFile;
+    var iHeader = iRows[0];
+    var idxName = iHeader.indexOf('商品名');
+    var idxQty  = iHeader.indexOf('売上数量');
+    var idxCat2 = iHeader.indexOf('カテゴリ2');
+
+    var dessertTotal = 0;
+    for (var j = 1; j < iRows.length; j++) {
+      var row = iRows[j];
+      if (!row[idxName]) continue;
+      var name = row[idxName].replace(/\u3000/g,' ').replace(/\s+/g,' ').trim();
+      var cat2 = idxCat2 !== -1 ? row[idxCat2] : '';
+
+      // カテゴリ「デザート」OR 商品名マッチ
+      var isDessert = cat2 === 'デザート';
+      if (!isDessert) {
+        isDessert = DESSERT_NAMES.some(function(t) {
+          return name.replace(/\s/g,'').indexOf(t.replace(/\u3000/g,'').replace(/\s/g,'')) !== -1;
+        });
+      }
+      if (isDessert) {
+        var qty = parseInt((row[idxQty] || '0').replace(/,/g,'')) || 0;
+        dessertTotal += qty;
+      }
+    }
+    upd.mission_dessert = dessertTotal;
+    upd.mission_updated = ts;
+  }
+
+  if (!db) { alert('Firebase未接続です'); return; }
+
+  db.ref('challenge/' + shopKey).update(upd).then(function() {
+    // 成功トースト
+    showToast('✅ CSVから更新しました');
+  }).catch(function(e) {
+    alert('Firebase書き込みエラー: ' + e.message);
+  });
+}
+
+function showToast(msg) {
+  var t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#006b3a;color:#fff;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:700;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.3)';
+  document.body.appendChild(t);
+  setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity 0.5s'; setTimeout(function(){ t.remove(); }, 500); }, 2000);
+}
+
+// ===== CHALLENGE TABS =====
+var currentChTab = 'challenge';
+
+function switchChTab(tab) {
+  currentChTab = tab;
+  ['challenge','enya','marco'].forEach(function(t) {
+    var btn = document.getElementById('chtab-' + t);
+    var content = document.getElementById('chtab-content-' + t);
+    if (btn) btn.classList.toggle('active', t === tab);
+    if (content) content.style.display = t === tab ? 'block' : 'none';
+  });
+  if (tab === 'enya' || tab === 'marco') {
+    renderReportTab(tab);
+  }
+}
+
+// ===== WEEKLY REPORT =====
+function renderReportTab(shop) {
+  var adminTools = document.getElementById('ch-' + shop + '-admin-tools');
+  var hint = document.getElementById('ch-' + shop + '-hint');
+
+  // 管理者ツール
+  if (adminTools) {
+    if (adminUnlocked) {
+      adminTools.innerHTML =
+        '<label class="ch-upload-area" style="margin:0;padding:8px 14px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent);border:1px solid var(--accent);cursor:pointer">' +
+        '📎 PDFを追加' +
+        '<input type="file" accept="application/pdf" onchange="uploadReport(event,\'' + shop + '\')">' +
+        '</label>';
+      if (hint) hint.textContent = '管理者：上のボタンからPDFをアップロードしてください';
+    } else {
+      adminTools.innerHTML = '';
+      if (hint) hint.textContent = '';
+    }
+  }
+
+  // Firebaseからレポート一覧取得
+  if (!db) return;
+  db.ref('reports/' + shop).orderByChild('ts').limitToLast(20).once('value', function(snap) {
+    var reports = [];
+    snap.forEach(function(child) { reports.push(Object.assign({key: child.key}, child.val())); });
+    reports.reverse(); // 新しい順
+    renderReportList(shop, reports);
+  });
+}
+
+function renderReportList(shop, reports) {
+  var emptyEl = document.getElementById('ch-report-' + shop + '-empty');
+  var listEl  = document.getElementById('ch-report-' + shop + '-list');
+  if (!emptyEl || !listEl) return;
+
+  if (reports.length === 0) {
+    emptyEl.style.display = 'block';
+    listEl.style.display = 'none';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  listEl.style.display = 'block';
+
+  listEl.innerHTML = reports.map(function(r, i) {
+    return '<div class="ch-report-item">' +
+      '<div class="ch-report-item-header" onclick="toggleReportBody(\'' + shop + '_' + i + '\')">' +
+        '<div>' +
+          '<div class="ch-report-item-title">' + escHtml(r.title) + '</div>' +
+          '<div class="ch-report-item-date">' + escHtml(r.dateLabel) + '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          (adminUnlocked ? '<button class="btn btn-r" style="font-size:11px;padding:4px 10px" onclick="event.stopPropagation();deleteReport(\'' + shop + '\',\'' + r.key + '\')">削除</button>' : '') +
+          '<span style="color:var(--text2);font-size:16px" id="ch-report-arrow-' + shop + '_' + i + '">▼</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ch-report-item-body" id="ch-report-body-' + shop + '_' + i + '">' +
+        '<iframe class="ch-report-iframe" src="' + escHtml(r.url) + '" loading="lazy"></iframe>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleReportBody(id) {
+  var body  = document.getElementById('ch-report-body-' + id);
+  var arrow = document.getElementById('ch-report-arrow-' + id);
+  if (!body) return;
+  var open = body.classList.toggle('open');
+  if (arrow) arrow.textContent = open ? '▲' : '▼';
+}
+
+function uploadReport(event, shop) {
+  var file = event.target.files[0];
+  if (!file) return;
+  if (!db) return;
+
+  // PDFをbase64に変換してFirebaseに保存
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var base64 = e.target.result; // data:application/pdf;base64,...
+    var now = new Date();
+    var dateLabel = now.getFullYear() + '/' + (now.getMonth()+1) + '/' + now.getDate();
+    // ファイル名からタイトル生成
+    var title = file.name.replace(/\.pdf$/i, '').replace(/_/g,' ');
+    var key = db.ref('reports/' + shop).push().key;
+    db.ref('reports/' + shop + '/' + key).set({
+      title: title,
+      dateLabel: dateLabel,
+      url: base64,
+      ts: now.getTime()
+    }).then(function() {
+      renderReportTab(shop);
+    });
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function deleteReport(shop, key) {
+  if (!confirm('このレポートを削除しますか？')) return;
+  if (!db) return;
+  db.ref('reports/' + shop + '/' + key).remove().then(function() {
+    renderReportTab(shop);
+  });
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ===== CALENDAR =====
