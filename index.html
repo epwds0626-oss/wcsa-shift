@@ -2303,8 +2303,16 @@ function renderChallenge(fixedShopKey) {
 }
 
 function updateChallengUI(d, shopKey) {
-  // UIが存在しない場合（別ページ表示中など）はスキップ
-  if (!document.getElementById('ch-big-current')) return;
+  // チャレンジタブが非表示なら何もしない
+  var challengeContent = document.getElementById('chtab-content-challenge');
+  if (!challengeContent || challengeContent.style.display === 'none') return;
+
+  // 安全なセッター
+  function setText(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
+  function setHtml(id, val) { var el = document.getElementById(id); if (el) el.innerHTML = val; }
+  function setCss(id, prop, val) { var el = document.getElementById(id); if (el) el.style[prop] = val; }
+  function setVal(id, val) { var el = document.getElementById(id); if (el) el.value = val; }
+
   var isMarco = shopKey === 'marco';
   // === BIG ===
   var bigCurrent = d.big_current || 0;
@@ -2313,118 +2321,96 @@ function updateChallengUI(d, shopKey) {
   var bigPct = bigTarget > 0 ? Math.round(bigCurrent / bigTarget * 100) : 0;
   var bigBarPct = Math.min(bigPct, 100);
 
-  document.getElementById('ch-big-current').textContent = fmtYen(bigCurrent);
-  document.getElementById('ch-big-target').textContent = fmtYen(bigTarget);
-  document.getElementById('ch-big-pct').textContent = bigPct + '%';
-  document.getElementById('ch-big-bar').style.width = bigBarPct + '%';
-  document.getElementById('ch-big-bar').style.background = bigPct >= 100 ? '#006b3a' : bigPct >= 80 ? 'var(--accent)' : 'var(--accent3)';
+  setText('ch-big-current', fmtYen(bigCurrent));
+  setText('ch-big-target', fmtYen(bigTarget));
+  setText('ch-big-pct', bigPct + '%');
+  setCss('ch-big-bar', 'width', bigBarPct + '%');
+  setCss('ch-big-bar', 'background', bigPct >= 100 ? '#006b3a' : bigPct >= 80 ? 'var(--accent)' : 'var(--accent3)');
 
   var bigRemain = bigTarget - bigCurrent;
-  var bigRemainEl = document.getElementById('ch-big-remain');
   if (bigPct >= 100) {
-    bigRemainEl.innerHTML = '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>';
+    setHtml('ch-big-remain', '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>');
   } else if (bigTarget > 0) {
-    bigRemainEl.innerHTML = '目標まで <strong>¥' + fmtYen(bigRemain) + '</strong>';
+    setHtml('ch-big-remain', '目標まで <strong>¥' + fmtYen(bigRemain) + '</strong>');
   } else {
-    bigRemainEl.textContent = '基準値を入力してください';
+    setText('ch-big-remain', '基準値を入力してください');
   }
-  if (d.big_updated) {
-    document.getElementById('ch-big-lastupdate').textContent = '最終更新: ' + d.big_updated;
-  }
+  if (d.big_updated) setText('ch-big-lastupdate', '最終更新: ' + d.big_updated);
   var bigStatusBadge = document.getElementById('ch-big-status-badge');
-  if (bigPct >= 100) {
-    bigStatusBadge.textContent = '✅ 達成';
-    bigStatusBadge.className = 'ch-badge';
-    bigStatusBadge.style.cssText = 'background:rgba(0,107,58,0.15);color:#006b3a;border:1px solid rgba(0,107,58,0.3)';
-  } else if (bigPct >= 80) {
-    bigStatusBadge.textContent = '🔥 あと少し';
-    bigStatusBadge.className = 'ch-badge ch-badge-big';
-    bigStatusBadge.style.cssText = '';
-  } else {
-    bigStatusBadge.textContent = 'TEAM';
-    bigStatusBadge.className = 'ch-badge ch-badge-big';
-    bigStatusBadge.style.cssText = '';
+  if (bigStatusBadge) {
+    if (bigPct >= 100) {
+      bigStatusBadge.textContent = '✅ 達成';
+      bigStatusBadge.className = 'ch-badge';
+      bigStatusBadge.style.cssText = 'background:rgba(0,107,58,0.15);color:#006b3a;border:1px solid rgba(0,107,58,0.3)';
+    } else if (bigPct >= 80) {
+      bigStatusBadge.textContent = '🔥 あと少し';
+      bigStatusBadge.className = 'ch-badge ch-badge-big';
+      bigStatusBadge.style.cssText = '';
+    } else {
+      bigStatusBadge.textContent = 'TEAM';
+      bigStatusBadge.className = 'ch-badge ch-badge-big';
+      bigStatusBadge.style.cssText = '';
+    }
   }
-  if (d.big_current && document.getElementById('ch-big-inp-current')) {
-    document.getElementById('ch-big-inp-current').value = d.big_current;
-  }
-  if (d.big_base && document.getElementById('ch-big-inp-base')) {
-    document.getElementById('ch-big-inp-base').value = d.big_base;
-  }
+  if (d.big_current) setVal('ch-big-inp-current', d.big_current);
+  if (d.big_base)    setVal('ch-big-inp-base',    d.big_base);
 
   // === MISSION (デザート出数率) ===
   var mDessert = d.mission_dessert || 0;
   var mTotal = d.mission_total || 0;
-  var mPct = mTotal > 0 ? Math.round(mDessert / mTotal * 1000) / 10 : 0; // 小数1桁
+  var mPct = mTotal > 0 ? Math.round(mDessert / mTotal * 1000) / 10 : 0;
   var mBarPct = Math.min(mPct / 30 * 100, 100);
   var mGap = Math.max(0, 30 - mPct).toFixed(1);
 
-  document.getElementById('ch-mission-dessert').textContent = mDessert;
-  document.getElementById('ch-mission-total').textContent = mTotal;
-  document.getElementById('ch-mission-pct').textContent = mPct.toFixed(1) + '%';
-  document.getElementById('ch-mission-bar').style.width = mBarPct + '%';
-  document.getElementById('ch-mission-bar').style.background = mPct >= 30 ? '#006b3a' : mPct >= 24 ? 'var(--accent2)' : 'var(--accent3)';
-  document.getElementById('ch-mission-gap').textContent = mGap + '%';
-  var mRemainEl = document.getElementById('ch-mission-remain');
+  setText('ch-mission-dessert', mDessert);
+  setText('ch-mission-total', mTotal);
+  setText('ch-mission-pct', mPct.toFixed(1) + '%');
+  setCss('ch-mission-bar', 'width', mBarPct + '%');
+  setCss('ch-mission-bar', 'background', mPct >= 30 ? '#006b3a' : mPct >= 24 ? 'var(--accent2)' : 'var(--accent3)');
+  setText('ch-mission-gap', mGap + '%');
   if (mPct >= 30) {
-    mRemainEl.innerHTML = '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>';
+    setHtml('ch-mission-remain', '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>');
   } else if (mTotal > 0) {
     var neededDessert = Math.ceil(mTotal * 0.3) - mDessert;
-    mRemainEl.innerHTML = '目標30%まで <strong>' + mGap + '%</strong>（あと <strong>' + neededDessert + '食</strong>）';
+    setHtml('ch-mission-remain', '目標30%まで <strong>' + mGap + '%</strong>（あと <strong>' + neededDessert + '食</strong>）');
   } else {
-    mRemainEl.textContent = '客数を入力してください';
+    setText('ch-mission-remain', '客数を入力してください');
   }
-  if (d.mission_updated) {
-    document.getElementById('ch-mission-lastupdate').textContent = '最終更新: ' + d.mission_updated;
-  }
-  if (d.mission_dessert && document.getElementById('ch-mission-inp-dessert')) {
-    document.getElementById('ch-mission-inp-dessert').value = d.mission_dessert;
-  }
-  if (d.mission_total && document.getElementById('ch-mission-inp-total')) {
-    document.getElementById('ch-mission-inp-total').value = d.mission_total;
-  }
+  if (d.mission_updated) setText('ch-mission-lastupdate', '最終更新: ' + d.mission_updated);
+  if (d.mission_dessert) setVal('ch-mission-inp-dessert', d.mission_dessert);
+  if (d.mission_total)   setVal('ch-mission-inp-total',   d.mission_total);
 
   // === SPOT (客単価) ===
   var sCurrent = d.spot_current || 0;
   var sBase = d.spot_base || 0;
   var sTarget = sBase > 0 ? Math.round(sBase * (isMarco ? 1.0 : 1.1)) : 0;
-  // アップ率で表示（マルコ:前月比プラスで達成、本店:前年比+10%で達成）
   var sUpRate = sBase > 0 ? Math.round((sCurrent - sBase) / sBase * 1000) / 10 : 0;
-  var sThreshold = isMarco ? 0 : 10;
-  var sAchieved = sUpRate > sThreshold || (isMarco && sUpRate >= 0 && sBase > 0);
+  var sAchieved = isMarco ? (sUpRate >= 0 && sBase > 0) : (sUpRate >= 10);
   var sBarPct = sBase > 0 ? Math.min(Math.max(isMarco ? (sUpRate > 0 ? 100 : Math.max(0, (sUpRate + 10) / 10 * 100)) : sUpRate / 10 * 100, 0), 100) : 0;
   var sGoalLabel = isMarco ? '前月比アップ' : '前年比アップ';
-  var sGoalText  = isMarco ? '前月比プラス' : '前年比+10%';
 
-  document.getElementById('ch-spot-current').textContent = fmtYen(sCurrent);
-  document.getElementById('ch-spot-target').textContent = isMarco ? '前月超え' : fmtYen(sTarget);
-  document.getElementById('ch-spot-pct').textContent = (sUpRate >= 0 ? '+' : '') + sUpRate + '%';
-  var sLabelEl = document.getElementById('ch-spot-pct').nextElementSibling;
-  if (sLabelEl) sLabelEl.textContent = sGoalLabel;
-  document.getElementById('ch-spot-bar').style.width = sBarPct + '%';
-  document.getElementById('ch-spot-bar').style.background = sAchieved ? '#006b3a' : sUpRate >= (isMarco ? -3 : 7) ? 'var(--accent)' : 'var(--accent3)';
-  var sRemainEl = document.getElementById('ch-spot-remain');
+  setText('ch-spot-current', fmtYen(sCurrent));
+  setText('ch-spot-target', isMarco ? '前月超え' : fmtYen(sTarget));
+  setText('ch-spot-pct', (sUpRate >= 0 ? '+' : '') + sUpRate + '%');
+  var sLabelEl = document.getElementById('ch-spot-pct');
+  if (sLabelEl && sLabelEl.nextElementSibling) sLabelEl.nextElementSibling.textContent = sGoalLabel;
+  setCss('ch-spot-bar', 'width', sBarPct + '%');
+  setCss('ch-spot-bar', 'background', sAchieved ? '#006b3a' : sUpRate >= (isMarco ? -3 : 7) ? 'var(--accent)' : 'var(--accent3)');
   if (sAchieved) {
-    sRemainEl.innerHTML = '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>';
+    setHtml('ch-spot-remain', '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>');
   } else if (sBase > 0) {
     if (isMarco) {
-      sRemainEl.innerHTML = '前月（¥' + fmtYen(sBase) + '）を超えれば達成 あと <strong>¥' + fmtYen(Math.max(0, sBase - sCurrent + 1)) + '</strong>';
+      setHtml('ch-spot-remain', '前月（¥' + fmtYen(sBase) + '）を超えれば達成 あと <strong>¥' + fmtYen(Math.max(0, sBase - sCurrent + 1)) + '</strong>');
     } else {
       var sGap = (10 - sUpRate).toFixed(1);
-      sRemainEl.innerHTML = '目標+10%まで あと <strong>+' + sGap + '%</strong>（¥' + fmtYen(sTarget - sCurrent) + '）';
+      setHtml('ch-spot-remain', '目標+10%まで あと <strong>+' + sGap + '%</strong>（¥' + fmtYen(sTarget - sCurrent) + '）');
     }
   } else {
-    sRemainEl.textContent = '基準値を入力してください';
+    setText('ch-spot-remain', '基準値を入力してください');
   }
-  if (d.spot_updated) {
-    document.getElementById('ch-spot-lastupdate').textContent = '最終更新: ' + d.spot_updated;
-  }
-  if (d.spot_current && document.getElementById('ch-spot-inp-current')) {
-    document.getElementById('ch-spot-inp-current').value = d.spot_current;
-  }
-  if (d.spot_base && document.getElementById('ch-spot-inp-base')) {
-    document.getElementById('ch-spot-inp-base').value = d.spot_base;
-  }
+  if (d.spot_updated) setText('ch-spot-lastupdate', '最終更新: ' + d.spot_updated);
+  if (d.spot_current) setVal('ch-spot-inp-current', d.spot_current);
+  if (d.spot_base)    setVal('ch-spot-inp-base',    d.spot_base);
 }
 
 function saveChallengeData(type) {
