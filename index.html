@@ -2547,6 +2547,9 @@ function parseCSV(text, sep) { return parseCSVAuto(text, sep); }
 
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
+  console.log('[CSV] shopKey:', shopKey, 'isMarco:', isMarco);
+  console.log('[CSV] salesFile:', !!results.salesFile, 'itemFile:', !!results.itemFile);
+  console.log('[CSV] marcoSalesFile:', !!results.marcoSalesFile, 'marcoItemFile:', !!results.marcoItemFile);
   var hasData = results.salesFile || results.itemFile || results.marcoSalesFile || results.marcoItemFile;
   if (!hasData) {
     alert('対応するCSVが見つかりませんでした。');
@@ -2559,7 +2562,7 @@ function processCsvResults(results, shopKey) {
            String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
   // ===== 本店: 売上実績CSV (UTF-16 TSV) =====
-  if (results.salesFile) {
+  if (results.salesFile && !isMarco) {
     var sRows = results.salesFile;
     var sHeader = sRows[0];
     var totalRow = null;
@@ -2582,7 +2585,7 @@ function processCsvResults(results, shopKey) {
   }
 
   // ===== 本店: 品目別CSV (UTF-16 TSV) =====
-  if (results.itemFile) {
+  if (results.itemFile && !isMarco) {
     var iRows = results.itemFile;
     var iHeader = iRows[0];
     var idxName = iHeader.indexOf('商品名');
@@ -2602,7 +2605,7 @@ function processCsvResults(results, shopKey) {
   }
 
   // ===== マルコ: 年間売上CSV =====
-  if (results.marcoSalesFile) {
+  if (results.marcoSalesFile && isMarco) {
     var mRows = results.marcoSalesFile;
     // 「対象月」ヘッダー行を探す
     var mHeaderIdx = -1;
@@ -2651,7 +2654,7 @@ function processCsvResults(results, shopKey) {
   }
 
   // ===== マルコ: aggregateMenu CSV =====
-  if (results.marcoItemFile) {
+  if (results.marcoItemFile && isMarco) {
     var aRows = results.marcoItemFile;
     // ヘッダー行を探す（ABC,商品名...）
     var aHeaderIdx = -1;
