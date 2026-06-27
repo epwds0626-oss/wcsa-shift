@@ -487,7 +487,7 @@ nav{display:flex;gap:2px}
           </div>
           <div style="margin-left:auto;text-align:right">
             <div class="ch-pct" id="ch-spot-pct" style="color:var(--accent3)">0%</div>
-            <div style="font-size:10px;color:var(--text2)">達成率</div>
+            <div style="font-size:10px;color:var(--text2)">前年比アップ</div>
           </div>
         </div>
         <div class="ch-bar-wrap"><div class="ch-bar" id="ch-spot-bar" style="width:0%;background:var(--accent3)"></div></div>
@@ -2373,19 +2373,24 @@ function updateChallengUI(d) {
   var sCurrent = d.spot_current || 0;
   var sBase = d.spot_base || 0;
   var sTarget = sBase > 0 ? Math.round(sBase * 1.1) : 0;
-  var sPct = sTarget > 0 ? Math.round(sCurrent / sTarget * 100) : 0;
-  var sBarPct = Math.min(sPct, 100);
+  // 前年比アップ率で表示（目標+10%超え）
+  var sUpRate = sBase > 0 ? Math.round((sCurrent - sBase) / sBase * 1000) / 10 : 0;
+  var sAchieved = sUpRate >= 10;
+  var sBarPct = sBase > 0 ? Math.min(Math.max(sUpRate / 10 * 100, 0), 100) : 0;
 
   document.getElementById('ch-spot-current').textContent = fmtYen(sCurrent);
   document.getElementById('ch-spot-target').textContent = fmtYen(sTarget);
-  document.getElementById('ch-spot-pct').textContent = sPct + '%';
+  document.getElementById('ch-spot-pct').textContent = (sUpRate >= 0 ? '+' : '') + sUpRate + '%';
+  var sLabelEl = document.getElementById('ch-spot-pct').nextElementSibling;
+  if (sLabelEl) sLabelEl.textContent = '前年比アップ';
   document.getElementById('ch-spot-bar').style.width = sBarPct + '%';
-  document.getElementById('ch-spot-bar').style.background = sPct >= 100 ? '#006b3a' : sPct >= 80 ? 'var(--accent)' : 'var(--accent3)';
+  document.getElementById('ch-spot-bar').style.background = sAchieved ? '#006b3a' : sUpRate >= 7 ? 'var(--accent)' : 'var(--accent3)';
   var sRemainEl = document.getElementById('ch-spot-remain');
-  if (sPct >= 100) {
+  if (sAchieved) {
     sRemainEl.innerHTML = '<span class="ch-complete-badge">🎉 達成！ おめでとう！</span>';
-  } else if (sTarget > 0) {
-    sRemainEl.innerHTML = '目標まで <strong>¥' + fmtYen(sTarget - sCurrent) + '</strong>';
+  } else if (sBase > 0) {
+    var sGap = (10 - sUpRate).toFixed(1);
+    sRemainEl.innerHTML = '目標+10%まで あと <strong>+' + sGap + '%</strong>（¥' + fmtYen(sTarget - sCurrent) + '）';
   } else {
     sRemainEl.textContent = '基準値を入力してください';
   }
