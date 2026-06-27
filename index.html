@@ -399,7 +399,7 @@ nav{display:flex;gap:2px}
         <button class="btn btn-s" style="font-size:11px;padding:5px 12px" onclick="renderChallenge(getChShopKey())">🔄 更新</button>
         <div id="ch-csv-import-btn" style="display:none">
           <label style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;border:1px solid var(--accent);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">
-            📂 CSVから更新
+            📊 売上CSVから更新
             <input type="file" accept=".csv" multiple style="display:none" onchange="handleCsvImport(event)">
           </label>
         </div>
@@ -2799,7 +2799,7 @@ function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
   var hasData = results.salesFile || results.itemFile || results.marcoSalesFile || results.marcoItemFile;
   if (!hasData) {
-    alert('対応するCSVが見つかりませんでした。');
+    alert('売上CSVが見つかりませんでした。\n\n【本店】売上実績CSV + Daily_Item_Sales CSV\n【マルコ】年間売上CSV + aggregateMenu CSV\n\n勤怠CSVは下の「💰インセンティブ試算」から読み込んでください。');
     return;
   }
 
