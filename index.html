@@ -2558,6 +2558,8 @@ function saveChallengeData(type) {
 // ===== INCENTIVE =====
 
 // 本店・マルコの除外・調整ルール
+// ※店舗サフィックス（【本店】/【マルコ】）付きCSVでは各店の実働時間をそのまま按分に使用。
+//   partial比率は旧形式CSV（合算時間）用の近似措置で、新形式では適用されない。
 var INCENTIVE_RULES = {
   enya: {
     shaain: ['青木 優介', '原 孝志', '小沼 太一'],
@@ -2568,7 +2570,7 @@ var INCENTIVE_RULES = {
     shaain: ['圷　竜司'],
     exclude: ['青木 優介', '原 孝志', '小沼 太一', '金沢　蓮'],
     partial: { '仲田 友子': 0.7 },
-    include: ['圷　竜司', '久野　有子', '仲田 友子']
+    include: ['圷　竜司', '久野　有子', '仲田 友子', '半谷 和津江']
   }
 };
 
