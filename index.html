@@ -2635,6 +2635,8 @@ function calcIncentive(staff, shopKey, pool) {
     if (rules.exclude && rules.exclude.indexOf(s.name) !== -1) return false;
     if (s.days === 0) return false;
     if (shopKey === 'marco' && rules.include) {
+      // 店舗実働行（この店のサフィックス付き行）は実績があれば自動的に対象
+      if (s.store === shopKey) return true;
       return rules.include.indexOf(s.name) !== -1;
     }
     return true;
