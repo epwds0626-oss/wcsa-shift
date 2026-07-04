@@ -2591,8 +2591,16 @@ function handleIncentiveCsv(event) {
     for (var i = 1; i < lines.length; i++) {
       var cols = lines[i].split(',');
       if (!cols[idxName]) continue;
+      // 店舗サフィックス（【本店】/【マルコ】）を解析して氏名と分離
+      // サフィックス付き行は給与システムの店舗分離出力＝その店舗の実働のみ
+      var rawName = cols[idxName].trim();
+      var rowStore = null;
+      if (rawName.indexOf('【本店】') !== -1) rowStore = 'enya';
+      else if (rawName.indexOf('【マルコ】') !== -1) rowStore = 'marco';
+      var cleanName = rawName.replace(/【本店】|【マルコ】/g, '').trim();
       staff.push({
-        name: cols[idxName].trim(),
+        name: cleanName,
+        store: rowStore || '',
         role: cols[idxRole] ? cols[idxRole].trim() : '',
         hours: parseFloat(cols[idxHours]) || 0,
         days: parseInt(cols[idxDays]) || 0
@@ -2620,6 +2628,8 @@ function calcIncentive(staff, shopKey, pool) {
 
   // マルコは対象者のみに絞る
   var filtered = staff.filter(function(s) {
+    // 店舗サフィックス付き行は、この店舗の行のみ採用（他店舗の実働は含めない）
+    if (s.store && s.store !== shopKey) return false;
     if (rules.exclude && rules.exclude.indexOf(s.name) !== -1) return false;
     if (s.days === 0) return false;
     if (shopKey === 'marco' && rules.include) {
@@ -2627,12 +2637,16 @@ function calcIncentive(staff, shopKey, pool) {
     }
     return true;
   }).map(function(s) {
-    var ratio = (rules.partial && rules.partial[s.name]) ? rules.partial[s.name] : 1.0;
+    // 店舗実働行（s.store あり）は実時間そのものを使うため按分比率は適用しない
+    // （partial比率は合算時間しか無かった旧CSV用の近似措置）
+    var ratio = (!s.store && rules.partial && rules.partial[s.name]) ? rules.partial[s.name] : 1.0;
     return {
       name: s.name,
       role: s.role,
       hours: s.hours * ratio,
-      note: ratio < 1 ? '（' + shopKey === 'enya' ? '本店' : 'マルコ' + Math.round(ratio*100) + '%）' : ''
+      note: ratio < 1
+        ? '（' + (shopKey === 'enya' ? '本店' : 'マルコ') + Math.round(ratio * 100) + '%）'
+        : (s.store ? '（店舗実働）' : '')
     };
   });
 
