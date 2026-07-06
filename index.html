@@ -3610,7 +3610,7 @@ function renderAdminCal() {
 
 function openAdminModal(date) {
   S.adminSelDate = date;
-  S.adminSess = 'lunch';
+  S.adminSess = 'before';
   var key = dKey(date);
   applyFixed(key);
   var DOW = ['日','月','火','水','木','金','土'];
@@ -3722,13 +3722,17 @@ function updAdminShiftEl(el) {
   var field = el.getAttribute('data-field');
   var val = el.value;
   S.shifts[key][sess][idx][field] = val;
-  // start/end を変更したら同じスタッフ(idx)の全セッションに反映
+  // start/end を変更したら同じ名前のスタッフを全セッションに反映（並び順が違ってもOK）
   if (field === 'start' || field === 'end') {
+    var staffName = S.shifts[key][sess][idx].name;
     var sessions = ['before', 'lunch', 'dinner'];
     for (var si = 0; si < sessions.length; si++) {
       var s = sessions[si];
-      if (s !== sess && S.shifts[key][s] && S.shifts[key][s][idx]) {
-        S.shifts[key][s][idx][field] = val;
+      if (s === sess || !S.shifts[key][s]) continue;
+      for (var sj = 0; sj < S.shifts[key][s].length; sj++) {
+        if (S.shifts[key][s][sj].name === staffName) {
+          S.shifts[key][s][sj][field] = val;
+        }
       }
     }
   }
