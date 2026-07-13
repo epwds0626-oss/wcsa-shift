@@ -2752,10 +2752,14 @@ function renderIncentive(shopKey) {
 }
 
 // ===== CSV IMPORT =====
+// デザート出数のカウント対象品目（この10品目のみ・R8.7.14指定）
+// ※空白（全角含む）を除去した部分一致なので「セットデザート 二種盛」等の表記ゆれも拾う
+// ※カテゴリでは判定しない（「先出し」「後出し」等の指示ボタンがデザートカテゴリに混在するため）
+// ※新しいデザートをメニューに追加したら、この配列に品名を追加すること
 var DESSERT_NAMES = [
-  '後付けセットデザート','セットデザート','後付バニラアイス','後付デザート二種',
-  'バニラアイス','セットデザート 二種盛','本日のおまかせデザート　2種盛',
-  '本日のおまかせデザート2種盛','ベイクドショコラ','フレンチトースト','後付ショコラ'
+  '後付けセットデザート','セットデザート','後付バニラアイス','バニラアイス',
+  '本日のおまかせデザート2種盛','ベイクドショコラ','フレンチトースト',
+  '後付デザート二種','後付ショコラ','後付けフレンチトースト'
 ];
 
 function handleCsvImport(event) {
@@ -2906,8 +2910,10 @@ function processCsvResults(results, shopKey) {
       var row = iRows[j];
       if (!row[idxName]) continue;
       var name = row[idxName].replace(/\u3000/g,' ').trim();
-      var isDessert = (idxCat2 !== -1 && row[idxCat2] === 'デザート') ||
-        DESSERT_NAMES.some(function(t){ return name.replace(/\s/g,'').indexOf(t.replace(/\u3000/g,'').replace(/\s/g,'')) !== -1; });
+      // 【修正 R8.7.14】カテゴリ判定を廃止し、DESSERT_NAMES の10品目のみカウント。
+      // （旧: カテゴリ2=デザート も対象 → 「先出し」「後出し」等の指示ボタンを誤集計していた）
+      var normName = name.replace(/\s/g,'');
+      var isDessert = DESSERT_NAMES.some(function(t){ return normName.indexOf(t.replace(/\s/g,'')) !== -1; });
       if (isDessert) dessertTotal += parseInt((row[idxQty]||'0').replace(/,/g,'')) || 0;
     }
     upd.mission_dessert = dessertTotal;
