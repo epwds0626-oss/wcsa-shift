@@ -529,6 +529,10 @@ nav{display:flex;gap:2px}
         <div class="ch-bar-wrap"><div class="ch-bar" id="ch-spot-bar" style="width:0%;background:var(--accent3)"></div></div>
         <div class="ch-remain" id="ch-spot-remain"></div>
         <div class="ch-lastupdate" id="ch-spot-lastupdate"></div>
+        <details id="ch-spot-high-wrap" open style="display:none;margin-top:8px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 高単価アイテムの出数（¥3,000以上・提案の狙いどころ）</summary>
+          <div id="ch-spot-high" style="margin-top:6px"></div>
+        </details>
         <div class="ch-update-row" id="ch-spot-edit" style="display:none">
           <div><div class="ch-update-label">今月平均客単価（税込）</div><input class="ch-inp" type="number" id="ch-spot-inp-current" placeholder="例: 1150"></div>
           <div><div class="ch-update-label" id="ch-spot-base-label">比較基準（前年同月）</div><input class="ch-inp" type="number" id="ch-spot-inp-base" placeholder="例: 1050"></div>
@@ -2637,6 +2641,33 @@ function updateChallengUI(d, shopKey) {
     }
   }
 
+  // 高単価アイテムの出数（日別CSV取込時に保存された spot_high_items）
+  var shItems = d.spot_high_items || [];
+  var shWrap = document.getElementById('ch-spot-high-wrap');
+  if (shWrap) {
+    if (shItems.length > 0) {
+      shWrap.style.display = 'block';
+      var shMax = 1;
+      for (var sm = 0; sm < shItems.length; sm++) if ((shItems[sm].qty||0) > shMax) shMax = shItems[sm].qty;
+      var shHtml = '';
+      for (var sh = 0; sh < shItems.length; sh++) {
+        var sit = shItems[sh];
+        var barPct = Math.round((sit.qty||0) / shMax * 100);
+        shHtml += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;padding:3px 4px;border-radius:4px;'
+          + 'background:linear-gradient(90deg,#4fa3a522 ' + barPct + '%,transparent ' + barPct + '%)">'
+          + '<span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="flex:none;font-weight:700;color:var(--accent3);font-variant-numeric:tabular-nums">¥' + (sit.price||0).toLocaleString() + '</span>'
+          + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + String(sit.name||'').replace(/</g,'&lt;') + '</span></span>'
+          + '<span style="white-space:nowrap;flex:none"><strong>' + (sit.qty||0) + '</strong>食</span>'
+          + '</div>';
+      }
+      shHtml += '<div style="font-size:10px;color:var(--text2);margin-top:4px">一声の提案が客単価をつくります。日別CSV（Daily_Item_Sales）取込時に更新。</div>';
+      var shEl = document.getElementById('ch-spot-high');
+      if (shEl) shEl.innerHTML = shHtml;
+    } else {
+      shWrap.style.display = 'none';
+    }
+  }
+
   // === SPOT (客単価) ===
   var sCurrent = d.spot_current || 0;
   var sBase = d.spot_base || 0;
@@ -3151,6 +3182,30 @@ function processCsvResults(results, shopKey) {
       foodGrand += it.total;
     });
     upd.big_item_weekday = { items: foodItems, totals: foodTotals, grand: foodGrand };
+
+    // ── 高単価アイテムの出数（客単価チャレンジの提案支援） ──
+    // 平均単価が SPOT_HIGH_MIN 以上の品目を単価順に。テイクアウトと除外品は対象外。
+    var SPOT_HIGH_MIN = 3000;
+    var dIdxCat2 = dHeader.indexOf('カテゴリ2');
+    var dIdxPrice = dHeader.indexOf('平均単価');
+    var byHigh = {};
+    for (var hj = 1; hj < dRows.length; hj++) {
+      var hRow = dRows[hj];
+      if (!hRow[dIdxName]) continue;
+      var hPrice = parseInt(String(hRow[dIdxPrice]||'').replace(/[¥,]/g,'')) || 0;
+      if (hPrice < SPOT_HIGH_MIN) continue;
+      if (dIdxCat2 !== -1 && hRow[dIdxCat2] === 'テイクアウト') continue;
+      var hName = hRow[dIdxName].replace(/\u3000/g,' ').trim();
+      if (BIG_ITEM_EXCLUDE.some(function(t){ return hName.indexOf(t) !== -1; })) continue;
+      var hQty = parseInt((hRow[dIdxQty]||'0').replace(/,/g,'')) || 0;
+      if (!byHigh[hName]) byHigh[hName] = { qty: 0, price: hPrice };
+      byHigh[hName].qty += hQty;
+      if (hPrice > byHigh[hName].price) byHigh[hName].price = hPrice;
+    }
+    var highItems = Object.keys(byHigh).map(function(n){
+      return { name: n, qty: byHigh[n].qty, price: byHigh[n].price };
+    }).sort(function(a,b){ return b.price - a.price; }).slice(0, 8);
+    upd.spot_high_items = highItems;
   }
 
   // ===== マルコ: 年間売上CSV =====
