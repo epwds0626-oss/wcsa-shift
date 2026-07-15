@@ -2500,21 +2500,47 @@ function updateChallengUI(d, shopKey) {
   if (d.mission_dessert) setVal('ch-mission-inp-dessert', d.mission_dessert);
   if (d.mission_total)   setVal('ch-mission-inp-total',   d.mission_total);
 
-  // 品目別内訳（CSV取込時に保存された mission_dessert_items を表示）
+  // 品目別内訳（CSV取込時に保存された mission_dessert_items をドーナツ＋バーで表示）
+  var CH_COLORS = ['#e8590c','#2b8a5e','#3b6fb5','#d4a72c','#8e5aa8','#c0392b','#4fa3a5','#9aa0a6'];
+  function chColor(i) { return CH_COLORS[i % CH_COLORS.length]; }
   var mItems = d.mission_dessert_items || [];
   var mItemsWrap = document.getElementById('ch-mission-items-wrap');
   if (mItemsWrap) {
     if (mItems.length > 0) {
       mItemsWrap.style.display = 'block';
-      var mItemsHtml = '';
+      var sumQty = 0;
+      for (var si = 0; si < mItems.length; si++) sumQty += (mItems[si].qty || 0);
+
+      // ドーナツグラフ（SVG）
+      var donut = '';
+      if (sumQty > 0) {
+        var r = 44, cx = 60, cy = 60, circ = 2 * Math.PI * r, off = 0;
+        donut = '<svg viewBox="0 0 120 120" width="128" height="128" style="flex:none">';
+        for (var di = 0; di < mItems.length; di++) {
+          var frac = (mItems[di].qty || 0) / sumQty;
+          if (frac <= 0) continue;
+          donut += '<circle r="' + r + '" cx="' + cx + '" cy="' + cy + '" fill="none" stroke="' + chColor(di)
+            + '" stroke-width="20" stroke-dasharray="' + (circ * frac) + ' ' + (circ * (1 - frac))
+            + '" stroke-dashoffset="' + (-off) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>';
+          off += circ * frac;
+        }
+        donut += '<text x="' + cx + '" y="' + (cy - 2) + '" text-anchor="middle" font-size="18" font-weight="700" fill="var(--text)">' + sumQty + '</text>'
+          + '<text x="' + cx + '" y="' + (cy + 14) + '" text-anchor="middle" font-size="9" fill="var(--text2)">食</text></svg>';
+      }
+
+      // 色チップ＋比率バー付きリスト
+      var mItemsHtml = '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">' + donut + '<div style="flex:1;min-width:240px">';
       for (var mi = 0; mi < mItems.length; mi++) {
         var it = mItems[mi];
-        var itPct = mDessert > 0 ? Math.round((it.qty || 0) / mDessert * 100) : 0;
-        mItemsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:3px 0;border-bottom:1px dashed var(--border)">'
-          + '<span>' + String(it.name || '').replace(/</g,'&lt;') + '</span>'
+        var itPct = sumQty > 0 ? Math.round((it.qty || 0) / sumQty * 100) : 0;
+        mItemsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:3px 4px;border-radius:4px;'
+          + 'background:linear-gradient(90deg,' + chColor(mi) + '22 ' + itPct + '%,transparent ' + itPct + '%)">'
+          + '<span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:' + chColor(mi) + ';flex:none"></span>'
+          + String(it.name || '').replace(/</g,'&lt;') + '</span>'
           + '<span style="white-space:nowrap"><strong>' + (it.qty || 0) + '</strong>食 <span style="color:var(--text2)">(' + itPct + '%)</span></span>'
           + '</div>';
       }
+      mItemsHtml += '</div></div>';
       var mItemsEl = document.getElementById('ch-mission-items');
       if (mItemsEl) mItemsEl.innerHTML = mItemsHtml;
     } else {
@@ -2522,14 +2548,48 @@ function updateChallengUI(d, shopKey) {
     }
   }
 
-  // 曜日別内訳（日別CSV取込時に保存された mission_dessert_weekday を表示）
+  // 曜日別内訳（日別CSV取込時に保存された mission_dessert_weekday を積み上げ棒＋表で表示）
   var wdData = d.mission_dessert_weekday;
   var wdWrap = document.getElementById('ch-mission-weekday-wrap');
   if (wdWrap) {
     if (wdData && wdData.items && wdData.items.length > 0) {
       wdWrap.style.display = 'block';
       var WDL = ['月','火','水','木','金','土','日'];
-      var wh = '<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:430px">';
+
+      // ── 積み上げ棒グラフ（上位5品目＋その他、品目別と同じ配色） ──
+      var TOPN = 5;
+      var maxWd = 1;
+      for (var mw = 0; mw < 7; mw++) if ((wdData.totals && wdData.totals[mw] || 0) > maxWd) maxWd = wdData.totals[mw];
+      var GW = 560, GH = 185, baseY = 152, plotH = 128, padX = 26, bw = 46;
+      var gapX = (GW - padX * 2 - bw * 7) / 6;
+      var gsvg = '<svg viewBox="0 0 ' + GW + ' ' + GH + '" style="width:100%;max-width:640px;display:block">';
+      for (var gx = 0; gx < 7; gx++) {
+        var x = padX + gx * (bw + gapX);
+        var colTotal = (wdData.totals && wdData.totals[gx]) || 0;
+        var yCur = baseY;
+        for (var gi = 0; gi < wdData.items.length; gi++) {
+          var v = (wdData.items[gi].w && wdData.items[gi].w[gx]) || 0;
+          if (v <= 0) continue;
+          var ci = gi < TOPN ? gi : TOPN;                 // 上位5品目は固有色、6位以下は「その他」色
+          var hgt = v / maxWd * plotH;
+          yCur -= hgt;
+          gsvg += '<rect x="' + x + '" y="' + yCur + '" width="' + bw + '" height="' + hgt + '" fill="' + chColor(ci) + '" rx="1"/>';
+        }
+        gsvg += '<text x="' + (x + bw/2) + '" y="' + (baseY + 15) + '" text-anchor="middle" font-size="11" fill="var(--text2)">' + WDL[gx] + '</text>';
+        if (colTotal > 0) gsvg += '<text x="' + (x + bw/2) + '" y="' + (yCur - 5) + '" text-anchor="middle" font-size="11" font-weight="700" fill="var(--text)">' + colTotal + '</text>';
+      }
+      gsvg += '<line x1="' + padX + '" y1="' + baseY + '" x2="' + (GW - padX) + '" y2="' + baseY + '" stroke="var(--border)" stroke-width="1"/></svg>';
+      // 凡例（上位5＋その他）
+      var glegend = '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:10.5px;color:var(--text2);margin:2px 0 8px">';
+      for (var gl = 0; gl < Math.min(wdData.items.length, TOPN); gl++) {
+        glegend += '<span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:' + chColor(gl) + '"></span>' + String(wdData.items[gl].name||'').replace(/</g,'&lt;') + '</span>';
+      }
+      if (wdData.items.length > TOPN) glegend += '<span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:' + chColor(TOPN) + '"></span>その他</span>';
+      glegend += '</div>';
+
+      // ── 詳細表（従来どおり） ──
+      var wh = gsvg + glegend;
+      wh += '<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:430px">';
       wh += '<tr><th style="text-align:left;padding:3px 4px;border-bottom:1px solid var(--border)">品目</th>';
       for (var wc = 0; wc < 7; wc++) wh += '<th style="padding:3px 4px;border-bottom:1px solid var(--border)">' + WDL[wc] + '</th>';
       wh += '<th style="padding:3px 4px;border-bottom:1px solid var(--border)">計</th></tr>';
@@ -2538,7 +2598,8 @@ function updateChallengUI(d, shopKey) {
         var wArr = wit.w || [];
         var wMax = 0;
         for (var wm = 0; wm < 7; wm++) if ((wArr[wm]||0) > wMax) wMax = wArr[wm]||0;
-        wh += '<tr><td style="text-align:left;padding:3px 4px;border-bottom:1px dashed var(--border);white-space:nowrap">' + String(wit.name||'').replace(/</g,'&lt;') + '</td>';
+        var rowChip = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + chColor(wr < TOPN ? wr : TOPN) + ';margin-right:5px"></span>';
+        wh += '<tr><td style="text-align:left;padding:3px 4px;border-bottom:1px dashed var(--border);white-space:nowrap">' + rowChip + String(wit.name||'').replace(/</g,'&lt;') + '</td>';
         for (var wv = 0; wv < 7; wv++) {
           var val = wArr[wv] || 0;
           var st = val === 0 ? 'color:var(--border)'
