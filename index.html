@@ -484,6 +484,10 @@ nav{display:flex;gap:2px}
           <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 品目別内訳を見る</summary>
           <div id="ch-mission-items" style="margin-top:6px"></div>
         </details>
+        <details id="ch-mission-weekday-wrap" style="display:none;margin-top:6px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 曜日別内訳（仕込み用）</summary>
+          <div id="ch-mission-weekday" style="margin-top:6px;overflow-x:auto"></div>
+        </details>
         <div class="ch-update-row" id="ch-mission-edit" style="display:none">
           <div><div class="ch-update-label">デザート注文数（今月）</div><input class="ch-inp" type="number" id="ch-mission-inp-dessert" placeholder="例: 180"></div>
           <div><div class="ch-update-label">総客数（今月）</div><input class="ch-inp" type="number" id="ch-mission-inp-total" placeholder="例: 520"></div>
@@ -2518,6 +2522,43 @@ function updateChallengUI(d, shopKey) {
     }
   }
 
+  // 曜日別内訳（日別CSV取込時に保存された mission_dessert_weekday を表示）
+  var wdData = d.mission_dessert_weekday;
+  var wdWrap = document.getElementById('ch-mission-weekday-wrap');
+  if (wdWrap) {
+    if (wdData && wdData.items && wdData.items.length > 0) {
+      wdWrap.style.display = 'block';
+      var WDL = ['月','火','水','木','金','土','日'];
+      var wh = '<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:430px">';
+      wh += '<tr><th style="text-align:left;padding:3px 4px;border-bottom:1px solid var(--border)">品目</th>';
+      for (var wc = 0; wc < 7; wc++) wh += '<th style="padding:3px 4px;border-bottom:1px solid var(--border)">' + WDL[wc] + '</th>';
+      wh += '<th style="padding:3px 4px;border-bottom:1px solid var(--border)">計</th></tr>';
+      for (var wr = 0; wr < wdData.items.length; wr++) {
+        var wit = wdData.items[wr];
+        var wArr = wit.w || [];
+        var wMax = 0;
+        for (var wm = 0; wm < 7; wm++) if ((wArr[wm]||0) > wMax) wMax = wArr[wm]||0;
+        wh += '<tr><td style="text-align:left;padding:3px 4px;border-bottom:1px dashed var(--border);white-space:nowrap">' + String(wit.name||'').replace(/</g,'&lt;') + '</td>';
+        for (var wv = 0; wv < 7; wv++) {
+          var val = wArr[wv] || 0;
+          var st = val === 0 ? 'color:var(--border)'
+                 : (val === wMax ? 'font-weight:700;color:var(--accent2)' : '');
+          wh += '<td style="text-align:center;padding:3px 4px;border-bottom:1px dashed var(--border);' + st + '">' + (val || '·') + '</td>';
+        }
+        wh += '<td style="text-align:center;padding:3px 4px;border-bottom:1px dashed var(--border);font-weight:700">' + (wit.total||0) + '</td></tr>';
+      }
+      wh += '<tr><td style="text-align:left;padding:4px">曜日計</td>';
+      for (var wt = 0; wt < 7; wt++) wh += '<td style="text-align:center;padding:4px;font-weight:700">' + ((wdData.totals && wdData.totals[wt]) || 0) + '</td>';
+      wh += '<td style="text-align:center;padding:4px;font-weight:700">' + (wdData.grand || 0) + '</td></tr>';
+      wh += '</table>';
+      wh += '<div style="font-size:10px;color:var(--text2);margin-top:4px">太字＝その品目が最も出る曜日。日別CSV（Daily_Item_Sales）取込時に更新されます。</div>';
+      var wdEl = document.getElementById('ch-mission-weekday');
+      if (wdEl) wdEl.innerHTML = wh;
+    } else {
+      wdWrap.style.display = 'none';
+    }
+  }
+
   // === SPOT (客単価) ===
   var sCurrent = d.spot_current || 0;
   var sBase = d.spot_base || 0;
@@ -2797,7 +2838,7 @@ function handleCsvImport(event) {
   var shopKey = getChShopKey();
   // 本店: salesFile(UTF-16 TSV) + itemFile(UTF-16 TSV)
   // マルコ: marcoSalesFile(CP932 CSV 年間売上) + marcoItemFile(Shift_JIS CSV aggregateMenu)
-  var results = { salesFile: null, itemFile: null, marcoSalesFile: null, marcoItemFile: null };
+  var results = { salesFile: null, itemFile: null, dailyFile: null, marcoSalesFile: null, marcoItemFile: null };
   var pending = files.length;
 
   files.forEach(function(file) {
@@ -2817,7 +2858,12 @@ function handleCsvImport(event) {
         if (rows.length >= 2) {
           var header = rows[0];
           if (header.indexOf('当年実績') !== -1) results.salesFile = rows;
-          if (header.indexOf('商品名') !== -1 && header.indexOf('売上数量') !== -1) results.itemFile = rows;
+          // 「営業日」列があれば日別CSV（Daily_Item_Sales）、無ければ月間ABC品目CSV
+          if (header.indexOf('営業日') !== -1 && header.indexOf('商品名') !== -1 && header.indexOf('売上数量') !== -1) {
+            results.dailyFile = rows;
+          } else if (header.indexOf('商品名') !== -1 && header.indexOf('売上数量') !== -1) {
+            results.itemFile = rows;
+          }
         }
       } else {
         // マルコ系（CP932 / Shift_JIS）→ TextDecoderで直接デコード
@@ -2891,7 +2937,7 @@ function parseCSV(text, sep) { return parseCSVAuto(text, sep); }
 
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
-  var hasData = results.salesFile || results.itemFile || results.marcoSalesFile || results.marcoItemFile;
+  var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoItemFile;
   if (!hasData) {
     alert('売上CSVが見つかりませんでした。\n\n【本店】売上実績CSV + Daily_Item_Sales CSV\n【マルコ】年間売上CSV + aggregateMenu CSV\n\n勤怠CSVは下の「💰インセンティブ試算」から読み込んでください。');
     return;
@@ -2951,6 +2997,47 @@ function processCsvResults(results, shopKey) {
     upd.mission_dessert = dessertTotal;
     upd.mission_dessert_items = dessertItems;
     upd.mission_updated = ts;
+  }
+
+  // ===== 本店: 日別品目CSV（Daily_Item_Sales・営業日つき）→ 曜日別内訳 =====
+  if (results.dailyFile && !isMarco) {
+    var dRows = results.dailyFile;
+    var dHeader = dRows[0];
+    var dIdxDate = dHeader.indexOf('営業日');
+    var dIdxName = dHeader.indexOf('商品名');
+    var dIdxQty  = dHeader.indexOf('売上数量');
+    var WD = ['月','火','水','木','金','土','日'];
+    var byItem = {};                       // 品目名 → [月..日] の食数
+    var wdTotals = [0,0,0,0,0,0,0];
+    var dGrand = 0;
+    for (var dj = 1; dj < dRows.length; dj++) {
+      var dRow = dRows[dj];
+      if (!dRow[dIdxName]) continue;
+      var dName = dRow[dIdxName].replace(/\u3000/g,' ').trim();
+      var dNorm = dName.replace(/\s/g,'');
+      var dIsDes = DESSERT_NAMES.some(function(t){ return dNorm.indexOf(t.replace(/\s/g,'')) !== -1; });
+      if (!dIsDes) continue;
+      var dm = String(dRow[dIdxDate]||'').match(/[（(]([月火水木金土日])[)）]/);
+      if (!dm) continue;
+      var wi = WD.indexOf(dm[1]);
+      if (wi === -1) continue;
+      var dQty = parseInt((dRow[dIdxQty]||'0').replace(/,/g,'')) || 0;
+      if (!byItem[dName]) byItem[dName] = [0,0,0,0,0,0,0];
+      byItem[dName][wi] += dQty;
+      wdTotals[wi] += dQty;
+      dGrand += dQty;
+    }
+    var wdItems = Object.keys(byItem).map(function(n){
+      var w = byItem[n];
+      return { name: n, w: w, total: w.reduce(function(a,b){ return a+b; }, 0) };
+    }).sort(function(a,b){ return b.total - a.total; });
+    upd.mission_dessert_weekday = { items: wdItems, totals: wdTotals, grand: dGrand };
+    // 月間ABC品目CSVが一緒に無いときは、日別CSVから合計・品目別内訳も更新する
+    if (!results.itemFile) {
+      upd.mission_dessert = dGrand;
+      upd.mission_dessert_items = wdItems.map(function(it){ return { name: it.name, qty: it.total }; });
+      upd.mission_updated = ts;
+    }
   }
 
   // ===== マルコ: 年間売上CSV =====
