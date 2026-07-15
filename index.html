@@ -443,6 +443,10 @@ nav{display:flex;gap:2px}
         <div class="ch-bar-wrap"><div class="ch-bar" id="ch-big-bar" style="width:0%;background:var(--accent)"></div></div>
         <div class="ch-remain" id="ch-big-remain">目標まで <strong>¥—</strong></div>
         <div class="ch-lastupdate" id="ch-big-lastupdate"></div>
+        <details id="ch-big-weekday-wrap" open style="display:none;margin-top:8px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 曜日別 人気メニュー TOP5（デザート以外）</summary>
+          <div id="ch-big-weekday" style="margin-top:6px;overflow-x:auto"></div>
+        </details>
         <div class="ch-update-row" id="ch-big-edit" style="display:none">
           <div><div class="ch-update-label">今月実績（税込）</div><input class="ch-inp" type="number" id="ch-big-inp-current" placeholder="例: 2500000"></div>
           <div><div class="ch-update-label" id="ch-big-base-label">比較基準（前年同月）</div><input class="ch-inp" type="number" id="ch-big-inp-base" placeholder="例: 2200000"></div>
@@ -480,11 +484,11 @@ nav{display:flex;gap:2px}
         <div class="ch-bar-wrap"><div class="ch-bar" id="ch-mission-bar" style="width:0%;background:var(--accent2)"></div></div>
         <div class="ch-remain" id="ch-mission-remain">目標 <strong>30%</strong> まで <strong id="ch-mission-gap">—%</strong></div>
         <div class="ch-lastupdate" id="ch-mission-lastupdate"></div>
-        <details id="ch-mission-items-wrap" style="display:none;margin-top:8px">
+        <details id="ch-mission-items-wrap" open style="display:none;margin-top:8px">
           <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 品目別内訳を見る</summary>
           <div id="ch-mission-items" style="margin-top:6px"></div>
         </details>
-        <details id="ch-mission-weekday-wrap" style="display:none;margin-top:6px">
+        <details id="ch-mission-weekday-wrap" open style="display:none;margin-top:6px">
           <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 曜日別内訳（仕込み用）</summary>
           <div id="ch-mission-weekday" style="margin-top:6px;overflow-x:auto"></div>
         </details>
@@ -2548,75 +2552,88 @@ function updateChallengUI(d, shopKey) {
     }
   }
 
-  // 曜日別内訳（日別CSV取込時に保存された mission_dessert_weekday を積み上げ棒＋表で表示）
+  // 曜日別チャート＋表の共通描画（デザート内訳と人気メニューTOP5で共用）
+  function chWeekdayBlockHTML(wdData, TOPN, noteText) {
+    var WDL = ['月','火','水','木','金','土','日'];
+    var maxWd = 1;
+    for (var mw = 0; mw < 7; mw++) if ((wdData.totals && wdData.totals[mw] || 0) > maxWd) maxWd = wdData.totals[mw];
+    var GW = 560, GH = 185, baseY = 152, plotH = 128, padX = 26, bw = 46;
+    var gapX = (GW - padX * 2 - bw * 7) / 6;
+    var gsvg = '<svg viewBox="0 0 ' + GW + ' ' + GH + '" style="width:100%;max-width:640px;display:block">';
+    for (var gx = 0; gx < 7; gx++) {
+      var x = padX + gx * (bw + gapX);
+      var colTotal = (wdData.totals && wdData.totals[gx]) || 0;
+      var yCur = baseY;
+      for (var gi = 0; gi < wdData.items.length; gi++) {
+        var v = (wdData.items[gi].w && wdData.items[gi].w[gx]) || 0;
+        if (v <= 0) continue;
+        var ci = gi < TOPN ? gi : TOPN;
+        var hgt = v / maxWd * plotH;
+        yCur -= hgt;
+        gsvg += '<rect x="' + x + '" y="' + yCur + '" width="' + bw + '" height="' + hgt + '" fill="' + chColor(ci) + '" rx="1"/>';
+      }
+      gsvg += '<text x="' + (x + bw/2) + '" y="' + (baseY + 15) + '" text-anchor="middle" font-size="11" fill="var(--text2)">' + WDL[gx] + '</text>';
+      if (colTotal > 0) gsvg += '<text x="' + (x + bw/2) + '" y="' + (yCur - 5) + '" text-anchor="middle" font-size="11" font-weight="700" fill="var(--text)">' + colTotal + '</text>';
+    }
+    gsvg += '<line x1="' + padX + '" y1="' + baseY + '" x2="' + (GW - padX) + '" y2="' + baseY + '" stroke="var(--border)" stroke-width="1"/></svg>';
+    var glegend = '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:10.5px;color:var(--text2);margin:2px 0 8px">';
+    for (var gl = 0; gl < Math.min(wdData.items.length, TOPN); gl++) {
+      glegend += '<span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:' + chColor(gl) + '"></span>' + String(wdData.items[gl].name||'').replace(/</g,'&lt;') + '</span>';
+    }
+    if (wdData.items.length > TOPN) glegend += '<span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:' + chColor(TOPN) + '"></span>その他</span>';
+    glegend += '</div>';
+
+    var wh = gsvg + glegend;
+    wh += '<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:430px">';
+    wh += '<tr><th style="text-align:left;padding:3px 4px;border-bottom:1px solid var(--border)">品目</th>';
+    for (var wc = 0; wc < 7; wc++) wh += '<th style="padding:3px 4px;border-bottom:1px solid var(--border)">' + WDL[wc] + '</th>';
+    wh += '<th style="padding:3px 4px;border-bottom:1px solid var(--border)">計</th></tr>';
+    for (var wr = 0; wr < wdData.items.length; wr++) {
+      var wit = wdData.items[wr];
+      var wArr = wit.w || [];
+      var wMax = 0;
+      for (var wm = 0; wm < 7; wm++) if ((wArr[wm]||0) > wMax) wMax = wArr[wm]||0;
+      var rowChip = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + chColor(wr < TOPN ? wr : TOPN) + ';margin-right:5px"></span>';
+      wh += '<tr><td style="text-align:left;padding:3px 4px;border-bottom:1px dashed var(--border);white-space:nowrap">' + rowChip + String(wit.name||'').replace(/</g,'&lt;') + '</td>';
+      for (var wv = 0; wv < 7; wv++) {
+        var val = wArr[wv] || 0;
+        var st = val === 0 ? 'color:var(--border)'
+               : (val === wMax ? 'font-weight:700;color:var(--accent2)' : '');
+        wh += '<td style="text-align:center;padding:3px 4px;border-bottom:1px dashed var(--border);' + st + '">' + (val || '·') + '</td>';
+      }
+      wh += '<td style="text-align:center;padding:3px 4px;border-bottom:1px dashed var(--border);font-weight:700">' + (wit.total||0) + '</td></tr>';
+    }
+    wh += '<tr><td style="text-align:left;padding:4px">曜日計</td>';
+    for (var wt = 0; wt < 7; wt++) wh += '<td style="text-align:center;padding:4px;font-weight:700">' + ((wdData.totals && wdData.totals[wt]) || 0) + '</td>';
+    wh += '<td style="text-align:center;padding:4px;font-weight:700">' + (wdData.grand || 0) + '</td></tr>';
+    wh += '</table>';
+    wh += '<div style="font-size:10px;color:var(--text2);margin-top:4px">' + noteText + '</div>';
+    return wh;
+  }
+
+  // 曜日別デザート内訳（日別CSV取込時に保存された mission_dessert_weekday）
   var wdData = d.mission_dessert_weekday;
   var wdWrap = document.getElementById('ch-mission-weekday-wrap');
   if (wdWrap) {
     if (wdData && wdData.items && wdData.items.length > 0) {
       wdWrap.style.display = 'block';
-      var WDL = ['月','火','水','木','金','土','日'];
-
-      // ── 積み上げ棒グラフ（上位5品目＋その他、品目別と同じ配色） ──
-      var TOPN = 5;
-      var maxWd = 1;
-      for (var mw = 0; mw < 7; mw++) if ((wdData.totals && wdData.totals[mw] || 0) > maxWd) maxWd = wdData.totals[mw];
-      var GW = 560, GH = 185, baseY = 152, plotH = 128, padX = 26, bw = 46;
-      var gapX = (GW - padX * 2 - bw * 7) / 6;
-      var gsvg = '<svg viewBox="0 0 ' + GW + ' ' + GH + '" style="width:100%;max-width:640px;display:block">';
-      for (var gx = 0; gx < 7; gx++) {
-        var x = padX + gx * (bw + gapX);
-        var colTotal = (wdData.totals && wdData.totals[gx]) || 0;
-        var yCur = baseY;
-        for (var gi = 0; gi < wdData.items.length; gi++) {
-          var v = (wdData.items[gi].w && wdData.items[gi].w[gx]) || 0;
-          if (v <= 0) continue;
-          var ci = gi < TOPN ? gi : TOPN;                 // 上位5品目は固有色、6位以下は「その他」色
-          var hgt = v / maxWd * plotH;
-          yCur -= hgt;
-          gsvg += '<rect x="' + x + '" y="' + yCur + '" width="' + bw + '" height="' + hgt + '" fill="' + chColor(ci) + '" rx="1"/>';
-        }
-        gsvg += '<text x="' + (x + bw/2) + '" y="' + (baseY + 15) + '" text-anchor="middle" font-size="11" fill="var(--text2)">' + WDL[gx] + '</text>';
-        if (colTotal > 0) gsvg += '<text x="' + (x + bw/2) + '" y="' + (yCur - 5) + '" text-anchor="middle" font-size="11" font-weight="700" fill="var(--text)">' + colTotal + '</text>';
-      }
-      gsvg += '<line x1="' + padX + '" y1="' + baseY + '" x2="' + (GW - padX) + '" y2="' + baseY + '" stroke="var(--border)" stroke-width="1"/></svg>';
-      // 凡例（上位5＋その他）
-      var glegend = '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:10.5px;color:var(--text2);margin:2px 0 8px">';
-      for (var gl = 0; gl < Math.min(wdData.items.length, TOPN); gl++) {
-        glegend += '<span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:' + chColor(gl) + '"></span>' + String(wdData.items[gl].name||'').replace(/</g,'&lt;') + '</span>';
-      }
-      if (wdData.items.length > TOPN) glegend += '<span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:' + chColor(TOPN) + '"></span>その他</span>';
-      glegend += '</div>';
-
-      // ── 詳細表（従来どおり） ──
-      var wh = gsvg + glegend;
-      wh += '<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:430px">';
-      wh += '<tr><th style="text-align:left;padding:3px 4px;border-bottom:1px solid var(--border)">品目</th>';
-      for (var wc = 0; wc < 7; wc++) wh += '<th style="padding:3px 4px;border-bottom:1px solid var(--border)">' + WDL[wc] + '</th>';
-      wh += '<th style="padding:3px 4px;border-bottom:1px solid var(--border)">計</th></tr>';
-      for (var wr = 0; wr < wdData.items.length; wr++) {
-        var wit = wdData.items[wr];
-        var wArr = wit.w || [];
-        var wMax = 0;
-        for (var wm = 0; wm < 7; wm++) if ((wArr[wm]||0) > wMax) wMax = wArr[wm]||0;
-        var rowChip = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + chColor(wr < TOPN ? wr : TOPN) + ';margin-right:5px"></span>';
-        wh += '<tr><td style="text-align:left;padding:3px 4px;border-bottom:1px dashed var(--border);white-space:nowrap">' + rowChip + String(wit.name||'').replace(/</g,'&lt;') + '</td>';
-        for (var wv = 0; wv < 7; wv++) {
-          var val = wArr[wv] || 0;
-          var st = val === 0 ? 'color:var(--border)'
-                 : (val === wMax ? 'font-weight:700;color:var(--accent2)' : '');
-          wh += '<td style="text-align:center;padding:3px 4px;border-bottom:1px dashed var(--border);' + st + '">' + (val || '·') + '</td>';
-        }
-        wh += '<td style="text-align:center;padding:3px 4px;border-bottom:1px dashed var(--border);font-weight:700">' + (wit.total||0) + '</td></tr>';
-      }
-      wh += '<tr><td style="text-align:left;padding:4px">曜日計</td>';
-      for (var wt = 0; wt < 7; wt++) wh += '<td style="text-align:center;padding:4px;font-weight:700">' + ((wdData.totals && wdData.totals[wt]) || 0) + '</td>';
-      wh += '<td style="text-align:center;padding:4px;font-weight:700">' + (wdData.grand || 0) + '</td></tr>';
-      wh += '</table>';
-      wh += '<div style="font-size:10px;color:var(--text2);margin-top:4px">太字＝その品目が最も出る曜日。日別CSV（Daily_Item_Sales）取込時に更新されます。</div>';
       var wdEl = document.getElementById('ch-mission-weekday');
-      if (wdEl) wdEl.innerHTML = wh;
+      if (wdEl) wdEl.innerHTML = chWeekdayBlockHTML(wdData, 5, '太字＝その品目が最も出る曜日。日別CSV（Daily_Item_Sales）取込時に更新されます。');
     } else {
       wdWrap.style.display = 'none';
+    }
+  }
+
+  // 曜日別 人気メニューTOP5・デザート以外（日別CSV取込時に保存された big_item_weekday）
+  var biData = d.big_item_weekday;
+  var biWrap = document.getElementById('ch-big-weekday-wrap');
+  if (biWrap) {
+    if (biData && biData.items && biData.items.length > 0) {
+      biWrap.style.display = 'block';
+      var biEl = document.getElementById('ch-big-weekday');
+      if (biEl) biEl.innerHTML = chWeekdayBlockHTML(biData, 5, 'フードのみ・売上¥0の指示行とお通し等は除外。日別CSV（Daily_Item_Sales）取込時に更新されます。');
+    } else {
+      biWrap.style.display = 'none';
     }
   }
 
@@ -3099,6 +3116,41 @@ function processCsvResults(results, shopKey) {
       upd.mission_dessert_items = wdItems.map(function(it){ return { name: it.name, qty: it.total }; });
       upd.mission_updated = ts;
     }
+
+    // ── デザート以外の人気メニューTOP5（曜日別・フードのみ） ──
+    // 売上¥0の行（さび抜き・シャリ少・先出し等の指示／セット構成）と下記除外品は数えない
+    var BIG_ITEM_EXCLUDE = ['お通し','T.Oパック'];
+    var dIdxCat1 = dHeader.indexOf('カテゴリ1');
+    var dIdxAmt  = dHeader.indexOf('売上金額');
+    var byFood = {};
+    for (var fj = 1; fj < dRows.length; fj++) {
+      var fRow = dRows[fj];
+      if (!fRow[dIdxName]) continue;
+      if (dIdxCat1 !== -1 && fRow[dIdxCat1] !== 'フード') continue;
+      var fAmt = parseInt(String(fRow[dIdxAmt]||'').replace(/[¥,]/g,'')) || 0;
+      if (fAmt <= 0) continue;
+      var fName = fRow[dIdxName].replace(/\u3000/g,' ').trim();
+      var fNorm = fName.replace(/\s/g,'');
+      if (DESSERT_NAMES.some(function(t){ return fNorm.indexOf(t.replace(/\s/g,'')) !== -1; })) continue;
+      if (BIG_ITEM_EXCLUDE.some(function(t){ return fName.indexOf(t) !== -1; })) continue;
+      var fm = String(fRow[dIdxDate]||'').match(/[（(]([月火水木金土日])[)）]/);
+      if (!fm) continue;
+      var fwi = WD.indexOf(fm[1]);
+      if (fwi === -1) continue;
+      var fQty = parseInt((fRow[dIdxQty]||'0').replace(/,/g,'')) || 0;
+      if (!byFood[fName]) byFood[fName] = [0,0,0,0,0,0,0];
+      byFood[fName][fwi] += fQty;
+    }
+    var foodItems = Object.keys(byFood).map(function(n){
+      var w = byFood[n];
+      return { name: n, w: w, total: w.reduce(function(a,b){ return a+b; }, 0) };
+    }).sort(function(a,b){ return b.total - a.total; }).slice(0, 5);
+    var foodTotals = [0,0,0,0,0,0,0], foodGrand = 0;
+    foodItems.forEach(function(it){
+      for (var fk = 0; fk < 7; fk++) { foodTotals[fk] += it.w[fk] || 0; }
+      foodGrand += it.total;
+    });
+    upd.big_item_weekday = { items: foodItems, totals: foodTotals, grand: foodGrand };
   }
 
   // ===== マルコ: 年間売上CSV =====
