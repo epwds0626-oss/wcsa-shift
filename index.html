@@ -2647,20 +2647,51 @@ function updateChallengUI(d, shopKey) {
   if (shWrap) {
     if (shItems.length > 0) {
       shWrap.style.display = 'block';
-      var shMax = 1;
-      for (var sm = 0; sm < shItems.length; sm++) if ((shItems[sm].qty||0) > shMax) shMax = shItems[sm].qty;
-      var shHtml = '';
+      // 単価帯の色（高いほど熱い色）
+      function shTierColor(p) {
+        return p >= 7000 ? '#c0392b' : p >= 5500 ? '#e8590c' : p >= 4500 ? '#d4a72c' : '#2b8a5e';
+      }
+      var shMax = 1, shTotalQty = 0, shTotalSales = 0, shTop = shItems[0];
+      for (var sm = 0; sm < shItems.length; sm++) {
+        var q0 = shItems[sm].qty || 0;
+        if (q0 > shMax) shMax = q0;
+        shTotalQty += q0;
+        shTotalSales += q0 * (shItems[sm].price || 0);
+        if (q0 > (shTop.qty || 0)) shTop = shItems[sm];
+      }
+      // サマリー3チップ
+      function shChip(label, value) {
+        return '<div style="flex:1;min-width:110px;background:var(--bg2,#f4f6f9);border-radius:8px;padding:6px 10px;text-align:center">'
+          + '<div style="font-size:10px;color:var(--text2)">' + label + '</div>'
+          + '<div style="font-size:15px;font-weight:700;color:var(--text)">' + value + '</div></div>';
+      }
+      var shHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+        + shChip('高単価帯の出数', shTotalQty.toLocaleString() + '食')
+        + shChip('高単価帯の売上（概算）', '¥' + Math.round(shTotalSales).toLocaleString())
+        + shChip('一番出ている高単価', String(shTop.name||'').split(' ')[0].replace(/</g,'&lt;') + ' ' + (shTop.qty||0) + '食')
+        + '</div>';
+      // バーチャート（棒＝出数、色＝単価帯）
       for (var sh = 0; sh < shItems.length; sh++) {
         var sit = shItems[sh];
-        var barPct = Math.round((sit.qty||0) / shMax * 100);
-        shHtml += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;padding:3px 4px;border-radius:4px;'
-          + 'background:linear-gradient(90deg,#4fa3a522 ' + barPct + '%,transparent ' + barPct + '%)">'
-          + '<span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="flex:none;font-weight:700;color:var(--accent3);font-variant-numeric:tabular-nums">¥' + (sit.price||0).toLocaleString() + '</span>'
-          + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + String(sit.name||'').replace(/</g,'&lt;') + '</span></span>'
-          + '<span style="white-space:nowrap;flex:none"><strong>' + (sit.qty||0) + '</strong>食</span>'
-          + '</div>';
+        var barPct = Math.max(2, Math.round((sit.qty||0) / shMax * 100));
+        var tc = shTierColor(sit.price||0);
+        var salesAmt = (sit.qty||0) * (sit.price||0);
+        shHtml += '<div style="margin-bottom:7px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:11.5px">'
+          +   '<span style="display:flex;align-items:baseline;gap:6px;min-width:0">'
+          +     '<span style="flex:none;font-weight:700;color:' + tc + ';font-variant-numeric:tabular-nums">¥' + (sit.price||0).toLocaleString() + '</span>'
+          +     '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + String(sit.name||'').replace(/</g,'&lt;') + '</span>'
+          +   '</span>'
+          +   '<span style="white-space:nowrap;flex:none"><strong style="font-size:13px">' + (sit.qty||0) + '</strong>食'
+          +     ' <span style="color:var(--text2);font-size:10px">＝¥' + salesAmt.toLocaleString() + '</span></span>'
+          + '</div>'
+          + '<div style="height:9px;border-radius:5px;background:var(--bg2,#eef1f5);margin-top:3px;overflow:hidden">'
+          +   '<div style="height:100%;width:' + barPct + '%;border-radius:5px;background:linear-gradient(90deg,' + tc + 'cc,' + tc + ')"></div>'
+          + '</div></div>';
       }
-      shHtml += '<div style="font-size:10px;color:var(--text2);margin-top:4px">一声の提案が客単価をつくります。日別CSV（Daily_Item_Sales）取込時に更新。</div>';
+      shHtml += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--text2);margin-top:2px">'
+        + '<span>棒の長さ＝出数　色＝単価帯（<span style="color:#c0392b">¥7,000〜</span>／<span style="color:#e8590c">¥5,500〜</span>／<span style="color:#d4a72c">¥4,500〜</span>／<span style="color:#2b8a5e">¥3,000〜</span>）</span>'
+        + '<span>一声の提案が客単価をつくります</span></div>';
       var shEl = document.getElementById('ch-spot-high');
       if (shEl) shEl.innerHTML = shHtml;
     } else {
