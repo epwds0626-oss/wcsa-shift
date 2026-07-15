@@ -480,6 +480,10 @@ nav{display:flex;gap:2px}
         <div class="ch-bar-wrap"><div class="ch-bar" id="ch-mission-bar" style="width:0%;background:var(--accent2)"></div></div>
         <div class="ch-remain" id="ch-mission-remain">目標 <strong>30%</strong> まで <strong id="ch-mission-gap">—%</strong></div>
         <div class="ch-lastupdate" id="ch-mission-lastupdate"></div>
+        <details id="ch-mission-items-wrap" style="display:none;margin-top:8px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 品目別内訳を見る</summary>
+          <div id="ch-mission-items" style="margin-top:6px"></div>
+        </details>
         <div class="ch-update-row" id="ch-mission-edit" style="display:none">
           <div><div class="ch-update-label">デザート注文数（今月）</div><input class="ch-inp" type="number" id="ch-mission-inp-dessert" placeholder="例: 180"></div>
           <div><div class="ch-update-label">総客数（今月）</div><input class="ch-inp" type="number" id="ch-mission-inp-total" placeholder="例: 520"></div>
@@ -2492,6 +2496,28 @@ function updateChallengUI(d, shopKey) {
   if (d.mission_dessert) setVal('ch-mission-inp-dessert', d.mission_dessert);
   if (d.mission_total)   setVal('ch-mission-inp-total',   d.mission_total);
 
+  // 品目別内訳（CSV取込時に保存された mission_dessert_items を表示）
+  var mItems = d.mission_dessert_items || [];
+  var mItemsWrap = document.getElementById('ch-mission-items-wrap');
+  if (mItemsWrap) {
+    if (mItems.length > 0) {
+      mItemsWrap.style.display = 'block';
+      var mItemsHtml = '';
+      for (var mi = 0; mi < mItems.length; mi++) {
+        var it = mItems[mi];
+        var itPct = mDessert > 0 ? Math.round((it.qty || 0) / mDessert * 100) : 0;
+        mItemsHtml += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:3px 0;border-bottom:1px dashed var(--border)">'
+          + '<span>' + String(it.name || '').replace(/</g,'&lt;') + '</span>'
+          + '<span style="white-space:nowrap"><strong>' + (it.qty || 0) + '</strong>食 <span style="color:var(--text2)">(' + itPct + '%)</span></span>'
+          + '</div>';
+      }
+      var mItemsEl = document.getElementById('ch-mission-items');
+      if (mItemsEl) mItemsEl.innerHTML = mItemsHtml;
+    } else {
+      mItemsWrap.style.display = 'none';
+    }
+  }
+
   // === SPOT (客単価) ===
   var sCurrent = d.spot_current || 0;
   var sBase = d.spot_base || 0;
@@ -2905,18 +2931,24 @@ function processCsvResults(results, shopKey) {
     var idxName = iHeader.indexOf('商品名');
     var idxQty  = iHeader.indexOf('売上数量');
     var idxCat2 = iHeader.indexOf('カテゴリ2');
-    var dessertTotal = 0;
+    var dessertTotal = 0, dessertItems = [];
     for (var j = 1; j < iRows.length; j++) {
       var row = iRows[j];
       if (!row[idxName]) continue;
       var name = row[idxName].replace(/\u3000/g,' ').trim();
-      // 【修正 R8.7.14】カテゴリ判定を廃止し、DESSERT_NAMES の10品目のみカウント。
+      // 【修正 R8.7.14】カテゴリ判定を廃止し、DESSERT_NAMES の品目のみカウント。
       // （旧: カテゴリ2=デザート も対象 → 「先出し」「後出し」等の指示ボタンを誤集計していた）
       var normName = name.replace(/\s/g,'');
       var isDessert = DESSERT_NAMES.some(function(t){ return normName.indexOf(t.replace(/\s/g,'')) !== -1; });
-      if (isDessert) dessertTotal += parseInt((row[idxQty]||'0').replace(/,/g,'')) || 0;
+      if (isDessert) {
+        var dq = parseInt((row[idxQty]||'0').replace(/,/g,'')) || 0;
+        dessertTotal += dq;
+        if (dq > 0) dessertItems.push({ name: name, qty: dq });
+      }
     }
+    dessertItems.sort(function(a,b){ return b.qty - a.qty; });
     upd.mission_dessert = dessertTotal;
+    upd.mission_dessert_items = dessertItems;
     upd.mission_updated = ts;
   }
 
@@ -2982,15 +3014,21 @@ function processCsvResults(results, shopKey) {
       var aNName   = aHeader.indexOf('商品名');
       var aNQty    = aHeader.indexOf('出数');
       var MARCO_DESSERT = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ'];
-      var mDessert = 0;
+      var mDessert = 0, mDessertItems = [];
       for (var ar = aHeaderIdx + 1; ar < aRows.length; ar++) {
         var aRow = aRows[ar];
         if (!aRow[aNName]) continue;
         var aName = aRow[aNName].replace(/\u3000/g,' ').trim();
         var isD = MARCO_DESSERT.some(function(t){ return aName.indexOf(t) !== -1; });
-        if (isD) mDessert += parseInt((aRow[aNQty]||'0').replace(/,/g,'')) || 0;
+        if (isD) {
+          var aq = parseInt((aRow[aNQty]||'0').replace(/,/g,'')) || 0;
+          mDessert += aq;
+          if (aq > 0) mDessertItems.push({ name: aName, qty: aq });
+        }
       }
+      mDessertItems.sort(function(a,b){ return b.qty - a.qty; });
       upd.mission_dessert = mDessert;
+      upd.mission_dessert_items = mDessertItems;
       upd.mission_updated = ts;
     }
   }
