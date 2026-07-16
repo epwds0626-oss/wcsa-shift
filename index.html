@@ -2655,6 +2655,13 @@ function updateChallengUI(d, shopKey) {
   var biFull = null;  // マルコの全品目行列（高単価リストの導出にも使う）
   if (d.big_item_wd) {
     biFull = buildWdMatrix(d.big_item_wd);
+    // サラダバー・ドリンクバー・お通しは人気商品/高単価の対象外（保存済みデータにも適用）
+    biFull.items = biFull.items.filter(function(it){
+      var n = String(it.name || '');
+      if (n === '合計') return false;  // CSVの集計行
+      return n.indexOf('サラダバー') === -1 && n.indexOf('ドリンクバー') === -1
+        && n.indexOf('お通し') === -1 && n.indexOf('大盛り') === -1 && n.indexOf('特盛') === -1;
+    });
     var biTop = biFull.items.slice(0, 5);
     var biTotals = [0,0,0,0,0,0,0], biGrand = 0;
     for (var bt = 0; bt < biTop.length; bt++) {
@@ -3332,7 +3339,7 @@ function processCsvResults(results, shopKey) {
   // ===== マルコ: aggregateMenu CSV =====
   if (results.marcoItemFiles && results.marcoItemFiles.length > 0 && isMarco) {
     var MARCO_DESSERT = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ'];
-    var MARCO_EXCLUDE = ['お通し'];  // 全品目集計の除外（単価¥0の指示行は自動除外）
+    var MARCO_EXCLUDE = ['お通し','サラダバー','ドリンクバー','大盛り','特盛'];  // 全品目集計の除外（単価¥0の指示行は自動除外）
     var WD_M = ['月','火','水','木','金','土','日'];
 
     for (var mf = 0; mf < results.marcoItemFiles.length; mf++) {
@@ -3365,6 +3372,7 @@ function processCsvResults(results, shopKey) {
           var aRow = aRows[ar];
           if (!aRow[aNName]) continue;
           var aName = aRow[aNName].replace(/\u3000/g,' ').trim();
+          if (aName === '合計') continue;  // 表末尾の集計行は品目ではない
           var aq = parseInt((aRow[aNQty]||'0').replace(/,/g,'')) || 0;
           var ap = parseInt(String(aRow[aNPrice]||'').replace(/[¥,]/g,'')) || 0;
           if (aq <= 0) continue;
