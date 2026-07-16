@@ -530,7 +530,7 @@ nav{display:flex;gap:2px}
         <div class="ch-remain" id="ch-spot-remain"></div>
         <div class="ch-lastupdate" id="ch-spot-lastupdate"></div>
         <details id="ch-spot-high-wrap" open style="display:none;margin-top:8px">
-          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 高単価アイテムの出数（¥3,000以上・提案の狙いどころ）</summary>
+          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 高単価アイテムの出数（提案の狙いどころ）</summary>
           <div id="ch-spot-high" style="margin-top:6px"></div>
         </details>
         <div class="ch-update-row" id="ch-spot-edit" style="display:none">
@@ -2615,8 +2615,29 @@ function updateChallengUI(d, shopKey) {
     return wh;
   }
 
-  // 曜日別デザート内訳（日別CSV取込時に保存された mission_dessert_weekday）
+  // 曜日キー保存形式（マルコ: mission_dessert_wd / big_item_wd）から行列を組み立てる
+  function buildWdMatrix(wdObj) {
+    var WD = ['月','火','水','木','金','土','日'];
+    var map = {}, totals = [0,0,0,0,0,0,0], grand = 0;
+    for (var wi = 0; wi < 7; wi++) {
+      var arr = wdObj[WD[wi]] || [];
+      for (var aj = 0; aj < arr.length; aj++) {
+        var nm = arr[aj] && arr[aj].name;
+        if (!nm) continue;
+        if (!map[nm]) map[nm] = { name: nm, w: [0,0,0,0,0,0,0], total: 0, price: arr[aj].price || 0 };
+        var q = arr[aj].qty || 0;
+        map[nm].w[wi] += q; map[nm].total += q; totals[wi] += q; grand += q;
+        if ((arr[aj].price || 0) > map[nm].price) map[nm].price = arr[aj].price || 0;
+      }
+    }
+    var items = Object.keys(map).map(function(k){ return map[k]; })
+      .sort(function(a,b){ return b.total - a.total; });
+    return { items: items, totals: totals, grand: grand };
+  }
+
+  // 曜日別デザート内訳（本店: mission_dessert_weekday ／ マルコ: mission_dessert_wd から組立）
   var wdData = d.mission_dessert_weekday;
+  if (d.mission_dessert_wd) wdData = buildWdMatrix(d.mission_dessert_wd);
   var wdWrap = document.getElementById('ch-mission-weekday-wrap');
   if (wdWrap) {
     if (wdData && wdData.items && wdData.items.length > 0) {
@@ -2629,7 +2650,19 @@ function updateChallengUI(d, shopKey) {
   }
 
   // 曜日別 人気メニューTOP5・デザート以外（日別CSV取込時に保存された big_item_weekday）
+  // 曜日別 人気メニューTOP5（本店: big_item_weekday ／ マルコ: big_item_wd から組立）
   var biData = d.big_item_weekday;
+  var biFull = null;  // マルコの全品目行列（高単価リストの導出にも使う）
+  if (d.big_item_wd) {
+    biFull = buildWdMatrix(d.big_item_wd);
+    var biTop = biFull.items.slice(0, 5);
+    var biTotals = [0,0,0,0,0,0,0], biGrand = 0;
+    for (var bt = 0; bt < biTop.length; bt++) {
+      for (var bk = 0; bk < 7; bk++) biTotals[bk] += biTop[bt].w[bk] || 0;
+      biGrand += biTop[bt].total;
+    }
+    biData = { items: biTop, totals: biTotals, grand: biGrand };
+  }
   var biWrap = document.getElementById('ch-big-weekday-wrap');
   if (biWrap) {
     if (biData && biData.items && biData.items.length > 0) {
@@ -2641,8 +2674,16 @@ function updateChallengUI(d, shopKey) {
     }
   }
 
-  // 高単価アイテムの出数（日別CSV取込時に保存された spot_high_items）
+  // 高単価アイテムの出数（本店: spot_high_items ／ マルコ: big_item_wd から導出）
   var shItems = d.spot_high_items || [];
+  if (biFull) {
+    var shMin = (typeof shopKey !== 'undefined' && shopKey === 'marco') ? 1500 : 3000;
+    shItems = biFull.items
+      .filter(function(it){ return (it.price || 0) >= shMin; })
+      .sort(function(a,b){ return b.price - a.price; })
+      .slice(0, 8)
+      .map(function(it){ return { name: it.name, qty: it.total, price: it.price }; });
+  }
   var shWrap = document.getElementById('ch-spot-high-wrap');
   if (shWrap) {
     if (shItems.length > 0) {
@@ -2978,7 +3019,7 @@ function handleCsvImport(event) {
   var shopKey = getChShopKey();
   // 本店: salesFile(UTF-16 TSV) + itemFile(UTF-16 TSV)
   // マルコ: marcoSalesFile(CP932 CSV 年間売上) + marcoItemFile(Shift_JIS CSV aggregateMenu)
-  var results = { salesFile: null, itemFile: null, dailyFile: null, marcoSalesFile: null, marcoItemFile: null };
+  var results = { salesFile: null, itemFile: null, dailyFile: null, marcoSalesFile: null, marcoItemFiles: [] };
   var pending = files.length;
 
   files.forEach(function(file) {
@@ -3028,7 +3069,7 @@ function handleCsvImport(event) {
           }
           // aggregateMenu CSV：「ABC」がヘッダー行
           if (cell0 === 'ABC') {
-            results.marcoItemFile = rows2;
+            results.marcoItemFiles.push(rows2);
             identified = true;
             break;
           }
@@ -3077,7 +3118,7 @@ function parseCSV(text, sep) { return parseCSVAuto(text, sep); }
 
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
-  var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoItemFile;
+  var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoItemFiles.length > 0;
   if (!hasData) {
     alert('売上CSVが見つかりませんでした。\n\n【本店】売上実績CSV + Daily_Item_Sales CSV\n【マルコ】年間売上CSV + aggregateMenu CSV\n\n勤怠CSVは下の「💰インセンティブ試算」から読み込んでください。');
     return;
@@ -3289,38 +3330,110 @@ function processCsvResults(results, shopKey) {
   }
 
   // ===== マルコ: aggregateMenu CSV =====
-  if (results.marcoItemFile && isMarco) {
-    var aRows = results.marcoItemFile;
-    // ヘッダー行を探す（ABC,商品名...）
-    var aHeaderIdx = -1;
-    for (var ah = 0; ah < aRows.length; ah++) {
-      if (aRows[ah][0] === 'ABC') { aHeaderIdx = ah; break; }
-    }
-    if (aHeaderIdx !== -1) {
+  if (results.marcoItemFiles && results.marcoItemFiles.length > 0 && isMarco) {
+    var MARCO_DESSERT = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ'];
+    var MARCO_EXCLUDE = ['お通し'];  // 全品目集計の除外（単価¥0の指示行は自動除外）
+    var WD_M = ['月','火','水','木','金','土','日'];
+
+    for (var mf = 0; mf < results.marcoItemFiles.length; mf++) {
+      var aRows = results.marcoItemFiles[mf];
+      // メタ行から曜日フィルタを読む（"曜日：",月 の形式）
+      var aWd = '';
+      for (var am = 0; am < Math.min(aRows.length, 10); am++) {
+        if ((aRows[am][0] || '').indexOf('曜日') !== -1) { aWd = (aRows[am][1] || '').trim(); break; }
+      }
+      // ヘッダー行を探す（ABC,商品名...）
+      var aHeaderIdx = -1;
+      for (var ah = 0; ah < aRows.length; ah++) {
+        if (aRows[ah][0] === 'ABC') { aHeaderIdx = ah; break; }
+      }
+      if (aHeaderIdx === -1) continue;
       var aHeader  = aRows[aHeaderIdx];
       var aNName   = aHeader.indexOf('商品名');
       var aNQty    = aHeader.indexOf('出数');
-      var MARCO_DESSERT = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ'];
-      var mDessert = 0, mDessertItems = [];
-      for (var ar = aHeaderIdx + 1; ar < aRows.length; ar++) {
-        var aRow = aRows[ar];
-        if (!aRow[aNName]) continue;
-        var aName = aRow[aNName].replace(/\u3000/g,' ').trim();
-        var isD = MARCO_DESSERT.some(function(t){ return aName.indexOf(t) !== -1; });
-        if (isD) {
+      var aNPrice  = aHeader.indexOf('平均単価');
+
+      var isSingleWd = (aWd.length === 1 && WD_M.indexOf(aWd) !== -1);
+      // 【POS仕様】曜日フィルタで「日」を選ぶと全曜日の羅列表記で出力されるため、
+      // 複数曜日の羅列（・区切り）は日曜データとして扱う（ひろ確認済み R8.7.16）
+      if (!isSingleWd && aWd.indexOf('・') !== -1) { aWd = '日'; isSingleWd = true; }
+
+      if (isSingleWd) {
+        // ── 曜日フィルタ付きファイル → その曜日の列だけを上書き保存 ──
+        var wdDessertArr = [], wdFoodArr = [];
+        for (var ar = aHeaderIdx + 1; ar < aRows.length; ar++) {
+          var aRow = aRows[ar];
+          if (!aRow[aNName]) continue;
+          var aName = aRow[aNName].replace(/\u3000/g,' ').trim();
           var aq = parseInt((aRow[aNQty]||'0').replace(/,/g,'')) || 0;
-          mDessert += aq;
-          if (aq > 0) mDessertItems.push({ name: aName, qty: aq });
+          var ap = parseInt(String(aRow[aNPrice]||'').replace(/[¥,]/g,'')) || 0;
+          if (aq <= 0) continue;
+          var isD = MARCO_DESSERT.some(function(t){ return aName.indexOf(t) !== -1; });
+          if (isD) wdDessertArr.push({ name: aName, qty: aq });
+          // 全品目：単価¥0（普通・大盛り・○○無し等の指示行）と除外品は数えない
+          if (!isD && ap > 0 && !MARCO_EXCLUDE.some(function(t){ return aName.indexOf(t) !== -1; })) {
+            wdFoodArr.push({ name: aName, qty: aq, price: ap });
+          }
         }
+        upd['mission_dessert_wd/' + aWd] = wdDessertArr;
+        upd['big_item_wd/' + aWd] = wdFoodArr;
+        upd.mission_updated = ts;
+      } else {
+        // ── 期間全体ファイル → 従来どおり月間の合計・品目別内訳を更新 ──
+        var mDessert = 0, mDessertItems = [];
+        for (var ar2 = aHeaderIdx + 1; ar2 < aRows.length; ar2++) {
+          var aRow2 = aRows[ar2];
+          if (!aRow2[aNName]) continue;
+          var aName2 = aRow2[aNName].replace(/\u3000/g,' ').trim();
+          var isD2 = MARCO_DESSERT.some(function(t){ return aName2.indexOf(t) !== -1; });
+          if (isD2) {
+            var aq2 = parseInt((aRow2[aNQty]||'0').replace(/,/g,'')) || 0;
+            mDessert += aq2;
+            if (aq2 > 0) mDessertItems.push({ name: aName2, qty: aq2 });
+          }
+        }
+        mDessertItems.sort(function(a,b){ return b.qty - a.qty; });
+        upd.mission_dessert = mDessert;
+        upd.mission_dessert_items = mDessertItems;
+        upd.mission_updated = ts;
       }
-      mDessertItems.sort(function(a,b){ return b.qty - a.qty; });
-      upd.mission_dessert = mDessert;
-      upd.mission_dessert_items = mDessertItems;
-      upd.mission_updated = ts;
     }
   }
 
   if (!db) { alert('Firebase未接続です'); return; }
+  // マルコの曜日別更新があるときは、保存済みの他曜日と合算して月間合計・品目別内訳も更新する
+  var hasMarcoWd = false;
+  for (var uk in upd) { if (uk.indexOf('mission_dessert_wd/') === 0) { hasMarcoWd = true; break; } }
+  if (hasMarcoWd) {
+    getChRef(shopKey).once('value').then(function(snap) {
+      var cur = snap.val() || {};
+      var WDx = ['月','火','水','木','金','土','日'];
+      var tot = 0, agg = {};
+      for (var wx = 0; wx < 7; wx++) {
+        var col = upd['mission_dessert_wd/' + WDx[wx]] !== undefined
+          ? upd['mission_dessert_wd/' + WDx[wx]]
+          : ((cur.mission_dessert_wd || {})[WDx[wx]] || []);
+        for (var wy = 0; wy < (col ? col.length : 0); wy++) {
+          var cit = col[wy];
+          if (!cit || !cit.name) continue;
+          tot += cit.qty || 0;
+          agg[cit.name] = (agg[cit.name] || 0) + (cit.qty || 0);
+        }
+      }
+      upd.mission_dessert = tot;
+      upd.mission_dessert_items = Object.keys(agg)
+        .map(function(n){ return { name: n, qty: agg[n] }; })
+        .sort(function(a,b){ return b.qty - a.qty; });
+      upd.mission_updated = ts;
+      return getChRef(shopKey).update(upd);
+    }).then(function() {
+      showToast('✅ CSVから更新しました');
+      renderChallenge(shopKey);
+    }).catch(function(e) {
+      alert('Firebase書き込みエラー: ' + e.message);
+    });
+    return;
+  }
   getChRef(shopKey).update(upd).then(function() {
     showToast('✅ CSVから更新しました');
     renderChallenge(shopKey);
