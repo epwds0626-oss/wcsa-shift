@@ -3076,7 +3076,17 @@ function handleCsvImport(event) {
           }
           // aggregateMenu CSV：「ABC」がヘッダー行
           if (cell0 === 'ABC') {
-            results.marcoItemFiles.push(rows2);
+            // 曜日メタを確認：全曜日の羅列なら「差分取込」か「日曜取込」かを選択
+            var wdMeta = '';
+            for (var km = 0; km < Math.min(rows2.length, 10); km++) {
+              if ((rows2[km][0] || '').indexOf('曜日') !== -1) { wdMeta = (rows2[km][1] || '').trim(); break; }
+            }
+            if (shopKey === 'marco' && wdMeta.indexOf('・') !== -1
+              && confirm('全曜日のaggregateMenu CSVです。取込方法を選んでください。\n\n【OK】差分取込：前回スナップショットとの差分を、該当営業日の曜日に加算します（毎営業日1回、この累計CSVを1本取り込む運用）\n\n【キャンセル】日曜データとして取込（従来どおり）')) {
+              results.marcoSnapshotFile = rows2;
+            } else {
+              results.marcoItemFiles.push(rows2);
+            }
             identified = true;
             break;
           }
@@ -3337,6 +3347,128 @@ function processCsvResults(results, shopKey) {
   }
 
   // ===== マルコ: aggregateMenu CSV =====
+  // ===== マルコ: 累計スナップショット差分取込（毎営業日1回・累計CSV1本の運用） =====
+  // 前回スナップショットとの出数差分を計算し、経過した営業日（1日のみ）の曜日列に加算する。
+  // 経過営業日が2日以上のときは割当先が決められないため中止（曜日別CSVで取り込むこと）。
+  if (results.marcoSnapshotFile && isMarco) {
+    var sRows = results.marcoSnapshotFile;
+    var sEnd = null;
+    for (var sm2 = 0; sm2 < Math.min(sRows.length, 10); sm2++) {
+      var mPer = String(sRows[sm2][1] || '').match(/(\d{4}-\d{2}-\d{2})〜(\d{4}-\d{2}-\d{2})/);
+      if (mPer) { sEnd = mPer[2]; break; }
+    }
+    if (!sEnd) { alert('抽出期間が読み取れませんでした。取込を中止します'); return; }
+    var sHeaderIdx = -1;
+    for (var sh2 = 0; sh2 < sRows.length; sh2++) { if (sRows[sh2][0] === 'ABC') { sHeaderIdx = sh2; break; } }
+    if (sHeaderIdx === -1) { alert('明細ヘッダーが見つかりません'); return; }
+    var sHeader = sRows[sHeaderIdx];
+    var sN = sHeader.indexOf('商品名'), sQ = sHeader.indexOf('出数'), sP = sHeader.indexOf('平均単価');
+    var snapItems = [];
+    for (var sr = sHeaderIdx + 1; sr < sRows.length; sr++) {
+      var sRow = sRows[sr];
+      if (!sRow[sN]) continue;
+      var sName = sRow[sN].replace(/\u3000/g,' ').trim();
+      if (sName === '合計') continue;
+      var sQty = parseInt((sRow[sQ]||'0').replace(/,/g,'')) || 0;
+      var sPrice = parseInt(String(sRow[sP]||'').replace(/[¥,]/g,'')) || 0;
+      if (sQty > 0) snapItems.push({ name: sName, qty: sQty, price: sPrice });
+    }
+    var MD_S = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ'];
+    var MX_S = ['お通し','サラダバー','ドリンクバー','大盛り','特盛'];
+    var WD_GETDAY = ['日','月','火','水','木','金','土']; // Date.getDay()順
+    var MARCO_CLOSED = ['木'];                             // マルコ定休日
+
+    getChRef(shopKey).once('value').then(function(snap) {
+      var cur = snap.val() || {};
+      var prev = cur.snapshot || null;
+      var updS = { snapshot: { end: sEnd, items: snapItems, at: ts } };
+
+      if (!prev || !prev.end) {
+        return getChRef(shopKey).update(updS).then(function() {
+          showToast('📸 初回スナップショット（〜' + sEnd + '）を保存しました。次回取込から差分を計上します');
+          renderChallenge(shopKey);
+        });
+      }
+      if (prev.end >= sEnd) {
+        alert('前回スナップショット（〜' + prev.end + '）より新しい期間ではありません。取込を中止しました');
+        return;
+      }
+      var bizDays = [];
+      var dCur = new Date(prev.end + 'T00:00:00');
+      var dEnd = new Date(sEnd + 'T00:00:00');
+      while (true) {
+        dCur.setDate(dCur.getDate() + 1);
+        if (dCur > dEnd) break;
+        var wdc = WD_GETDAY[dCur.getDay()];
+        if (MARCO_CLOSED.indexOf(wdc) === -1) bizDays.push(wdc);
+      }
+      if (bizDays.length === 0) {
+        return getChRef(shopKey).update(updS).then(function() {
+          showToast('差分なし（定休日のみ）。スナップショットを〜' + sEnd + 'に更新しました');
+          renderChallenge(shopKey);
+        });
+      }
+      if (bizDays.length > 1) {
+        alert('前回（〜' + prev.end + '）から営業日が' + bizDays.length + '日（' + bizDays.join('・') + '）経過しています。\n差分を1つの曜日に割り当てられないため中止しました。\nこの期間は曜日別CSVで取り込み直すか、次回から毎営業日ごとに取り込んでください');
+        return;
+      }
+      var wdChar = bizDays[0];
+      var prevMap = {};
+      (prev.items || []).forEach(function(it) { if (it && it.name) prevMap[it.name] = it.qty || 0; });
+      var deltaDes = [], deltaFood = [];
+      snapItems.forEach(function(it) {
+        var dq = (it.qty || 0) - (prevMap[it.name] || 0);
+        if (dq <= 0) return;
+        var isD = MD_S.some(function(t){ return it.name.indexOf(t) !== -1; });
+        if (isD) deltaDes.push({ name: it.name, qty: dq });
+        else if ((it.price || 0) > 0 && !MX_S.some(function(t){ return it.name.indexOf(t) !== -1; })) {
+          deltaFood.push({ name: it.name, qty: dq, price: it.price });
+        }
+      });
+      function addToCol(colArr, add, withPrice) {
+        var mm = {};
+        (colArr || []).forEach(function(it){ if (it && it.name) mm[it.name] = { qty: it.qty || 0, price: it.price || 0 }; });
+        add.forEach(function(it){
+          if (!mm[it.name]) mm[it.name] = { qty: 0, price: it.price || 0 };
+          mm[it.name].qty += it.qty;
+          if ((it.price || 0) > mm[it.name].price) mm[it.name].price = it.price || 0;
+        });
+        return Object.keys(mm).map(function(n){
+          var o = { name: n, qty: mm[n].qty };
+          if (withPrice && mm[n].price) o.price = mm[n].price;
+          return o;
+        });
+      }
+      updS['mission_dessert_wd/' + wdChar] = addToCol((cur.mission_dessert_wd || {})[wdChar], deltaDes, false);
+      updS['big_item_wd/' + wdChar] = addToCol((cur.big_item_wd || {})[wdChar], deltaFood, true);
+      var WDX = ['月','火','水','木','金','土','日'];
+      var totS = 0, aggS = {};
+      for (var wz = 0; wz < 7; wz++) {
+        var colz = updS['mission_dessert_wd/' + WDX[wz]] !== undefined
+          ? updS['mission_dessert_wd/' + WDX[wz]]
+          : ((cur.mission_dessert_wd || {})[WDX[wz]] || []);
+        for (var cz = 0; cz < (colz ? colz.length : 0); cz++) {
+          var cit = colz[cz];
+          if (!cit || !cit.name) continue;
+          totS += cit.qty || 0;
+          aggS[cit.name] = (aggS[cit.name] || 0) + (cit.qty || 0);
+        }
+      }
+      updS.mission_dessert = totS;
+      updS.mission_dessert_items = Object.keys(aggS)
+        .map(function(n){ return { name: n, qty: aggS[n] }; })
+        .sort(function(a,b){ return b.qty - a.qty; });
+      updS.mission_updated = ts;
+      var desSum = 0;
+      for (var dz = 0; dz < deltaDes.length; dz++) desSum += deltaDes[dz].qty;
+      return getChRef(shopKey).update(updS).then(function() {
+        showToast('✅ ' + wdChar + '曜（' + prev.end + '→' + sEnd + '）の差分を計上：デザート+' + desSum + '食');
+        renderChallenge(shopKey);
+      });
+    }).catch(function(e) { alert('差分取込エラー: ' + e.message); });
+    return; // 差分取込は単独処理（他ファイルとの同時取込は不可）
+  }
+
   if (results.marcoItemFiles && results.marcoItemFiles.length > 0 && isMarco) {
     var MARCO_DESSERT = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ'];
     var MARCO_EXCLUDE = ['お通し','サラダバー','ドリンクバー','大盛り','特盛'];  // 全品目集計の除外（単価¥0の指示行は自動除外）
