@@ -3239,9 +3239,16 @@ function handleCsvImport(event) {
             for (var km = 0; km < Math.min(rows2.length, 10); km++) {
               if ((rows2[km][0] || '').indexOf('曜日') !== -1) { wdMeta = (rows2[km][1] || '').trim(); break; }
             }
-            if (shopKey === 'marco' && wdMeta.indexOf('・') !== -1
-              && confirm('全曜日のaggregateMenu CSVです。取込方法を選んでください。\n\n【OK】差分取込：前回スナップショットとの差分を、該当営業日の曜日に加算します（毎営業日1回、この累計CSVを1本取り込む運用）\n\n【キャンセル】日曜データとして取込（従来どおり）')) {
-              results.marcoSnapshotFile = rows2;
+            if (shopKey === 'marco' && wdMeta.indexOf('・') !== -1) {
+              // 【修正 R8.7.19】キャンセル＝日曜取込は誤操作を招くため二段式に変更
+              // 1問目OK＝差分取込／1問目キャンセル→2問目で日曜取込を明示確認（キャンセル＝取込中止）
+              if (confirm('全曜日のaggregateMenu CSVです。\n\n【OK】差分取込：前回スナップショットとの差分を該当営業日の曜日に加算（毎営業日1回、累計CSVを1本取り込む運用）\n\n【キャンセル】別の取込方法を選ぶ')) {
+                results.marcoSnapshotFile = rows2;
+              } else if (confirm('このCSVを「日曜日のデータ」として取り込みますか？\n（POSで曜日＝日を選んで書き出したファイルの場合のみOKを押してください）\n\n【キャンセル】取込を中止')) {
+                results.marcoItemFiles.push(rows2);
+              } else {
+                showToast('取込を中止しました');
+              }
             } else {
               results.marcoItemFiles.push(rows2);
             }
