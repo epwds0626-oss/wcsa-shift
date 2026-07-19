@@ -3300,7 +3300,7 @@ function parseCSV(text, sep) { return parseCSVAuto(text, sep); }
 
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
-  var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoItemFiles.length > 0;
+  var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoSnapshotFile || results.marcoItemFiles.length > 0;
   if (!hasData) {
     alert('売上CSVが見つかりませんでした。\n\n【本店】売上実績CSV + Daily_Item_Sales CSV\n【マルコ】年間売上CSV + aggregateMenu CSV\n\n勤怠CSVは下の「💰インセンティブ試算」から読み込んでください。');
     return;
