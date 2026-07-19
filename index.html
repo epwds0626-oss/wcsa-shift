@@ -484,6 +484,7 @@ nav{display:flex;gap:2px}
         <div class="ch-bar-wrap"><div class="ch-bar" id="ch-mission-bar" style="width:0%;background:var(--accent2)"></div></div>
         <div class="ch-remain" id="ch-mission-remain">目標 <strong>30%</strong> まで <strong id="ch-mission-gap">—%</strong></div>
         <div class="ch-lastupdate" id="ch-mission-lastupdate"></div>
+        <div id="ch-mission-drink" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bg2,#f4f6f9);border-radius:8px;font-size:12px"></div>
         <details id="ch-mission-items-wrap" open style="display:none;margin-top:8px">
           <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 品目別内訳を見る</summary>
           <div id="ch-mission-items" style="margin-top:6px"></div>
@@ -2508,6 +2509,24 @@ function updateChallengUI(d, shopKey) {
   if (d.mission_dessert) setVal('ch-mission-inp-dessert', d.mission_dessert);
   if (d.mission_total)   setVal('ch-mission-inp-total',   d.mission_total);
 
+  // ドリンク出数率（ドリンク杯数 ÷ 総客数）
+  var drinkN = d.mission_drink || 0;
+  var custN  = d.mission_total || 0;
+  var drinkEl = document.getElementById('ch-mission-drink');
+  if (drinkEl) {
+    if (drinkN > 0 && custN > 0) {
+      var drinkPct = drinkN / custN * 100;
+      drinkEl.style.display = 'block';
+      drinkEl.innerHTML = '🥤 <strong>ドリンク出数率 ' + drinkPct.toFixed(1) + '%</strong>'
+        + ' <span style="color:var(--text2)">（' + drinkN.toLocaleString() + '杯 ÷ 総客数 ' + custN.toLocaleString() + '人）</span>'
+        + '<div style="height:6px;border-radius:3px;background:#e3e7ee;margin-top:5px;overflow:hidden">'
+        + '<div style="height:100%;width:' + Math.min(100, drinkPct) + '%;background:#3b6fb5;border-radius:3px"></div></div>'
+        + (drinkPct > 100 ? '<div style="font-size:10px;color:var(--text2);margin-top:3px">100%超＝お一人あたり平均' + (drinkN/custN).toFixed(2) + '杯</div>' : '');
+    } else {
+      drinkEl.style.display = 'none';
+    }
+  }
+
   // 品目別内訳（CSV取込時に保存された mission_dessert_items をドーナツ＋バーで表示）
   var CH_COLORS = ['#e8590c','#2b8a5e','#3b6fb5','#d4a72c','#8e5aa8','#c0392b','#4fa3a5','#9aa0a6'];
   function chColor(i) { return CH_COLORS[i % CH_COLORS.length]; }
@@ -3018,6 +3037,16 @@ var DESSERT_NAMES = [
   'お茶アイス' // POS実名は「後付お茶アイス」（け無し）。部分一致で両表記を拾う
 ];
 
+// ドリンク出数から除外する指示ボタン類（本店POS）
+// 「〜 ｗ」（末尾の全角ｗ）は提供指示ボタンの印
+function isDrinkExcluded(name) {
+  var subs = ['利用しない','無し','食前','同時出し','先出し','後出し'];
+  if (subs.some(function(t){ return name.indexOf(t) !== -1; })) return true;
+  if (/[ 　]ｗ$/.test(name)) return true;
+  if (name === 'グラス') return true;  // 提供形態の指定（グラスワイン等の商品名は残る）
+  return false;
+}
+
 function handleCsvImport(event) {
   var files = Array.from(event.target.files);
   event.target.value = '';
@@ -3176,7 +3205,8 @@ function processCsvResults(results, shopKey) {
     var idxName = iHeader.indexOf('商品名');
     var idxQty  = iHeader.indexOf('売上数量');
     var idxCat2 = iHeader.indexOf('カテゴリ2');
-    var dessertTotal = 0, dessertItems = [];
+    var idxCat1i = iHeader.indexOf('カテゴリ1');
+    var dessertTotal = 0, dessertItems = [], drinkTotalI = 0;
     for (var j = 1; j < iRows.length; j++) {
       var row = iRows[j];
       if (!row[idxName]) continue;
@@ -3190,10 +3220,15 @@ function processCsvResults(results, shopKey) {
         dessertTotal += dq;
         if (dq > 0) dessertItems.push({ name: name, qty: dq });
       }
+      // ドリンク出数（カテゴリ1=ドリンク。指示ボタン類は除外）
+      if (idxCat1i !== -1 && row[idxCat1i] === 'ドリンク' && !isDrinkExcluded(name)) {
+        drinkTotalI += parseInt((row[idxQty]||'0').replace(/,/g,'')) || 0;
+      }
     }
     dessertItems.sort(function(a,b){ return b.qty - a.qty; });
     upd.mission_dessert = dessertTotal;
     upd.mission_dessert_items = dessertItems;
+    upd.mission_drink = drinkTotalI;
     upd.mission_updated = ts;
   }
 
@@ -3230,10 +3265,22 @@ function processCsvResults(results, shopKey) {
       return { name: n, w: w, total: w.reduce(function(a,b){ return a+b; }, 0) };
     }).sort(function(a,b){ return b.total - a.total; });
     upd.mission_dessert_weekday = { items: wdItems, totals: wdTotals, grand: dGrand };
-    // 月間ABC品目CSVが一緒に無いときは、日別CSVから合計・品目別内訳も更新する
+    // 月間ABC品目CSVが一緒に無いときは、日別CSVから合計・品目別内訳・ドリンクも更新する
     if (!results.itemFile) {
       upd.mission_dessert = dGrand;
       upd.mission_dessert_items = wdItems.map(function(it){ return { name: it.name, qty: it.total }; });
+      var drinkTotalD = 0;
+      var dIdxAmtD = dHeader.indexOf('売上金額');
+      for (var dk = 1; dk < dRows.length; dk++) {
+        var dkRow = dRows[dk];
+        if (!dkRow[dIdxName]) continue;
+        var dkName = dkRow[dIdxName].replace(/\u3000/g,' ').trim();
+        var dkAmt = dIdxAmtD !== -1 ? (parseInt(String(dkRow[dIdxAmtD]||'').replace(/[¥,]/g,'')) || 0) : 1;
+        if (dIdxCat1 !== -1 && dkRow[dIdxCat1] === 'ドリンク' && dkAmt > 0 && !isDrinkExcluded(dkName)) {
+          drinkTotalD += parseInt((dkRow[dIdxQty]||'0').replace(/,/g,'')) || 0;
+        }
+      }
+      upd.mission_drink = drinkTotalD;
       upd.mission_updated = ts;
     }
 
@@ -3378,10 +3425,21 @@ function processCsvResults(results, shopKey) {
     var WD_GETDAY = ['日','月','火','水','木','金','土']; // Date.getDay()順
     var MARCO_CLOSED = ['木'];                             // マルコ定休日
 
+    // マルコのドリンク判定（POSにカテゴリ列が無いため品名キーワード。要メンテ）
+    // 「〜無し」は注文ではなく指示のため除外
+    var MARCO_DRINK = ['ドリンクバー','ワイン','ビール','グラッパ','スプマンテ','ハイボール','サワー',
+      'カクテル','コーヒー','紅茶','エスプレッソ','カプチーノ','ラテ','ジュース','コーラ','ウーロン',
+      'オレンジ','レモネード','リモナータ','炭酸','ソーダ','ノンアル'];
+    var snapDrink = 0;
+    snapItems.forEach(function(it){
+      if (it.name.indexOf('無し') !== -1) return;
+      if (MARCO_DRINK.some(function(t){ return it.name.indexOf(t) !== -1; })) snapDrink += it.qty || 0;
+    });
+
     getChRef(shopKey).once('value').then(function(snap) {
       var cur = snap.val() || {};
       var prev = cur.snapshot || null;
-      var updS = { snapshot: { end: sEnd, items: snapItems, at: ts } };
+      var updS = { snapshot: { end: sEnd, items: snapItems, at: ts }, mission_drink: snapDrink };
 
       if (!prev || !prev.end) {
         return getChRef(shopKey).update(updS).then(function() {
