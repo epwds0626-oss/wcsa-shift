@@ -472,10 +472,9 @@ nav{display:flex;gap:2px}
         <div style="height:8px;border-radius:4px;background:#e3e7ee;margin-top:8px;overflow:hidden">
           <div id="ch-drink-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#3b6fb5,#2b8a5e);border-radius:4px"></div>
         </div>
-        <details open style="margin-top:10px">
-          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 上位5アイテムの出数</summary>
-          <div id="ch-drink-top5" style="margin-top:6px"></div>
-        </details>
+        <div id="ch-drink-mix" style="margin-top:12px"></div>
+        <div style="margin-top:12px;font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1px">上位5アイテム</div>
+        <div id="ch-drink-top5" style="margin-top:6px"></div>
         <div id="ch-drink-insights" style="margin-top:10px"></div>
       </div>
     </div>
@@ -2789,50 +2788,89 @@ function updateChallengUI(d, shopKey) {
       var barEl = document.getElementById('ch-drink-bar');
       if (barEl) barEl.style.width = Math.min(100, drRate) + '%';
 
-      // TOP5（バー付き）
-      var t5El = document.getElementById('ch-drink-top5');
-      if (t5El) {
-        var top5 = drItems.slice(0, 5);
-        var t5max = 1;
-        top5.forEach(function(it){ if ((it.qty||0) > t5max) t5max = it.qty; });
-        var DR_COLORS = ['#3b6fb5','#2b8a5e','#d4a72c','#8e5aa8','#e8590c'];
-        var t5h = '';
-        top5.forEach(function(it, i){
-          var pct5 = Math.round((it.qty||0) / t5max * 100);
-          t5h += '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:11.5px">'
-            + '<span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:9px;height:9px;border-radius:2px;background:' + DR_COLORS[i] + ';flex:none"></span>'
-            + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + String(it.name||'').replace(/</g,'&lt;') + '</span></span>'
-            + '<span style="white-space:nowrap;flex:none"><strong>' + (it.qty||0) + '</strong>杯 <span style="color:var(--text2)">(' + (drTotal>0?Math.round((it.qty||0)/drTotal*100):0) + '%)</span></span></div>'
-            + '<div style="height:7px;border-radius:4px;background:#eef1f5;margin-top:3px;overflow:hidden"><div style="height:100%;width:' + pct5 + '%;background:' + DR_COLORS[i] + ';border-radius:4px"></div></div></div>';
+      // ドリンクの構成（バー系／お酒／ソフト・その他の100%横棒）
+      var ALC_KW = ['ビール','ハイボール','サワー','ワイン','ウィスキー','梅酒','モヒート','スプマンテ','グラッパ','カクテル','一合','呑比べ','飲み比べ','純米','吟醸','生酒','冷や','四合瓶','焼酎','ロック','水割り','ミニボトル'];
+      var SAKE_KW = ['一合','呑比べ','飲み比べ','純米','吟醸','生酒','冷や','四合瓶','ミニボトル'];
+      function drShare(kws) {
+        var q = 0;
+        drItems.forEach(function(it){ if (kws.some(function(k){ return String(it.name||'').indexOf(k) !== -1; })) q += it.qty || 0; });
+        return q;
+      }
+      var hasItems = drItems.length > 0;
+      var barQ = 0, alcQ = 0, sakeQ = 0, softQ = 0;
+      if (hasItems) {
+        barQ = drShare(['ドリンクバー']);
+        drItems.forEach(function(it){
+          var n = String(it.name||'');
+          if (n.indexOf('ドリンクバー') !== -1) return;
+          if (ALC_KW.some(function(k){ return n.indexOf(k) !== -1; })
+              && n.indexOf('ノンアル') === -1) alcQ += it.qty || 0;
+          else softQ += it.qty || 0;
         });
-        t5El.innerHTML = t5h;
+        sakeQ = drShare(SAKE_KW);
+      }
+      var mixEl = document.getElementById('ch-drink-mix');
+      if (mixEl) {
+        if (hasItems && drTotal > 0) {
+          var pB = barQ / drTotal * 100, pA = alcQ / drTotal * 100, pS = 100 - pB - pA;
+          mixEl.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1px;margin-bottom:5px">ドリンクの構成</div>'
+            + '<div style="display:flex;height:22px;border-radius:6px;overflow:hidden;font-size:10.5px;color:#fff;font-weight:700">'
+            + (pB > 0 ? '<div style="width:' + pB + '%;background:#3b6fb5;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">' + (pB >= 12 ? 'バー ' + pB.toFixed(0) + '%' : '') + '</div>' : '')
+            + (pA > 0 ? '<div style="width:' + pA + '%;background:#c0392b;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">' + (pA >= 12 ? 'お酒 ' + pA.toFixed(0) + '%' : '') + '</div>' : '')
+            + (pS > 0 ? '<div style="width:' + pS + '%;background:#9aa0a6;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">' + (pS >= 12 ? 'ソフト ' + pS.toFixed(0) + '%' : '') + '</div>' : '')
+            + '</div>'
+            + '<div style="display:flex;gap:12px;font-size:10.5px;color:var(--text2);margin-top:4px">'
+            + '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#3b6fb5"></span> ドリンクバー ' + barQ + '杯</span>'
+            + '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#c0392b"></span> お酒 ' + alcQ + '杯（うち地酒' + sakeQ + '杯）</span>'
+            + '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#9aa0a6"></span> ソフト他 ' + softQ + '杯</span>'
+            + '</div>';
+        } else {
+          mixEl.innerHTML = '<div style="padding:8px 10px;background:#fef3c7;border-radius:6px;font-size:11.5px;color:#92400e">品目別データが未取込です。最新ページでCSV（日別または月間ABC）をもう一度取り込むと、構成・上位5・強み弱みが表示されます。</div>';
+        }
       }
 
-      // 強み・弱み・改善点（品目キーワードから自動生成）
+      // TOP5（バー付き・常時表示）
+      var t5El = document.getElementById('ch-drink-top5');
+      if (t5El) {
+        if (hasItems) {
+          var top5 = drItems.slice(0, 5);
+          var t5max = 1;
+          top5.forEach(function(it){ if ((it.qty||0) > t5max) t5max = it.qty; });
+          var DR_COLORS = ['#3b6fb5','#2b8a5e','#d4a72c','#8e5aa8','#e8590c'];
+          var t5h = '';
+          top5.forEach(function(it, i){
+            var pct5 = Math.round((it.qty||0) / t5max * 100);
+            t5h += '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:11.5px">'
+              + '<span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:9px;height:9px;border-radius:2px;background:' + DR_COLORS[i] + ';flex:none"></span>'
+              + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + String(it.name||'').replace(/</g,'&lt;') + '</span></span>'
+              + '<span style="white-space:nowrap;flex:none"><strong style="font-size:13px">' + (it.qty||0) + '</strong>杯 <span style="color:var(--text2)">(' + (drTotal>0?Math.round((it.qty||0)/drTotal*100):0) + '%)</span></span></div>'
+              + '<div style="height:8px;border-radius:4px;background:#eef1f5;margin-top:3px;overflow:hidden"><div style="height:100%;width:' + pct5 + '%;background:linear-gradient(90deg,' + DR_COLORS[i] + 'cc,' + DR_COLORS[i] + ');border-radius:4px"></div></div></div>';
+          });
+          t5El.innerHTML = t5h;
+        } else {
+          t5El.innerHTML = '<div style="font-size:11px;color:var(--text2)">—</div>';
+        }
+      }
+
+      // 強み・弱み・改善点（品目が無いときは出数率のみで判定し、誤診しない）
       var insEl = document.getElementById('ch-drink-insights');
       if (insEl) {
-        function drShare(kws) {
-          var q = 0;
-          drItems.forEach(function(it){ if (kws.some(function(k){ return String(it.name||'').indexOf(k) !== -1; })) q += it.qty || 0; });
-          return q;
-        }
-        var barQ  = drShare(['ドリンクバー']);
-        var alcQ  = drShare(['ビール','ハイボール','サワー','ワイン','ウィスキー','梅酒','モヒート','スプマンテ','グラッパ','カクテル','一合','呑比べ','飲み比べ','純米','吟醸','生酒','冷や','四合瓶','焼酎','ロック','水割り','ミニボトル']);
-        var sakeQ = drShare(['一合','呑比べ','飲み比べ','純米','吟醸','生酒','冷や','四合瓶','ミニボトル']);
         var strengths = [], weaknesses = [], actions = [];
         if (drRate >= 100)      strengths.push('お一人平均' + (drTotal/drCust).toFixed(1) + '杯。追加注文が取れている');
         else if (drRate >= 60)  strengths.push('出数率' + drRate.toFixed(0) + '%。過半のお客様が注文');
         else { weaknesses.push('出数率' + drRate.toFixed(0) + '%＝約2人に1杯。頼まない客が多数派');
                actions.push('着席時のファーストドリンクの声かけを全卓で徹底'); }
-        var barPctS = drTotal > 0 ? Math.round(barQ / drTotal * 100) : 0;
-        if (barPctS >= 35) { strengths.push('ドリンクバーが定着（全体の' + barPctS + '%）');
-                             actions.push('バー利用客への「＋一杯」（食後の一合・グラスワイン）の提案'); }
-        var alcPctS = drTotal > 0 ? Math.round(alcQ / drTotal * 100) : 0;
-        if (alcPctS < 30) { weaknesses.push('アルコール比率' + alcPctS + '%と低め'); }
-        else              { strengths.push('アルコール比率' + alcPctS + '%'); }
-        var sakePctS = drTotal > 0 ? Math.round(sakeQ / drTotal * 100) : 0;
-        if (sakeQ > 0 && sakePctS < 15) { weaknesses.push('地酒は' + sakeQ + '杯（全体の' + sakePctS + '%）。魚の店の看板としては弱い');
-                                          actions.push('お造り・鮨の提供時に「合わせるなら本日の一合」を一言添える'); }
+        if (hasItems) {
+          var barPctS = drTotal > 0 ? Math.round(barQ / drTotal * 100) : 0;
+          if (barPctS >= 35) { strengths.push('ドリンクバーが定着（全体の' + barPctS + '%）');
+                               actions.push('バー利用客への「＋一杯」（食後の一合・グラスワイン）の提案'); }
+          var alcPctS = drTotal > 0 ? Math.round(alcQ / drTotal * 100) : 0;
+          if (alcPctS < 30) weaknesses.push('アルコール比率' + alcPctS + '%と低め');
+          else              strengths.push('アルコール比率' + alcPctS + '%');
+          var sakePctS = drTotal > 0 ? Math.round(sakeQ / drTotal * 100) : 0;
+          if (sakePctS < 15) { weaknesses.push('地酒は' + sakeQ + '杯（全体の' + sakePctS + '%）。魚の店の看板としては弱い');
+                               actions.push('お造り・鮨の提供時に「合わせるなら本日の一合」を一言添える'); }
+        }
         function insBlock(icon, title, color, arr) {
           if (!arr.length) return '';
           var h = '<div style="margin-top:6px;padding:7px 10px;background:' + color + '12;border-left:3px solid ' + color + ';border-radius:0 6px 6px 0;font-size:11.5px">'
