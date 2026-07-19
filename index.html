@@ -3549,7 +3549,8 @@ function processCsvResults(results, shopKey) {
     var sRows = results.marcoSnapshotFile;
     var sEnd = null;
     for (var sm2 = 0; sm2 < Math.min(sRows.length, 10); sm2++) {
-      var mPer = String(sRows[sm2][1] || '').match(/(\d{4}-\d{2}-\d{2})〜(\d{4}-\d{2}-\d{2})/);
+      // 〜はShift-JISの解読環境で U+301C(〜) にも U+FF5E(～) にもなるため両対応
+      var mPer = String(sRows[sm2][1] || '').match(/(\d{4}-\d{2}-\d{2})\s*[〜～~]\s*(\d{4}-\d{2}-\d{2})/);
       if (mPer) { sEnd = mPer[2]; break; }
     }
     if (!sEnd) { alert('抽出期間が読み取れませんでした。取込を中止します'); return; }
