@@ -3270,13 +3270,16 @@ function processCsvResults(results, shopKey) {
       upd.mission_dessert = dGrand;
       upd.mission_dessert_items = wdItems.map(function(it){ return { name: it.name, qty: it.total }; });
       var drinkTotalD = 0;
+      // 【修正 R8.7.19】カテゴリ1の列indexは後段(TOP5部)で定義されるため、ここで自前に取得する
+      // （従来は未定義参照で常に0杯になっていた）
+      var dIdxCat1D = dHeader.indexOf('カテゴリ1');
       var dIdxAmtD = dHeader.indexOf('売上金額');
       for (var dk = 1; dk < dRows.length; dk++) {
         var dkRow = dRows[dk];
         if (!dkRow[dIdxName]) continue;
         var dkName = dkRow[dIdxName].replace(/\u3000/g,' ').trim();
         var dkAmt = dIdxAmtD !== -1 ? (parseInt(String(dkRow[dIdxAmtD]||'').replace(/[¥,]/g,'')) || 0) : 1;
-        if (dIdxCat1 !== -1 && dkRow[dIdxCat1] === 'ドリンク' && dkAmt > 0 && !isDrinkExcluded(dkName)) {
+        if (dIdxCat1D !== -1 && dkRow[dIdxCat1D] === 'ドリンク' && dkAmt > 0 && !isDrinkExcluded(dkName)) {
           drinkTotalD += parseInt((dkRow[dIdxQty]||'0').replace(/,/g,'')) || 0;
         }
       }
