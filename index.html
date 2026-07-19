@@ -2789,8 +2789,11 @@ function updateChallengUI(d, shopKey) {
       if (barEl) barEl.style.width = Math.min(100, drRate) + '%';
 
       // ドリンクの構成（バー系／お酒／ソフト・その他の100%横棒）
-      var ALC_KW = ['ビール','ハイボール','サワー','ワイン','ウィスキー','梅酒','モヒート','スプマンテ','グラッパ','カクテル','一合','呑比べ','飲み比べ','純米','吟醸','生酒','冷や','四合瓶','焼酎','ロック','水割り','ミニボトル'];
-      var SAKE_KW = ['一合','呑比べ','飲み比べ','純米','吟醸','生酒','冷や','四合瓶','ミニボトル'];
+      var isMarcoShop = (typeof shopKey !== 'undefined' && shopKey === 'marco');
+      var ALC_KW = ['ビール','ハイボール','サワー','ワイン','ウィスキー','梅酒','モヒート','スプマンテ','グラッパ','カクテル','スプリッツ','リモンチェッロ','一合','呑比べ','飲み比べ','純米','吟醸','生酒','冷や','四合瓶','焼酎','ロック','水割り','ミニボトル'];
+      // 「看板の酒」：本店=地酒、マルコ=ワイン系
+      var SIG_KW   = isMarcoShop ? ['ワイン','スプマンテ','グラッパ','スプリッツ','リモンチェッロ'] : ['一合','呑比べ','飲み比べ','純米','吟醸','生酒','冷や','四合瓶','ミニボトル'];
+      var SIG_LABEL = isMarcoShop ? 'ワイン' : '地酒';
       function drShare(kws) {
         var q = 0;
         drItems.forEach(function(it){ if (kws.some(function(k){ return String(it.name||'').indexOf(k) !== -1; })) q += it.qty || 0; });
@@ -2807,7 +2810,7 @@ function updateChallengUI(d, shopKey) {
               && n.indexOf('ノンアル') === -1) alcQ += it.qty || 0;
           else softQ += it.qty || 0;
         });
-        sakeQ = drShare(SAKE_KW);
+        sakeQ = drShare(SIG_KW);
       }
       var mixEl = document.getElementById('ch-drink-mix');
       if (mixEl) {
@@ -2821,7 +2824,7 @@ function updateChallengUI(d, shopKey) {
             + '</div>'
             + '<div style="display:flex;gap:12px;font-size:10.5px;color:var(--text2);margin-top:4px">'
             + '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#3b6fb5"></span> ドリンクバー ' + barQ + '杯</span>'
-            + '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#c0392b"></span> お酒 ' + alcQ + '杯（うち地酒' + sakeQ + '杯）</span>'
+            + '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#c0392b"></span> お酒 ' + alcQ + '杯（うち' + SIG_LABEL + sakeQ + '杯）</span>'
             + '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#9aa0a6"></span> ソフト他 ' + softQ + '杯</span>'
             + '</div>';
         } else {
@@ -2863,13 +2866,17 @@ function updateChallengUI(d, shopKey) {
         if (hasItems) {
           var barPctS = drTotal > 0 ? Math.round(barQ / drTotal * 100) : 0;
           if (barPctS >= 35) { strengths.push('ドリンクバーが定着（全体の' + barPctS + '%）');
-                               actions.push('バー利用客への「＋一杯」（食後の一合・グラスワイン）の提案'); }
+                               actions.push(isMarcoShop
+                                 ? 'バー利用客への「＋一杯」（食後のエスプレッソ・グラスワイン）の提案'
+                                 : 'バー利用客への「＋一杯」（食後の一合・グラスワイン）の提案'); }
           var alcPctS = drTotal > 0 ? Math.round(alcQ / drTotal * 100) : 0;
           if (alcPctS < 30) weaknesses.push('アルコール比率' + alcPctS + '%と低め');
           else              strengths.push('アルコール比率' + alcPctS + '%');
           var sakePctS = drTotal > 0 ? Math.round(sakeQ / drTotal * 100) : 0;
-          if (sakePctS < 15) { weaknesses.push('地酒は' + sakeQ + '杯（全体の' + sakePctS + '%）。魚の店の看板としては弱い');
-                               actions.push('お造り・鮨の提供時に「合わせるなら本日の一合」を一言添える'); }
+          if (sakePctS < 15) { weaknesses.push(SIG_LABEL + 'は' + sakeQ + '杯（全体の' + sakePctS + '%）。' + (isMarcoShop ? 'イタリアンの看板としては弱い' : '魚の店の看板としては弱い'));
+                               actions.push(isMarcoShop
+                                 ? 'パスタ・前菜の提供時に「合わせるならグラスワイン」を一言添える'
+                                 : 'お造り・鮨の提供時に「合わせるなら本日の一合」を一言添える'); }
         }
         function insBlock(icon, title, color, arr) {
           if (!arr.length) return '';
@@ -3562,8 +3569,8 @@ function processCsvResults(results, shopKey) {
     // マルコのドリンク判定（POSにカテゴリ列が無いため品名キーワード。要メンテ）
     // 「〜無し」は注文ではなく指示のため除外
     var MARCO_DRINK = ['ドリンクバー','ワイン','ビール','グラッパ','スプマンテ','ハイボール','サワー',
-      'カクテル','コーヒー','紅茶','エスプレッソ','カプチーノ','ラテ','ジュース','コーラ','ウーロン',
-      'オレンジ','レモネード','リモナータ','炭酸','ソーダ','ノンアル'];
+      'カクテル','スプリッツ','リモンチェッロ','コーヒー','紅茶','エスプレッソ','カプチーノ','ラテ',
+      'ジュース','コーラ','ウーロン','オレンジ','レモネード','リモナータ','炭酸','ソーダ','ノンアル'];
     var snapDrink = 0, snapDrinkItems = [];
     snapItems.forEach(function(it){
       if (it.name.indexOf('無し') !== -1) return;
