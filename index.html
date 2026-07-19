@@ -455,6 +455,31 @@ nav{display:flex;gap:2px}
       </div>
     </div>
 
+    <div class="ch-section" id="ch-drink-section" style="display:none">
+      <div class="ch-section-title">🥤 DRINK</div>
+      <div class="ch-card">
+        <div class="ch-top">
+          <div>
+            <div class="ch-card-label">ドリンク出数率</div>
+            <div class="ch-card-title">ドリンクは客単価の一杯目</div>
+          </div>
+          <div style="text-align:right">
+            <div id="ch-drink-rate" style="font-size:30px;font-weight:800;color:var(--accent)">—%</div>
+            <div style="font-size:10px;color:var(--text2)">出数率</div>
+          </div>
+        </div>
+        <div id="ch-drink-sub" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
+        <div style="height:8px;border-radius:4px;background:#e3e7ee;margin-top:8px;overflow:hidden">
+          <div id="ch-drink-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#3b6fb5,#2b8a5e);border-radius:4px"></div>
+        </div>
+        <details open style="margin-top:10px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 上位5アイテムの出数</summary>
+          <div id="ch-drink-top5" style="margin-top:6px"></div>
+        </details>
+        <div id="ch-drink-insights" style="margin-top:10px"></div>
+      </div>
+    </div>
+
     <div class="ch-section">
       <div class="ch-section-title">🟡 MONTHLY MISSION</div>
       <div class="ch-card" id="ch-mission-card">
@@ -484,7 +509,6 @@ nav{display:flex;gap:2px}
         <div class="ch-bar-wrap"><div class="ch-bar" id="ch-mission-bar" style="width:0%;background:var(--accent2)"></div></div>
         <div class="ch-remain" id="ch-mission-remain">目標 <strong>30%</strong> まで <strong id="ch-mission-gap">—%</strong></div>
         <div class="ch-lastupdate" id="ch-mission-lastupdate"></div>
-        <div id="ch-mission-drink" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bg2,#f4f6f9);border-radius:8px;font-size:12px"></div>
         <details id="ch-mission-items-wrap" open style="display:none;margin-top:8px">
           <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 品目別内訳を見る</summary>
           <div id="ch-mission-items" style="margin-top:6px"></div>
@@ -2509,24 +2533,6 @@ function updateChallengUI(d, shopKey) {
   if (d.mission_dessert) setVal('ch-mission-inp-dessert', d.mission_dessert);
   if (d.mission_total)   setVal('ch-mission-inp-total',   d.mission_total);
 
-  // ドリンク出数率（ドリンク杯数 ÷ 総客数）
-  var drinkN = d.mission_drink || 0;
-  var custN  = d.mission_total || 0;
-  var drinkEl = document.getElementById('ch-mission-drink');
-  if (drinkEl) {
-    if (drinkN > 0 && custN > 0) {
-      var drinkPct = drinkN / custN * 100;
-      drinkEl.style.display = 'block';
-      drinkEl.innerHTML = '🥤 <strong>ドリンク出数率 ' + drinkPct.toFixed(1) + '%</strong>'
-        + ' <span style="color:var(--text2)">（' + drinkN.toLocaleString() + '杯 ÷ 総客数 ' + custN.toLocaleString() + '人）</span>'
-        + '<div style="height:6px;border-radius:3px;background:#e3e7ee;margin-top:5px;overflow:hidden">'
-        + '<div style="height:100%;width:' + Math.min(100, drinkPct) + '%;background:#3b6fb5;border-radius:3px"></div></div>'
-        + (drinkPct > 100 ? '<div style="font-size:10px;color:var(--text2);margin-top:3px">100%超＝お一人あたり平均' + (drinkN/custN).toFixed(2) + '杯</div>' : '');
-    } else {
-      drinkEl.style.display = 'none';
-    }
-  }
-
   // 品目別内訳（CSV取込時に保存された mission_dessert_items をドーナツ＋バーで表示）
   var CH_COLORS = ['#e8590c','#2b8a5e','#3b6fb5','#d4a72c','#8e5aa8','#c0392b','#4fa3a5','#9aa0a6'];
   function chColor(i) { return CH_COLORS[i % CH_COLORS.length]; }
@@ -2763,6 +2769,84 @@ function updateChallengUI(d, shopKey) {
       if (shEl) shEl.innerHTML = shHtml;
     } else {
       shWrap.style.display = 'none';
+    }
+  }
+
+  // ===== 独立ドリンクカード（出数率・TOP5・強み弱み・改善点） =====
+  var drSection = document.getElementById('ch-drink-section');
+  if (drSection) {
+    var drTotal = d.mission_drink || 0;
+    var drCust  = d.mission_total || 0;
+    var drItems = d.mission_drink_items || [];
+    if (drTotal > 0 && drCust > 0) {
+      drSection.style.display = 'block';
+      var drRate = drTotal / drCust * 100;
+      var rateEl = document.getElementById('ch-drink-rate');
+      if (rateEl) rateEl.textContent = drRate.toFixed(1) + '%';
+      var subEl = document.getElementById('ch-drink-sub');
+      if (subEl) subEl.textContent = drTotal.toLocaleString() + '杯 ÷ 総客数 ' + drCust.toLocaleString() + '人'
+        + (drRate > 100 ? '（お一人平均 ' + (drTotal/drCust).toFixed(2) + '杯）' : '');
+      var barEl = document.getElementById('ch-drink-bar');
+      if (barEl) barEl.style.width = Math.min(100, drRate) + '%';
+
+      // TOP5（バー付き）
+      var t5El = document.getElementById('ch-drink-top5');
+      if (t5El) {
+        var top5 = drItems.slice(0, 5);
+        var t5max = 1;
+        top5.forEach(function(it){ if ((it.qty||0) > t5max) t5max = it.qty; });
+        var DR_COLORS = ['#3b6fb5','#2b8a5e','#d4a72c','#8e5aa8','#e8590c'];
+        var t5h = '';
+        top5.forEach(function(it, i){
+          var pct5 = Math.round((it.qty||0) / t5max * 100);
+          t5h += '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:11.5px">'
+            + '<span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:9px;height:9px;border-radius:2px;background:' + DR_COLORS[i] + ';flex:none"></span>'
+            + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + String(it.name||'').replace(/</g,'&lt;') + '</span></span>'
+            + '<span style="white-space:nowrap;flex:none"><strong>' + (it.qty||0) + '</strong>杯 <span style="color:var(--text2)">(' + (drTotal>0?Math.round((it.qty||0)/drTotal*100):0) + '%)</span></span></div>'
+            + '<div style="height:7px;border-radius:4px;background:#eef1f5;margin-top:3px;overflow:hidden"><div style="height:100%;width:' + pct5 + '%;background:' + DR_COLORS[i] + ';border-radius:4px"></div></div></div>';
+        });
+        t5El.innerHTML = t5h;
+      }
+
+      // 強み・弱み・改善点（品目キーワードから自動生成）
+      var insEl = document.getElementById('ch-drink-insights');
+      if (insEl) {
+        function drShare(kws) {
+          var q = 0;
+          drItems.forEach(function(it){ if (kws.some(function(k){ return String(it.name||'').indexOf(k) !== -1; })) q += it.qty || 0; });
+          return q;
+        }
+        var barQ  = drShare(['ドリンクバー']);
+        var alcQ  = drShare(['ビール','ハイボール','サワー','ワイン','ウィスキー','梅酒','モヒート','スプマンテ','グラッパ','カクテル','一合','呑比べ','飲み比べ','純米','吟醸','生酒','冷や','四合瓶','焼酎','ロック','水割り','ミニボトル']);
+        var sakeQ = drShare(['一合','呑比べ','飲み比べ','純米','吟醸','生酒','冷や','四合瓶','ミニボトル']);
+        var strengths = [], weaknesses = [], actions = [];
+        if (drRate >= 100)      strengths.push('お一人平均' + (drTotal/drCust).toFixed(1) + '杯。追加注文が取れている');
+        else if (drRate >= 60)  strengths.push('出数率' + drRate.toFixed(0) + '%。過半のお客様が注文');
+        else { weaknesses.push('出数率' + drRate.toFixed(0) + '%＝約2人に1杯。頼まない客が多数派');
+               actions.push('着席時のファーストドリンクの声かけを全卓で徹底'); }
+        var barPctS = drTotal > 0 ? Math.round(barQ / drTotal * 100) : 0;
+        if (barPctS >= 35) { strengths.push('ドリンクバーが定着（全体の' + barPctS + '%）');
+                             actions.push('バー利用客への「＋一杯」（食後の一合・グラスワイン）の提案'); }
+        var alcPctS = drTotal > 0 ? Math.round(alcQ / drTotal * 100) : 0;
+        if (alcPctS < 30) { weaknesses.push('アルコール比率' + alcPctS + '%と低め'); }
+        else              { strengths.push('アルコール比率' + alcPctS + '%'); }
+        var sakePctS = drTotal > 0 ? Math.round(sakeQ / drTotal * 100) : 0;
+        if (sakeQ > 0 && sakePctS < 15) { weaknesses.push('地酒は' + sakeQ + '杯（全体の' + sakePctS + '%）。魚の店の看板としては弱い');
+                                          actions.push('お造り・鮨の提供時に「合わせるなら本日の一合」を一言添える'); }
+        function insBlock(icon, title, color, arr) {
+          if (!arr.length) return '';
+          var h = '<div style="margin-top:6px;padding:7px 10px;background:' + color + '12;border-left:3px solid ' + color + ';border-radius:0 6px 6px 0;font-size:11.5px">'
+            + '<div style="font-weight:700;color:' + color + ';margin-bottom:2px">' + icon + ' ' + title + '</div>';
+          arr.slice(0,3).forEach(function(t){ h += '<div style="margin-top:2px">・' + t + '</div>'; });
+          return h + '</div>';
+        }
+        insEl.innerHTML =
+          insBlock('💪', '強み', '#2b8a5e', strengths)
+          + insBlock('⚠️', '弱み', '#c0392b', weaknesses)
+          + insBlock('🎯', '改善点', '#3b6fb5', actions);
+      }
+    } else {
+      drSection.style.display = 'none';
     }
   }
 
@@ -3206,7 +3290,7 @@ function processCsvResults(results, shopKey) {
     var idxQty  = iHeader.indexOf('売上数量');
     var idxCat2 = iHeader.indexOf('カテゴリ2');
     var idxCat1i = iHeader.indexOf('カテゴリ1');
-    var dessertTotal = 0, dessertItems = [], drinkTotalI = 0;
+    var dessertTotal = 0, dessertItems = [], drinkTotalI = 0, drinkItemsI = [];
     for (var j = 1; j < iRows.length; j++) {
       var row = iRows[j];
       if (!row[idxName]) continue;
@@ -3222,13 +3306,17 @@ function processCsvResults(results, shopKey) {
       }
       // ドリンク出数（カテゴリ1=ドリンク。指示ボタン類は除外）
       if (idxCat1i !== -1 && row[idxCat1i] === 'ドリンク' && !isDrinkExcluded(name)) {
-        drinkTotalI += parseInt((row[idxQty]||'0').replace(/,/g,'')) || 0;
+        var dqI = parseInt((row[idxQty]||'0').replace(/,/g,'')) || 0;
+        drinkTotalI += dqI;
+        if (dqI > 0) drinkItemsI.push({ name: name, qty: dqI });
       }
     }
     dessertItems.sort(function(a,b){ return b.qty - a.qty; });
     upd.mission_dessert = dessertTotal;
     upd.mission_dessert_items = dessertItems;
     upd.mission_drink = drinkTotalI;
+    drinkItemsI.sort(function(x,y){ return y.qty - x.qty; });
+    upd.mission_drink_items = drinkItemsI;
     upd.mission_updated = ts;
   }
 
@@ -3269,7 +3357,7 @@ function processCsvResults(results, shopKey) {
     if (!results.itemFile) {
       upd.mission_dessert = dGrand;
       upd.mission_dessert_items = wdItems.map(function(it){ return { name: it.name, qty: it.total }; });
-      var drinkTotalD = 0;
+      var drinkTotalD = 0, drinkMapD = {};
       // 【修正 R8.7.19】カテゴリ1の列indexは後段(TOP5部)で定義されるため、ここで自前に取得する
       // （従来は未定義参照で常に0杯になっていた）
       var dIdxCat1D = dHeader.indexOf('カテゴリ1');
@@ -3280,10 +3368,15 @@ function processCsvResults(results, shopKey) {
         var dkName = dkRow[dIdxName].replace(/\u3000/g,' ').trim();
         var dkAmt = dIdxAmtD !== -1 ? (parseInt(String(dkRow[dIdxAmtD]||'').replace(/[¥,]/g,'')) || 0) : 1;
         if (dIdxCat1D !== -1 && dkRow[dIdxCat1D] === 'ドリンク' && dkAmt > 0 && !isDrinkExcluded(dkName)) {
-          drinkTotalD += parseInt((dkRow[dIdxQty]||'0').replace(/,/g,'')) || 0;
+          var dqD = parseInt((dkRow[dIdxQty]||'0').replace(/,/g,'')) || 0;
+          drinkTotalD += dqD;
+          if (dqD > 0) drinkMapD[dkName] = (drinkMapD[dkName] || 0) + dqD;
         }
       }
       upd.mission_drink = drinkTotalD;
+      upd.mission_drink_items = Object.keys(drinkMapD)
+        .map(function(n){ return { name: n, qty: drinkMapD[n] }; })
+        .sort(function(x,y){ return y.qty - x.qty; });
       upd.mission_updated = ts;
     }
 
@@ -3433,16 +3526,20 @@ function processCsvResults(results, shopKey) {
     var MARCO_DRINK = ['ドリンクバー','ワイン','ビール','グラッパ','スプマンテ','ハイボール','サワー',
       'カクテル','コーヒー','紅茶','エスプレッソ','カプチーノ','ラテ','ジュース','コーラ','ウーロン',
       'オレンジ','レモネード','リモナータ','炭酸','ソーダ','ノンアル'];
-    var snapDrink = 0;
+    var snapDrink = 0, snapDrinkItems = [];
     snapItems.forEach(function(it){
       if (it.name.indexOf('無し') !== -1) return;
-      if (MARCO_DRINK.some(function(t){ return it.name.indexOf(t) !== -1; })) snapDrink += it.qty || 0;
+      if (MARCO_DRINK.some(function(t){ return it.name.indexOf(t) !== -1; })) {
+        snapDrink += it.qty || 0;
+        if ((it.qty || 0) > 0) snapDrinkItems.push({ name: it.name, qty: it.qty });
+      }
     });
+    snapDrinkItems.sort(function(x,y){ return y.qty - x.qty; });
 
     getChRef(shopKey).once('value').then(function(snap) {
       var cur = snap.val() || {};
       var prev = cur.snapshot || null;
-      var updS = { snapshot: { end: sEnd, items: snapItems, at: ts }, mission_drink: snapDrink };
+      var updS = { snapshot: { end: sEnd, items: snapItems, at: ts }, mission_drink: snapDrink, mission_drink_items: snapDrinkItems };
 
       if (!prev || !prev.end) {
         return getChRef(shopKey).update(updS).then(function() {
