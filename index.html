@@ -236,6 +236,7 @@ nav{display:flex;gap:2px}
       <button class="shop-btn active" id="modeShift" onclick="switchMode('shift')" style="background:var(--accent);color:#0a0a0f">シフト</button>
       <button class="shop-btn" id="modeMusubu" onclick="switchMode('musubu')">Musubu</button>
       <button class="shop-btn" id="modeChallenge" onclick="switchMode('challenge', currentShop)">🏆</button>
+      <button class="shop-btn" id="modeFish" onclick="switchMode('fish')">🐟</button>
     </div>
     <nav style="margin-left:auto;flex-shrink:0;">
       <button class="nav-btn active" id="nav0" onclick="showPage('calendar')">カレンダー</button>
@@ -779,6 +780,12 @@ nav{display:flex;gap:2px}
 </div>
 
 <!-- MUSUBU WRAPPER (統合版 v3) -->
+<!-- ===== 魚台帳 ===== -->
+<div id="fish-wrapper" style="display:none;position:fixed;top:82px;left:0;right:0;bottom:0;z-index:50;overflow:hidden;background:#E6EBED;">
+  <iframe id="fish-frame" src="fish.html" style="width:100%;height:100%;border:none;background:#E6EBED" loading="lazy"></iframe>
+</div>
+<!-- ===== /魚台帳 ===== -->
+
 <div id="musubu-wrapper" style="display:none;position:fixed;top:82px;left:0;right:0;bottom:0;z-index:50;overflow:hidden;">
 <style>
 #musubu-wrapper {
@@ -2039,16 +2046,55 @@ var SHOPS = [
 ];
 var currentShop = 0;
 
+window.addEventListener('resize', function(){
+  var fw = document.getElementById('fish-wrapper');
+  if (fw && fw.style.display === 'block') {
+    var fh = document.getElementById('main-header');
+    var fhh = fh ? fh.getBoundingClientRect().height : 82;
+    fw.style.top = fhh + 'px';
+    fw.style.height = (window.innerHeight - fhh) + 'px';
+  }
+});
+
 function switchMode(mode, shopIdx) {
   var musubuWrapper = document.getElementById('musubu-wrapper');
   var headerNav = document.querySelector('nav');
   var pdfBtn = document.querySelector('.pdf-btn');
 
   // 全モードボタンをリセット
-  ['modeShift','modeMusubu','modeChallenge'].forEach(function(id) {
+  ['modeShift','modeMusubu','modeChallenge','modeFish'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.className = 'shop-btn'; el.style.cssText = ''; }
   });
+
+  // 魚台帳は毎回いったん隠す
+  var fishWrapper = document.getElementById('fish-wrapper');
+  if (fishWrapper) fishWrapper.style.display = 'none';
+
+  if (mode === 'fish') {
+    if (musubuWrapper) musubuWrapper.style.display = 'none';
+    var fh = document.getElementById('main-header');
+    var fhh = fh ? fh.getBoundingClientRect().height : 82;
+    if (fishWrapper) {
+      fishWrapper.style.position = 'fixed';
+      fishWrapper.style.top = fhh + 'px';
+      fishWrapper.style.left = '0';
+      fishWrapper.style.right = '0';
+      fishWrapper.style.bottom = '0';
+      fishWrapper.style.height = (window.innerHeight - fhh) + 'px';
+      fishWrapper.style.zIndex = '50';
+      fishWrapper.style.display = 'block';
+      fishWrapper.style.webkitTransform = 'translateZ(0)';
+    }
+    ['page-calendar','page-wish','page-admin','page-admin-lock','page-challenge'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    if (headerNav) headerNav.style.display = 'none';
+    if (pdfBtn) pdfBtn.style.display = 'none';
+    var mf = document.getElementById('modeFish');
+    if (mf) { mf.className = 'shop-btn active'; mf.style.cssText = 'background:var(--accent);color:#0a0a0f'; }
+    return;
+  }
 
   if (mode === 'musubu') {
     if (musubuWrapper) {
