@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light">
+<title>魚の旨み・熟成台帳</title>
+<style>
+:root{
+  --ice:#E6EBED;
+  --ice-2:#F2F5F6;
+  --ink:#0E212B;
+  --ai:#1F4E5F;
+  --ai-2:#2E6E82;
+  --gin:#6F7E85;
+  --gin-2:#9AA8AD;
+  --chiai:#A8342B;
+  --kombu:#6B7A3C;
+  --line:rgba(14,33,43,.14);
+  --serif:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP",serif;
+  --sans:"Hiragino Sans","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{background:var(--ice);color-scheme:light only;-webkit-text-size-adjust:100%}
+main,.panel,.split,.rail,.detail{background:var(--ice)}
+body{
+  background:var(--ice);
+  min-height:100vh;
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit}
+
+/* ---------- header ---------- */
+header{
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#F4F7F8,var(--ice));
+  position:sticky;top:0;z-index:40;
+  backdrop-filter:blur(6px);
+}
+.head-in{max-width:1240px;margin:0 auto;padding:14px 20px 0}
+.brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.brand h1{
+  font-family:var(--serif);
+  font-size:26px;font-weight:600;margin:0;
+  letter-spacing:.16em;
+}
+.brand .sub{
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+  color:var(--gin);text-transform:uppercase;
+}
+nav{display:flex;gap:2px;margin-top:12px;flex-wrap:wrap}
+nav button{
+  appearance:none;border:0;background:none;cursor:pointer;
+  font-family:var(--sans);font-size:13px;color:var(--gin);
+  padding:9px 16px;border-bottom:2px solid transparent;
+  letter-spacing:.06em;
+}
+nav button:hover{color:var(--ai)}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--chiai);font-weight:700}
+nav button:focus-visible,.f-btn:focus-visible,.fish-item:focus-visible{outline:2px solid var(--ai-2);outline-offset:2px}
+
+/* ---------- layout ---------- */
+main{max-width:1240px;margin:0 auto;padding:22px 20px 80px}
+.panel{display:none}
+.panel.on{display:block}
+
+.split{display:grid;grid-template-columns:268px 1fr;gap:28px;align-items:start}
+
+/* ---------- filters + list ---------- */
+.rail{position:sticky;top:118px;max-height:calc(100vh - 140px);display:flex;flex-direction:column}
+.search{
+  width:100%;padding:9px 12px;border:1px solid var(--line);
+  background:#fff;border-radius:2px;font-family:var(--sans);font-size:14px;color:var(--ink);
+}
+.search::placeholder{color:var(--gin-2)}
+.filters{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0}
+.f-btn{
+  appearance:none;cursor:pointer;font-family:var(--mono);font-size:11px;
+  padding:4px 9px;border:1px solid var(--line);background:transparent;color:var(--gin);
+  border-radius:99px;letter-spacing:.04em;
+}
+.f-btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ice-2)}
+.fish-list{overflow-y:auto;border-top:1px solid var(--line);margin-top:4px}
+.grp{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--gin);
+  padding:14px 0 5px;border-bottom:1px solid var(--line)}
+.fish-item{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  width:100%;text-align:left;appearance:none;border:0;background:none;cursor:pointer;
+  padding:8px 8px 8px 0;border-bottom:1px solid rgba(14,33,43,.06);
+  font-family:var(--sans);font-size:14px;color:var(--ink);
+}
+.fish-item:hover{background:rgba(31,78,95,.06)}
+.fish-item[aria-current="true"]{background:var(--ink);color:var(--ice-2);padding-left:8px}
+.fish-item[aria-current="true"] .tag{color:var(--gin-2)}
+.tag{font-family:var(--mono);font-size:10px;color:var(--gin);white-space:nowrap}
+
+/* ---------- detail ---------- */
+.detail{min-width:0}
+.d-head{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:22px}
+.d-kana{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--gin)}
+.d-name{font-family:var(--serif);font-size:40px;font-weight:600;margin:2px 0 8px;letter-spacing:.06em;line-height:1.15}
+.d-meta{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--ai);font-family:var(--mono)}
+.verdict{
+  display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+  padding:3px 10px;border-radius:2px;margin-left:12px;vertical-align:middle;
+}
+.v-yes{background:var(--kombu);color:#F4F7EC}
+.v-short{background:var(--ai-2);color:#EAF3F5}
+.v-no{background:var(--chiai);color:#FBEDEB}
+
+/* chart — signature */
+.chart-wrap{background:#fff;border:1px solid var(--line);padding:18px 16px 10px;margin-bottom:26px;position:relative}
+.chart-title{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:6px}
+.chart-title h3{font-family:var(--serif);font-size:16px;margin:0;letter-spacing:.1em;font-weight:600}
+.legend{display:flex;gap:14px;font-family:var(--mono);font-size:10px;color:var(--gin);flex-wrap:wrap}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:5px}
+svg.chart{display:block;width:100%;height:230px;touch-action:none}
+.readout{
+  font-family:var(--mono);font-size:11.5px;color:var(--ai);
+  border-top:1px solid var(--line);margin-top:6px;padding-top:8px;min-height:38px;line-height:1.6;
+}
+.readout b{color:var(--ink)}
+
+/* content blocks */
+.blocks{display:grid;grid-template-columns:1fr 1fr;gap:0 30px}
+.block{border-top:1px solid var(--line);padding:14px 0 18px}
+.block.wide{grid-column:1/-1}
+.block h4{
+  font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--gin);
+  margin:0 0 8px;font-weight:400;
+}
+.block p{margin:0;font-size:14.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border:1px solid var(--line);background:#fff;border-radius:2px}
+.chip.k{border-color:rgba(107,122,60,.45);color:var(--kombu);background:#FAFBF4}
+.chip.v{border-color:rgba(46,110,130,.4);color:var(--ai);background:#F4F9FA}
+.cuis{display:grid;gap:10px}
+.cu{display:flex;gap:10px;align-items:flex-start}
+.cu-l{
+  flex:0 0 auto;width:26px;height:26px;display:grid;place-items:center;
+  font-family:var(--serif);font-size:14px;background:var(--ink);color:var(--ice-2);border-radius:2px;
+}
+.note{background:#fff;border-left:3px solid var(--chiai);padding:12px 16px;font-size:14px;margin-top:6px}
+
+/* ---------- table view ---------- */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);background:#fff}
+table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:1180px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid rgba(14,33,43,.08);vertical-align:top}
+thead th{
+  position:sticky;top:0;background:var(--ink);color:var(--ice-2);
+  font-family:var(--mono);font-size:10px;letter-spacing:.14em;font-weight:400;white-space:nowrap;z-index:2;
+}
+tbody tr:hover{background:rgba(31,78,95,.05)}
+td.num{font-family:var(--mono);color:var(--ai);white-space:nowrap}
+.dot{display:inline-block;width:7px;height:7px;border-radius:99px;margin-right:6px;vertical-align:middle}
+*  {}
+.lead{max-width:70ch;color:#1a3f4d;font-size:14px;margin:0 0 18px}
+h2.sec{font-family:var(--serif);font-size:22px;letter-spacing:.1em;font-weight:600;margin:0 0 6px}
+
+/* glossary */
+.gl{columns:2;column-gap:30px}
+.gl .item{break-inside:avoid;border-top:1px solid var(--line);padding:13px 0 15px}
+.gl h5{margin:0;font-family:var(--serif);font-size:16px;font-weight:600;letter-spacing:.05em}
+.gl .cls{font-family:var(--mono);font-size:10px;color:var(--gin);letter-spacing:.14em}
+.gl p{margin:6px 0 0;font-size:13.5px}
+.gl .tl{margin-top:6px;font-size:13px;color:var(--ai);border-left:2px solid var(--gin-2);padding-left:10px}
+
+footer{max-width:1240px;margin:0 auto;padding:0 20px 60px;color:var(--gin);font-size:12px;line-height:1.9}
+footer hr{border:0;border-top:1px solid var(--line);margin:0 0 16px}
+
+@media (max-width:920px){
+  .split{grid-template-columns:1fr}
+  .rail{position:static;max-height:none}
+  .fish-list{max-height:260px}
+  .blocks{grid-template-columns:1fr}
+  .gl{columns:1}
+  .d-name{font-size:30px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-in">
+    <div class="brand">
+      <h1>魚の旨み・熟成台帳</h1>
+      <span class="sub">umami &amp; aging reference / kitchen edition</span>
+    </div>
+    <nav role="tablist">
+      <button role="tab" id="t-fish" aria-selected="true" data-p="p-fish">魚種カルテ</button>
+      <button role="tab" id="t-list" aria-selected="false" data-p="p-list">熟成一覧</button>
+      <button role="tab" id="t-gloss" aria-selected="false" data-p="p-gloss">成分辞典</button>
+      <button role="tab" id="t-how" aria-selected="false" data-p="p-how">扱いの原則</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ============ 魚種カルテ ============ -->
+  <section class="panel on" id="p-fish">
+    <div class="split">
+      <aside class="rail">
+        <input class="search" id="q" type="search" placeholder="魚名・かなで検索" aria-label="魚を検索">
+        <div class="filters" id="filters"></div>
+        <div class="fish-list" id="list"></div>
+      </aside>
+      <div class="detail" id="detail"></div>
+    </div>
+  </section>
+
+  <!-- ============ 熟成一覧 ============ -->
+  <section class="panel" id="p-list">
+    <h2 class="sec">熟成一覧</h2>
+    <p class="lead">食べ頃の早い順。0〜5℃保管が前提。時間はすべて「〆てから」の経過。生食可能期間は適切な処理・保管を行った場合の目安です。</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>魚介</th><th>分類</th><th>熟成</th><th>食べ頃</th><th>生食可能期間</th>
+          <th>主な旨み</th><th>相性素材</th><th>相性野菜</th><th>和</th><th>洋</th><th>中</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 成分辞典 ============ -->
+  <section class="panel" id="p-gloss">
+    <h2 class="sec">成分辞典</h2>
+    <p class="lead">味に効く成分と、〆てからの動き方。</p>
+    <div class="gl" id="gloss"></div>
+  </section>
+
+  <!-- ============ 扱いの原則 ============ -->
+  <section class="panel" id="p-how">
+    <h2 class="sec">扱いの原則</h2>
+    <p class="lead">魚種を問わず効く、旨みを落とさない仕込みの順序。</p>
+    <div class="gl" id="how"></div>
+  </section>
+</main>
+
+<footer>
+  <hr>
+  グラフは各成分の挙動を示す模式図です。実測値ではなく、魚種ごとの速さの違いを比べるためのもの。<br>
+  生食は鮮度と衛生管理が前提。サバ・イワシ・サンマ・カツオなどはアニサキス対策（目視・冷凍）を行ってください。
+</footer>
+
+<script>
+/* ============================================================
+   データ
+   aging: 'no' | 'short' | 'yes'
+   prof : 核酸の立ち上がり(rise,h) / 半減期(decay,h) / 遊離アミノ酸の伸び(amino,h)
+          / 鮮度低下の速さ(spoil,h) / 核酸ラベル
+   win  : 食べ頃の窓 [開始h, 終了h]
+============================================================ */
+const CAT = {
+  white:{label:'白身',color:'#2E6E82'},
+  red:{label:'赤身・青魚',color:'#A8342B'},
+  crust:{label:'甲殻類',color:'#C06A2B'},
+  ceph:{label:'イカ・タコ',color:'#6B5C8A'},
+  shell:{label:'貝',color:'#6B7A3C'},
+  river:{label:'川魚',color:'#3E7A5E'},
+  other:{label:'その他',color:'#4A5B62'}
+};
+
+const FISH = [
+/* ---------- 白身 ---------- */
+{n:'ヒラメ',k:'HIRAME',c:'white',season:'11〜2月',aging:'yes',age:'半日〜2日',peak:'18〜24時間',
+ win:[14,48],prof:{rise:7,decay:220,amino:60,spoil:300,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','グリシン'],
+ pair:['昆布','スダチ','ポン酢','もみじおろし','塩','オリーブオイル'],
+ method:['薄造り','昆布締め','縁側の炙り','карпаччо風','潮汁'],
+ change:'〆た直後はコリコリと歯応えが立つがイノシン酸はまだ少ない。半日で旨みが乗り、24時間前後で核酸が頂点。2日目からは身が緩みはじめる代わりに遊離アミノ酸が増え、甘みの角が取れる。',
+ note:'当日は食感、翌日は旨み。同じ一枚を二日に分けて別の顔で出せる魚。縁側は当日のうちに。'},
+
+{n:'マダイ',k:'MADAI',c:'white',season:'3〜6月',aging:'yes',age:'1〜3日',peak:'24時間',
+ win:[18,72],prof:{rise:8,decay:240,amino:70,spoil:320,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','タウリン'],
+ pair:['昆布','煎り酒','白ごま','出汁','柚子','塩麹'],
+ method:['松皮造り','昆布締め','鯛茶漬け','兜煮','鯛めし'],
+ change:'イノシン酸のピークは1日目。2〜3日目は核酸が緩やかに減る一方でグルタミン酸が増え、単体の旨みから重層的な旨みへ移る。皮目の脂の香りは日を追って穏やかになる。',
+ note:'ごまだれや茶漬けにするなら2〜3日目のほうが合う。造りの張りを見せたい日は1日目。'},
+
+{n:'スズキ',k:'SUZUKI',c:'white',season:'6〜8月',aging:'short',age:'当日〜1日',age_:'',peak:'12時間',
+ win:[4,30],prof:{rise:6,decay:150,amino:60,spoil:180,nuc:'イノシン酸'},
+ umami:['イノシン酸','グリシン'],
+ pair:['氷水','梅肉','大葉','塩','レモン'],
+ method:['洗い','薄造り','ポワレ','塩焼き'],
+ change:'水分が多く、置くほど身が緩みやすい。イノシン酸は半日で乗るが、そこから先は食感の劣化が旨みの伸びを上回る。',
+ note:'夏場は洗いが正解。氷水で締めると脂の重さが抜けて甘みが立つ。'},
+
+{n:'カワハギ',k:'KAWAHAGI',c:'white',season:'10〜2月',aging:'short',age:'当日〜翌日',peak:'12〜18時間',
+ win:[6,30],prof:{rise:6,decay:160,amino:55,spoil:150,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['肝','醤油','あさつき','ポン酢','味噌'],
+ method:['薄造り＋肝醤油','肝和え','鍋','唐揚げ'],
+ change:'身自体は淡白でイノシン酸の伸びも穏やか。主役は肝で、肝は鮮度勝負。時間が経つと肝の酸化臭が出る。',
+ note:'肝は当日。身だけなら翌日まで置いて旨みを乗せる手もある。'},
+
+{n:'クエ',k:'KUE',c:'white',season:'11〜2月',aging:'yes',age:'3〜5日',peak:'48〜72時間',
+ win:[48,144],prof:{rise:14,decay:400,amino:110,spoil:500,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','コラーゲン由来ペプチド'],
+ pair:['昆布','塩','酒','葱','柚子胡椒'],
+ method:['薄造り','鍋','唐揚げ','兜蒸し'],
+ change:'大型で身が締まっており、分解が遅い。3日目以降に遊離アミノ酸が大きく伸びて、噛むほど甘い状態へ。皮と骨のゼラチンも同時にほぐれる。',
+ note:'早く出すと硬いだけで味が出ない。仕入れたら日を数える魚。'},
+
+{n:'アンコウ',k:'ANKOU',c:'white',season:'12〜2月',aging:'short',age:'当日〜1日',peak:'—',
+ win:[0,24],prof:{rise:6,decay:120,amino:50,spoil:140,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','コラーゲン'],
+ pair:['あん肝','味噌','酒粕','葱','大根','紅葉おろし'],
+ method:['どぶ汁','あん肝の蒸し','共酢','唐揚げ','鍋'],
+ change:'身は水分が多く、置くと水が出て味が薄まる。肝は脂質が主体で、鮮度が落ちると酸化臭が前に出る。旨みは加熱で出汁に移る型の魚。',
+ note:'七つ道具それぞれ持ちが違う。肝と身は分けて管理する。'},
+
+{n:'ホウボウ',k:'HOUBOU',c:'white',season:'11〜3月',aging:'yes',age:'1〜2日',peak:'24時間',
+ win:[12,60],prof:{rise:8,decay:220,amino:70,spoil:300,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['昆布','塩','スダチ','バター','香草'],
+ method:['薄造り','昆布締め','潮汁','ポワレ'],
+ change:'白身の中では比較的しっかり熟成が乗る。1日でイノシン酸、2日目でアミノ酸の甘み。骨が良い出汁を引く。',
+ note:'アラは必ず潮汁に。身より骨のほうが値打ちがある日もある。'},
+
+{n:'キンメダイ',k:'KINMEDAI',c:'white',season:'12〜2月',aging:'yes',age:'1〜2日',peak:'24時間',
+ win:[12,60],prof:{rise:8,decay:210,amino:75,spoil:260,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['醤油','味醂','生姜','昆布','塩'],
+ method:['煮付け','湯霜造り','炙り','しゃぶしゃぶ'],
+ change:'脂が多く、1日置くと脂と旨みが馴染む。皮下に旨みが集中するので、皮を残す仕事が向く。',
+ note:'湯霜で皮を活かすと、同じ身でも一段甘く感じる。'},
+
+{n:'トラフグ',k:'TORAFUGU',c:'white',season:'11〜2月',aging:'yes',age:'1〜2日（必須）',peak:'24〜36時間',
+ win:[20,60],prof:{rise:12,decay:300,amino:90,spoil:400,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','タウリン'],
+ pair:['ポン酢','もみじおろし','あさつき','昆布','ひれ酒'],
+ method:['てっさ','てっちり','唐揚げ','焼き白子'],
+ change:'〆た直後は硬すぎて味が分からない。1日置いて硬直が解け、イノシン酸が乗ってはじめて薄造りの意味が出る。',
+ note:'寝かせないフグは食感の遊びだけになる。免許のある者が扱うこと。'},
+
+{n:'メバル',k:'MEBARU',c:'white',season:'3〜5月',aging:'short',age:'当日〜1日',peak:'12〜18時間',
+ win:[6,36],prof:{rise:7,decay:170,amino:60,spoil:200,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['醤油','生姜','酒','木の芽','塩'],
+ method:['煮付け','塩焼き','薄造り','唐揚げ'],
+ change:'小型で分解が早め。旨みは半日〜1日で十分に乗る。',
+ note:'小魚は熟成の余地が少ない。数を揃えて煮付けに回すほうが値打ちが出る。'},
+
+/* ---------- 赤身・青魚 ---------- */
+{n:'本マグロ（赤身）',k:'HONMAGURO',c:'red',season:'11〜2月',aging:'yes',age:'2〜7日',peak:'24〜48時間',
+ win:[24,168],prof:{rise:10,decay:300,amino:100,spoil:340,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','ヒスチジン'],
+ pair:['醤油','山葵','海苔','煎り酒','酢飯'],
+ method:['刺身','漬け','手巻き','ヅケ丼','ステーキ'],
+ change:'イノシン酸は1〜2日で頂点。以降ゆっくり減るが、遊離アミノ酸と分解ペプチドが増えて味が濃くなる。色は日を追って黒みが差す。',
+ note:'色と味のピークがずれるのがこの魚の難しさ。見た目重視なら早く、味重視なら寝かせる。'},
+
+{n:'本マグロ（中トロ）',k:'CHUTORO',c:'red',season:'11〜2月',aging:'yes',age:'2〜5日',peak:'24〜48時間',
+ win:[24,120],prof:{rise:10,decay:280,amino:95,spoil:220,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','脂質由来の香気'],
+ pair:['醤油','山葵','塩','大根おろし','葱'],
+ method:['刺身','炙り','ねぎま','漬け'],
+ change:'赤身より脂の酸化が早いぶん寝かせられる日数が短い。脂は熟成でとろみが増すが、行き過ぎると酸敗臭が出る。',
+ note:'真空・脱気で酸素を切ると持ちが変わる。脂の多い部位ほど空気に触れさせない。'},
+
+{n:'カツオ',k:'KATSUO',c:'red',season:'4〜5月／9〜11月',aging:'no',age:'当日',peak:'6〜12時間',
+ win:[0,18],prof:{rise:3,decay:90,amino:40,spoil:60,nuc:'イノシン酸'},
+ umami:['イノシン酸','ヒスチジン','グルタミン酸'],
+ pair:['ニンニク','生姜','玉葱','大葉','ポン酢','藁の燻香'],
+ method:['たたき（藁焼き）','刺身','漬け','角煮'],
+ change:'イノシン酸の立ち上がりは非常に早く、下がるのも早い。ヒスチジンが多く、温度が上がるとヒスタミンに変わって危険。血合いの酸化も速い。',
+ note:'温度管理が全て。常温に置かない。生食は当日のうちに使い切る前提で仕入れる。'},
+
+{n:'ブリ',k:'BURI',c:'red',season:'12〜2月',aging:'yes',age:'1〜3日',peak:'24時間',
+ win:[12,72],prof:{rise:8,decay:200,amino:80,spoil:200,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['大根','醤油','生姜','柚子','酢'],
+ method:['刺身','ぶり大根','照り焼き','しゃぶしゃぶ','漬け'],
+ change:'1日でイノシン酸のピーク。2〜3日目は脂と旨みが馴染んで丸くなるが、脂の酸化と血合いの臭みが出やすい。',
+ note:'血合いをきちんと外すかどうかで、2日目以降の印象がまるで違う。'},
+
+{n:'カンパチ',k:'KANPACHI',c:'red',season:'6〜9月',aging:'yes',age:'1〜2日',peak:'18〜24時間',
+ win:[12,60],prof:{rise:8,decay:210,amino:75,spoil:250,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['醤油','塩','スダチ','胡麻','わさび'],
+ method:['刺身','漬け','カルパッチョ','兜焼き'],
+ change:'ブリより身が締まって水分が少なく、熟成中の劣化が遅い。1〜2日目が張りと旨みの両立点。',
+ note:'夏の赤身としては最も扱いやすい。仕入れが安定するなら定番向き。'},
+
+{n:'マアジ',k:'MAAJI',c:'red',season:'5〜8月',aging:'no',age:'当日',peak:'6〜12時間',
+ win:[0,18],prof:{rise:4,decay:100,amino:45,spoil:70,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['生姜','葱','味噌','大葉','酢'],
+ method:['なめろう','刺身','塩焼き','フライ','酢〆'],
+ change:'旨みの立ち上がりも劣化も早い。半日を過ぎると生臭さの元（TMA）が増えはじめる。',
+ note:'青魚は「熟成」ではなく「酢〆」で時間を稼ぐ、と割り切ったほうがいい。'},
+
+{n:'マイワシ',k:'MAIWASHI',c:'red',season:'6〜10月',aging:'no',age:'当日',peak:'4〜8時間',
+ win:[0,12],prof:{rise:3,decay:70,amino:40,spoil:45,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['生姜','梅','大葉','味噌','オリーブオイル'],
+ method:['刺身','梅煮','つみれ','マリネ','オイル漬け'],
+ change:'脂質が多く自己消化が最も速い部類。数時間で身が緩み、脂の酸化臭が出る。',
+ note:'即日勝負。翌日に回すなら火を入れるか酢に漬けるか、判断を朝のうちに。'},
+
+{n:'サバ',k:'SABA',c:'red',season:'10〜2月',aging:'no',age:'当日（生食）',peak:'4〜8時間',
+ win:[0,12],prof:{rise:3,decay:80,amino:45,spoil:40,nuc:'イノシン酸'},
+ umami:['イノシン酸','ヒスチジン','グルタミン酸'],
+ pair:['酢','塩','昆布','生姜','味噌','からし'],
+ method:['〆鯖','味噌煮','塩焼き','棒寿司'],
+ change:'ヒスチジンが多く、温度管理を誤るとヒスタミン食中毒の原因に。分解酵素が強く、身が最も早く崩れる魚のひとつ。',
+ note:'「サバの生き腐れ」は酵素の強さのこと。塩→酢で水分と菌を抑えるのが伝統的な正解。'},
+
+{n:'サンマ',k:'SANMA',c:'red',season:'9〜11月',aging:'no',age:'当日',peak:'4〜8時間',
+ win:[0,12],prof:{rise:3,decay:75,amino:40,spoil:45,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['大根おろし','スダチ','醤油','生姜'],
+ method:['刺身','塩焼き','蒲焼き','なめろう'],
+ change:'脂の酸化が速く、内臓の酵素が身に回りやすい。旨みのピークは短い。',
+ note:'内臓を食べさせるなら鮮度が全て。抜くなら早めに抜く。'},
+
+{n:'シマアジ',k:'SHIMAAJI',c:'red',season:'6〜9月',aging:'yes',age:'1〜2日',peak:'18〜24時間',
+ win:[10,54],prof:{rise:8,decay:200,amino:70,spoil:230,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','グリシン'],
+ pair:['塩','スダチ','わさび','昆布','オリーブオイル'],
+ method:['刺身','昆布締め','カルパッチョ','握り'],
+ change:'青魚に分類されるが身質は白身寄りで、1日程度の熟成に耐える。甘みが強い。',
+ note:'値は張るが、寝かせて味が伸びる数少ない「アジ」。'},
+
+{n:'サワラ',k:'SAWARA',c:'red',season:'3〜5月／10〜12月',aging:'yes',age:'2〜3日',peak:'24〜48時間',
+ win:[18,84],prof:{rise:9,decay:230,amino:85,spoil:220,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['藁の燻香','塩','柚子','西京味噌','酢橘'],
+ method:['藁焼きたたき','刺身','西京焼き','幽庵焼き'],
+ change:'身が柔らかく水っぽいが、2日置くと水分が抜けて旨みが凝縮する。脂の香りも立つ。',
+ note:'藁で炙ると香りが水っぽさを覆い、熟成の効きが分かりやすくなる。'},
+
+{n:'タチウオ',k:'TACHIUO',c:'red',season:'7〜10月',aging:'short',age:'当日〜1日',peak:'12時間',
+ win:[4,30],prof:{rise:6,decay:150,amino:55,spoil:160,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],
+ pair:['塩','レモン','バター','大葉','醤油'],
+ method:['炙り造り','塩焼き','ムニエル','天ぷら'],
+ change:'脂は多いが身は繊細で、置くと崩れやすい。旨みは半日で十分乗る。',
+ note:'皮目を炙ると脂の香りが立つ。刺身なら炙り一択に近い。'},
+
+/* ---------- 甲殻類 ---------- */
+{n:'伊勢海老',k:'ISE-EBI',c:'crust',season:'10〜4月',aging:'no',age:'活け〜当日',peak:'〆た直後',
+ win:[0,8],prof:{rise:0,decay:26,amino:36,spoil:34,nuc:'AMP（アデニル酸）'},
+ umami:['AMP','グリシン','アラニン','アルギニン','ベタイン'],
+ pair:['昆布（グルタミン酸）','塩','酢橘','日本酒','味噌'],
+ method:['活け造り','昆布締め（短時間）','鬼殻焼き','具足煮','味噌汁'],
+ change:'甲殻類はATPの分解がAMPで滞留し、イノシン酸まで進まない。つまり熟成で旨みが増えるのではなく、〆た瞬間が頂点で、そこから減っていく。暴れさせるとATPを使い切って甘みの元が減る。',
+ note:'氷水で15〜30分静かにさせてからの活け〆でATPを温存。塩は直接強く当てず3%の立て塩、提供は10〜12℃に戻すと甘みが立つ。昆布のグルタミン酸を合わせるとAMPとの相乗で旨みが跳ねる。'},
+
+{n:'車海老',k:'KURUMA-EBI',c:'crust',season:'11〜2月',aging:'no',age:'活け〜当日',peak:'〆た直後',
+ win:[0,10],prof:{rise:0,decay:30,amino:40,spoil:40,nuc:'AMP'},
+ umami:['AMP','グリシン','アラニン','ベタイン'],
+ pair:['昆布','塩','出汁','卵黄','バター'],
+ method:['踊り','鬼殻焼き','天ぷら','握り（茹で）'],
+ change:'生では甘みアミノ酸が主役。加熱するとタンパク質がほどけてアミノ酸が舌に届きやすくなり、甘みが増したように感じる。',
+ note:'茹でるなら塩は海水程度、氷締めはせず余熱で。急冷すると身が縮んで甘みが逃げる。'},
+
+{n:'甘エビ',k:'AMAEBI',c:'crust',season:'通年',aging:'short',age:'半日〜1日',peak:'12〜24時間',
+ win:[6,36],prof:{rise:5,decay:80,amino:50,spoil:70,nuc:'AMP'},
+ umami:['グリシン','アラニン','AMP','ベタイン'],
+ pair:['塩','昆布','山葵','オリーブオイル','レモン'],
+ method:['刺身','昆布締め','漬け','唐揚げ（頭）'],
+ change:'甲殻類の中では例外的に、半日〜1日置くと自己消化で遊離アミノ酸が増えて甘みが強まる。ただし身は溶けるように柔らかくなる。',
+ note:'食感を残したい日は当日、甘みを出したい日は一晩。頭は別に取って揚げるか出汁に。'},
+
+{n:'ズワイガニ',k:'ZUWAIGANI',c:'crust',season:'11〜3月',aging:'no',age:'活け〜当日',peak:'〆た直後',
+ win:[0,10],prof:{rise:0,decay:28,amino:38,spoil:36,nuc:'AMP'},
+ umami:['グリシン','アラニン','AMP','ベタイン'],
+ pair:['塩','酢','昆布出汁','三杯酢','バター'],
+ method:['茹で','焼き','刺身（活け）','蟹味噌'],
+ change:'死後は身が水っぽくなり、甘みアミノ酸が流出する。活けから茹でるのが最も歩留まりが良い。',
+ note:'茹で汁に塩を効かせるのは味付けではなく、アミノ酸の流出を抑えるため。'},
+
+/* ---------- イカ・タコ ---------- */
+{n:'アオリイカ',k:'AORI-IKA',c:'ceph',season:'4〜6月／9〜11月',aging:'yes',age:'2〜3日',peak:'48〜72時間',
+ win:[24,120],prof:{rise:20,decay:500,amino:130,spoil:400,nuc:'AMP'},
+ umami:['グリシン','アラニン','プロリン','タウリン','ベタイン'],
+ pair:['塩','スダチ','昆布','醤油','柚子胡椒'],
+ method:['刺身（細造り）','塩辛','天ぷら','炙り'],
+ change:'核酸系の旨みはもともと少なく、主役は遊離アミノ酸。2〜3日置くとタンパク質が分解してアミノ酸が倍近くに増え、透明だった身が白濁して甘みが濃くなる。',
+ note:'イカは熟成が最も分かりやすく効く食材。当日は食感、3日目は甘さ。両方出せると強い。'},
+
+{n:'スルメイカ',k:'SURUME-IKA',c:'ceph',season:'6〜9月',aging:'short',age:'当日〜1日',peak:'12〜24時間',
+ win:[0,36],prof:{rise:10,decay:200,amino:80,spoil:120,nuc:'AMP'},
+ umami:['グリシン','タウリン','ベタイン'],
+ pair:['醤油','生姜','肝','葱','唐辛子'],
+ method:['刺身','ワタ焼き','塩辛','煮付け'],
+ change:'アオリイカほど熟成は伸びない。肝の酵素が強く、ワタを入れたまま置くと身まで柔らかくなりすぎる。',
+ note:'肝を使うなら先に外す。塩辛にするなら肝は塩を当てて一晩脱水。'},
+
+{n:'マダコ',k:'MADAKO',c:'ceph',season:'6〜9月',aging:'short',age:'茹でて1日',peak:'茹で後12〜24時間',
+ win:[8,48],prof:{rise:8,decay:220,amino:90,spoil:200,nuc:'AMP'},
+ umami:['タウリン','グリシン','ベタイン','グルタミン酸'],
+ pair:['塩','オリーブオイル','醤油','柚子','大根'],
+ method:['ボイル→薄造り','ステーキ（ボイル後ソテー）','唐揚げ','煮ダコ','カルパッチョ'],
+ change:'生のままでは硬くタウリン主体で味が出にくい。茹でて冷蔵で一晩置くと、アミノ酸が回って甘みが出て、繊維も落ち着く。',
+ note:'茹でてすぐ切るより、一晩寝かせたほうが確実に旨い。ステーキにする場合もこの順序。'},
+
+/* ---------- 貝 ---------- */
+{n:'ホタテ',k:'HOTATE',c:'shell',season:'12〜4月',aging:'short',age:'当日〜1日',peak:'6〜18時間',
+ win:[0,30],prof:{rise:5,decay:130,amino:60,spoil:90,nuc:'AMP'},
+ umami:['グリシン','アラニン','グルタミン酸','コハク酸','AMP'],
+ pair:['バター','醤油','塩','レモン','昆布'],
+ method:['刺身','炙り','ソテー','フライ','唐揚げ'],
+ change:'甘みアミノ酸が非常に多い。時間が経つと水分と一緒に流出して味が薄まる。加熱するとコハク酸とグルタミン酸が前に出る。',
+ note:'ドリップを出さないことが全て。キッチンペーパーで包んで冷蔵、洗わない。'},
+
+{n:'ハマグリ',k:'HAMAGURI',c:'shell',season:'2〜4月',aging:'no',age:'活け',peak:'加熱直後',
+ win:[0,12],prof:{rise:0,decay:40,amino:45,spoil:50,nuc:'AMP'},
+ umami:['コハク酸','グルタミン酸','グリシン','アラニン'],
+ pair:['昆布','酒','塩','三つ葉','柚子'],
+ method:['潮汁','焼きハマグリ','酒蒸し','鍋'],
+ change:'貝の旨みの本体はコハク酸。生きているうちは体内に保たれ、弱ると流出・分解する。加熱すると汁に一気に移る。',
+ note:'砂抜きは海水程度の塩水で暗くして。真水は貝を弱らせてコハク酸を逃がす。'},
+
+{n:'アワビ',k:'AWABI',c:'shell',season:'5〜8月',aging:'short',age:'当日（生）／蒸して1日',peak:'蒸し後12時間',
+ win:[0,36],prof:{rise:6,decay:180,amino:80,spoil:150,nuc:'AMP'},
+ umami:['グルタミン酸','グリシン','タウリン','コハク酸'],
+ pair:['肝','酒','昆布','醤油','バター'],
+ method:['薄造り','酒蒸し','ステーキ','肝ソース'],
+ change:'生はコリコリした食感が主で味は控えめ。酒と昆布で長時間蒸すとコラーゲンがほどけ、グルタミン酸が舌に届いて別物になる。',
+ note:'生で出すか蒸すかで完全に別の料理。中途半端な加熱が一番よくない。'},
+
+{n:'赤貝',k:'AKAGAI',c:'shell',season:'12〜3月',aging:'no',age:'当日',peak:'剥いた直後',
+ win:[0,10],prof:{rise:0,decay:45,amino:40,spoil:50,nuc:'AMP'},
+ umami:['グリシン','アラニン','コハク酸','ベタイン'],
+ pair:['酢味噌','わさび','醤油','大葉'],
+ method:['刺身','ぬた','握り'],
+ change:'剥いてからの劣化が速く、香りが命。時間が経つと磯の香りが生臭さに転じる。',
+ note:'剥き身で仕入れると値打ちが半減する貝。殻付きで持って直前に開ける。'},
+
+{n:'真牡蠣',k:'MAGAKI',c:'shell',season:'11〜3月',aging:'no',age:'当日',peak:'剥いた直後',
+ win:[0,12],prof:{rise:0,decay:50,amino:50,spoil:45,nuc:'AMP'},
+ umami:['グルタミン酸','コハク酸','グリシン','タウリン','グリコーゲン'],
+ pair:['レモン','ポン酢','日本酒','バター','パン粉'],
+ method:['生食','焼き','フライ','蒸し','オイル漬け'],
+ change:'グリコーゲンが甘みとコクの元。産卵期に向けて増え、産卵後に激減する。旬の差が最も大きい食材のひとつ。',
+ note:'生食用と加熱用の違いは鮮度ではなく採取海域の規制。混同しない。'},
+
+/* ---------- その他 ---------- */
+{n:'ウニ',k:'UNI',c:'other',season:'6〜8月',aging:'no',age:'当日',peak:'開けた直後',
+ win:[0,10],prof:{rise:0,decay:40,amino:42,spoil:36,nuc:'AMP'},
+ umami:['グリシン','アラニン','バリン','メチオニン','グルタミン酸'],
+ pair:['海苔','醤油','酢飯','塩','日本酒'],
+ method:['そのまま','軍艦','冷製パスタ','蒸し'],
+ change:'甘みはグリシン・アラニン、苦みはバリンとメチオニン。鮮度が落ちると苦みアミノ酸の印象が強まり、形も崩れる。',
+ note:'ミョウバンの有無で味がまるで違う。無添加は当日勝負と割り切る。'},
+
+{n:'シラス',k:'SHIRASU',c:'other',season:'3〜5月／9〜11月',aging:'no',age:'当日',peak:'水揚げ直後',
+ win:[0,8],prof:{rise:0,decay:30,amino:40,spoil:26,nuc:'イノシン酸'},
+ umami:['グルタミン酸','イノシン酸','グリシン'],
+ pair:['大根おろし','生姜','醤油','オリーブオイル','ニンニク'],
+ method:['生しらす','釜揚げ','しらす丼','パスタ'],
+ change:'内臓ごと食べるため酵素の影響が大きく、劣化が全魚介で最速の部類。数時間で溶けはじめる。',
+ note:'生で出せるのは水揚げのある日だけ。釜揚げに切り替える判断を早く。'},
+
+{n:'サーモン（トラウト）',k:'SALMON',c:'other',season:'通年',aging:'short',age:'1〜2日',peak:'24時間',
+ win:[6,60],prof:{rise:8,decay:200,amino:70,spoil:180,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','脂質由来の香気'],
+ pair:['レモン','ディル','玉葱','クリーム','醤油'],
+ method:['刺身','マリネ','ムニエル','スモーク','漬け'],
+ change:'養殖が中心で鮮度が安定している。1日置くと脂と身が馴染むが、脂の酸化が進むと戻らない。',
+ note:'脂が多いぶん空気に触れさせないこと。切り置きはしない。'}
+];
+
+/* ==== 追加魚種 ==== */
+const FISH2 = [
+/* ---------- 白身 ---------- */
+{n:'マコガレイ',k:'MAKOGAREI',c:'white',season:'6〜8月',aging:'yes',age:'1〜2日',peak:'18〜24時間',
+ win:[12,48],prof:{rise:7,decay:210,amino:65,spoil:280,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','グリシン'],pair:['昆布','スダチ','塩','ポン酢'],
+ veg:['大根','あさつき','木の芽','ラディッシュ'],
+ wa:['薄造り','煮付け','唐揚げ'],yo:['ムニエル','カルパッチョ'],chu:['清蒸','糖醋'],
+ raw:'〆てから3日',rawNote:'夏が旬。身が薄く、脱水の進み具合で判断',
+ change:'ヒラメより身が薄く、旨みの立ち上がりがやや早い。1日でイノシン酸が乗り、2日目は甘みが増す代わりに張りが落ちる。',
+ note:'夏の白身の主力。ヒラメの代わりに使えるが、薄いぶん引くのが難しい。'},
+
+{n:'イサキ',k:'ISAKI',c:'white',season:'6〜8月',aging:'yes',age:'1〜2日',peak:'24時間',
+ win:[12,54],prof:{rise:8,decay:200,amino:70,spoil:240,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','スダチ','醤油','オリーブオイル'],
+ veg:['大葉','茗荷','胡瓜','ズッキーニ'],
+ wa:['刺身','塩焼き','煮付け'],yo:['ポワレ','アクアパッツァ'],chu:['清蒸','葱油淋'],
+ raw:'〆てから3日',rawNote:'梅雨時期は脂が乗り、酸化がやや早い',
+ change:'脂が多い時期は1日置くと脂と旨みが馴染む。皮下の香りが持ち味なので、皮を残す仕事が向く。',
+ note:'梅雨イサキは焼きが強い。刺身にするなら皮霜で香りを引き出す。'},
+
+{n:'アマダイ',k:'AMADAI',c:'white',season:'10〜2月',aging:'yes',age:'1〜3日',peak:'24〜48時間',
+ win:[12,84],prof:{rise:9,decay:250,amino:85,spoil:300,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','グリシン'],pair:['昆布','塩','酒','柚子'],
+ veg:['蕪','葱','水菜','百合根'],
+ wa:['若狭焼き','昆布締め','蒸し物'],yo:['ポワレ・鱗立て','ブレゼ'],chu:['清蒸','塩蒸し'],
+ raw:'〆てから3日',rawNote:'水分が多く、脱水しながら寝かせる',
+ change:'水分が多い身。ペーパーで包んで寝かせると水が抜けて旨みが凝縮し、2日目以降に甘みが出る。',
+ note:'鱗を立てて揚げ焼きにすると身の柔らかさと食感の対比が出る。'},
+
+{n:'アカムツ（ノドグロ）',k:'AKAMUTSU',c:'white',season:'9〜12月',aging:'yes',age:'1〜2日',peak:'24時間',
+ win:[10,60],prof:{rise:8,decay:210,amino:75,spoil:200,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','醤油','酢橘','大根おろし'],
+ veg:['大根','葱','蕪','水菜'],
+ wa:['塩焼き','炙り造り','煮付け'],yo:['ポワレ','ロースト'],chu:['清蒸','紅焼'],
+ raw:'〆てから2日',rawNote:'脂が非常に多く、酸化が先に来る',
+ change:'脂の融点が低く、炙ると一気に香りが立つ。生のままだと脂が舌に膜を張るので、火や酸を当てたほうが旨みが分かる。',
+ note:'高価な魚。刺身で出すなら必ず皮目を炙る。'},
+
+{n:'シロギス',k:'SHIROGISU',c:'white',season:'5〜8月',aging:'no',age:'当日',peak:'6〜12時間',
+ win:[0,18],prof:{rise:5,decay:110,amino:45,spoil:110,nuc:'イノシン酸'},
+ umami:['イノシン酸','グリシン'],pair:['塩','レモン','昆布','酢'],
+ veg:['大葉','茄子','ズッキーニ','貝割れ'],
+ wa:['天ぷら','昆布締め','塩焼き'],yo:['フリット','ムニエル'],chu:['清蒸','唐揚げ甘酢'],
+ raw:'〆てから1日',rawNote:'小型で身が繊細。当日が基本',
+ change:'淡白で旨みの絶対量が少ない。熟成より、昆布のグルタミン酸を足して補う発想が向く。',
+ note:'天ぷらが最も値打ちが出る魚。刺身は昆布締め一択に近い。'},
+
+{n:'カサゴ',k:'KASAGO',c:'white',season:'11〜3月',aging:'short',age:'当日〜1日',peak:'12〜18時間',
+ win:[6,36],prof:{rise:7,decay:170,amino:60,spoil:210,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','コラーゲン'],pair:['醤油','生姜','酒','塩'],
+ veg:['葱','大根','牛蒡','木の芽'],
+ wa:['煮付け','唐揚げ','味噌汁'],yo:['アクアパッツァ','ブイヤベース'],chu:['紅焼','糖醋'],
+ raw:'〆てから2日',rawNote:'身は締まっているが小型で劣化は早め',
+ change:'骨と皮からゼラチンが出るのが持ち味。身の熟成より、加熱で出汁を引き出す方向が合う。',
+ note:'アラごと使えるので原価効率が良い。数を揃えて汁物に。'},
+
+{n:'マハタ',k:'MAHATA',c:'white',season:'11〜3月',aging:'yes',age:'2〜4日',peak:'48時間',
+ win:[36,120],prof:{rise:12,decay:350,amino:100,spoil:450,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','コラーゲン由来ペプチド'],pair:['昆布','塩','酒','柚子胡椒'],
+ veg:['白菜','葱','春菊','椎茸'],
+ wa:['薄造り','鍋','蒸し物'],yo:['ロースト','ブレゼ'],chu:['清蒸','紅焼'],
+ raw:'〆てから5日',rawNote:'大型ほど長く持つ。クエに準じる',
+ change:'クエと同じく分解が遅く、2日目以降にアミノ酸が伸びる。皮のゼラチンが同時にほどけて口当たりが変わる。',
+ note:'養殖の流通が安定してきた。日を数えて使える白身の定番候補。'},
+
+{n:'サヨリ',k:'SAYORI',c:'white',season:'3〜5月',aging:'no',age:'当日',peak:'6時間',
+ win:[0,14],prof:{rise:4,decay:100,amino:45,spoil:80,nuc:'イノシン酸'},
+ umami:['イノシン酸','グリシン'],pair:['塩','スダチ','梅','昆布'],
+ veg:['大葉','貝割れ','胡瓜','せり'],
+ wa:['刺身','細造り','天ぷら'],yo:['カルパッチョ','マリネ'],chu:['湯引き葱油'],
+ raw:'当日',rawNote:'身が薄く、劣化が速い',
+ change:'旨みは淡く、香りと透明感が持ち味。時間が経つと真っ先に香りが失われる。',
+ note:'仕込んだら早く出す。細工造りにするなら鮮度が全て。'},
+
+{n:'イシダイ',k:'ISHIDAI',c:'white',season:'6〜9月',aging:'yes',age:'2〜3日',peak:'36〜48時間',
+ win:[24,96],prof:{rise:11,decay:300,amino:95,spoil:380,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','昆布','醤油','山葵'],
+ veg:['大根','胡瓜','大葉','セロリ'],
+ wa:['薄造り','兜煮','塩焼き'],yo:['ポワレ','カルパッチョ'],chu:['清蒸'],
+ raw:'〆てから4日',rawNote:'身が硬く締まり、持ちが良い',
+ change:'〆た直後は硬すぎて味が分からない。2日目からようやく旨みが表に出る、寝かせる前提の白身。',
+ note:'夏の高級魚。すぐ出すと値打ちが伝わらない。'},
+
+{n:'マダラ',k:'MADARA',c:'white',season:'12〜2月',aging:'no',age:'当日〜1日',peak:'12時間',
+ win:[0,24],prof:{rise:6,decay:130,amino:55,spoil:130,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','酒','味噌','醤油'],
+ veg:['白菜','葱','春菊','大根','じゃがいも'],
+ wa:['鍋','白子','味噌漬け'],yo:['ブランダード','ムニエル','グラタン'],chu:['紅焼','唐揚げ甘酢'],
+ raw:'生食は非推奨',rawNote:'アニサキスが多く、加熱か冷凍処理が前提',
+ change:'水分が多く身が崩れやすい。旨みは汁に出る型で、熟成より塩で脱水したほうが味が立つ。',
+ note:'白子が主役になる季節。身は塩を当てて水を抜いてから使う。'},
+
+{n:'ハタハタ',k:'HATAHATA',c:'white',season:'11〜1月',aging:'no',age:'当日〜1日',peak:'12時間',
+ win:[0,24],prof:{rise:6,decay:120,amino:50,spoil:120,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','酒','醤油','麹'],
+ veg:['葱','白菜','せり','大根'],
+ wa:['しょっつる鍋','塩焼き','田楽'],yo:['フリット','マリネ'],chu:['唐揚げ','紅焼'],
+ raw:'生食は非推奨',rawNote:'加熱・発酵が基本の魚',
+ change:'鱗がなく身が柔らかい。発酵させると遊離アミノ酸が大きく増え、しょっつるの旨みになる。',
+ note:'ブリコ（卵）が入る時期が本番。塩焼きが最も分かりやすい。'},
+
+{n:'アイナメ',k:'AINAME',c:'white',season:'4〜7月',aging:'yes',age:'1〜2日',peak:'24時間',
+ win:[12,54],prof:{rise:8,decay:210,amino:70,spoil:270,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['昆布','塩','醤油','木の芽'],
+ veg:['蕪','葱','大根','三つ葉'],
+ wa:['薄造り','煮付け','塩焼き'],yo:['ポワレ','ムニエル'],chu:['清蒸','紅焼'],
+ raw:'〆てから3日',rawNote:'身が締まって安定している',
+ change:'脂が乗ると熟成でとろみが出る。1日目は歯応え、2日目は甘み。',
+ note:'地味だが安定して旨い魚。仕入れ値も落ち着いている。'},
+
+{n:'アナゴ',k:'ANAGO',c:'white',season:'6〜8月',aging:'no',age:'当日',peak:'—',
+ win:[0,12],prof:{rise:5,decay:110,amino:50,spoil:100,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','コラーゲン'],pair:['醤油','味醂','酒','山椒','塩'],
+ veg:['胡瓜','葱','木の芽','茗荷'],
+ wa:['煮穴子','白焼き','天ぷら'],yo:['コンフィ','フリット'],chu:['紅焼','唐揚げ'],
+ raw:'生食不可',rawNote:'血液に毒性タンパクがあり、必ず加熱する',
+ change:'加熱でゼラチンがほどけてふっくらする。生の熟成という概念が当てはまらない魚。',
+ note:'煮上げてからの寝かせが味を決める。煮汁ごと一晩置く。'},
+
+{n:'ハモ',k:'HAMO',c:'white',season:'6〜8月',aging:'no',age:'当日',peak:'—',
+ win:[0,12],prof:{rise:5,decay:110,amino:50,spoil:100,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','コラーゲン'],pair:['梅肉','出汁','酒','塩'],
+ veg:['玉葱','三つ葉','松茸','水菜','胡瓜'],
+ wa:['落とし','焼き霜','天ぷら'],yo:['フリット','スープ'],chu:['湯引き','唐揚げ'],
+ raw:'生食不可',rawNote:'骨切りと加熱が前提',
+ change:'骨切りして湯に落とすとタンパクが縮んで花が開く。旨みは加熱の瞬間に立つ。',
+ note:'骨切りの精度がすべて。仕込んだら早く落とす。'},
+
+/* ---------- 赤身・青魚 ---------- */
+{n:'キハダマグロ',k:'KIHADA',c:'red',season:'6〜9月',aging:'short',age:'1〜2日',peak:'18〜24時間',
+ win:[8,60],prof:{rise:8,decay:180,amino:70,spoil:200,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','ヒスチジン'],pair:['醤油','山葵','塩','ごま油'],
+ veg:['アボカド','貝割れ','葱','玉葱'],
+ wa:['刺身','漬け','づけ丼'],yo:['タルタル','ステーキ','ポキ'],chu:['葱油和え','麻辣和え'],
+ raw:'〆てから4日',rawNote:'脂が少なく色変わりが早い',
+ change:'本マグロより脂が少なく、熟成の伸びも控えめ。1日でピークを迎えたあとは色の劣化が先に来る。',
+ note:'漬けにすると色の問題が消える。回転の読めない日はこちらへ。'},
+
+{n:'メバチマグロ',k:'MEBACHI',c:'red',season:'10〜1月',aging:'yes',age:'2〜4日',peak:'24〜48時間',
+ win:[18,120],prof:{rise:9,decay:250,amino:85,spoil:280,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['醤油','山葵','海苔','煎り酒'],
+ veg:['葱','貝割れ','山芋','アボカド'],
+ wa:['刺身','漬け','山かけ'],yo:['タタキ','カルパッチョ'],chu:['葱姜和え'],
+ raw:'〆てから5日',rawNote:'流通が安定し、扱いやすい',
+ change:'本マグロに近い曲線で、価格が読める。2日目前後が旨みと色のバランス点。',
+ note:'日常の刺身の主力にしやすい。冷凍解凍の管理を揃えると味が安定する。'},
+
+{n:'コハダ',k:'KOHADA',c:'red',season:'7〜11月',aging:'no',age:'当日（酢〆前提）',peak:'酢〆後6〜12時間',
+ win:[0,18],prof:{rise:4,decay:90,amino:45,spoil:55,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['酢','塩','生姜','おぼろ'],
+ veg:['生姜','葱','大葉','胡瓜'],
+ wa:['酢〆','握り','南蛮漬け'],yo:['マリネ','エスカベッシュ'],chu:['甘酢和え'],
+ raw:'当日',rawNote:'生食は稀。塩と酢で締めるのが前提',
+ change:'塩で水を抜き、酢でタンパクを固める。時間の経過は「熟成」ではなく「〆の進行」として管理する。',
+ note:'塩の当て時間と酢の時間の比が仕事の全て。魚のサイズごとに変える。'},
+
+{n:'キビナゴ',k:'KIBINAGO',c:'red',season:'5〜7月',aging:'no',age:'当日',peak:'4〜8時間',
+ win:[0,12],prof:{rise:3,decay:75,amino:40,spoil:45,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['酢味噌','醤油','生姜','塩'],
+ veg:['大葉','葱','茗荷','貝割れ'],
+ wa:['手開き刺身','天ぷら','塩焼き'],yo:['フリット','マリネ'],chu:['唐揚げ甘酢'],
+ raw:'当日',rawNote:'極小で劣化が速い',
+ change:'小型で酵素の影響が全身に回る。旨みより銀の輝きと香りが商品価値。',
+ note:'手開きで開くなら仕入れ当日。翌日は揚げに回す。'},
+
+{n:'トビウオ',k:'TOBIUO',c:'red',season:'5〜8月',aging:'no',age:'当日',peak:'6〜12時間',
+ win:[0,18],prof:{rise:4,decay:100,amino:45,spoil:70,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['生姜','葱','味噌','醤油'],
+ veg:['大葉','茗荷','葱','胡瓜'],
+ wa:['なめろう','刺身','つみれ'],yo:['マリネ','フリット'],chu:['蒸し物','唐揚げ'],
+ raw:'当日',rawNote:'脂が少ないぶんアジより持つが、当日が基本',
+ change:'脂が少なく淡白。旨みは弱めなので、薬味や味噌と合わせて補う。',
+ note:'あご出汁の魚。焼いて干せば出汁の素材として使える。'},
+
+{n:'ニシン',k:'NISHIN',c:'red',season:'3〜5月',aging:'no',age:'当日',peak:'6時間',
+ win:[0,12],prof:{rise:3,decay:80,amino:45,spoil:50,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['酢','塩','山椒','醤油','麹'],
+ veg:['玉葱','葱','大根','ディル'],
+ wa:['糠漬け','昆布巻き','焼き'],yo:['マリネ','スモーク'],chu:['紅焼','豆豉蒸し'],
+ raw:'生食は非推奨',rawNote:'アニサキスが多い。冷凍処理か加熱・酢〆で',
+ change:'脂が多く酸化が速い。塩蔵・糠漬け・酢〆で時間を止めるのが伝統的な扱い。',
+ note:'数の子と身は別管理。身は保存食に振ったほうが値打ちが出る。'},
+
+{n:'ホッケ',k:'HOKKE',c:'red',season:'5〜7月',aging:'no',age:'当日〜1日',peak:'12時間',
+ win:[0,24],prof:{rise:5,decay:110,amino:50,spoil:90,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','醤油','酒','レモン'],
+ veg:['大根おろし','葱','レモン','じゃがいも'],
+ wa:['開き干し','塩焼き','煮付け'],yo:['グリル','ムニエル'],chu:['紅焼','唐揚げ'],
+ raw:'生食は非推奨',rawNote:'鮮度落ちが極端に速く、加熱が前提',
+ change:'自己消化が速く、生食に耐える時間がほとんどない。一夜干しにすると水分が抜けて旨みが濃くなる。',
+ note:'干す前提の魚。産地以外で生を狙う意味は薄い。'},
+
+/* ---------- 甲殻類 ---------- */
+{n:'ボタンエビ',k:'BOTAN-EBI',c:'crust',season:'11〜3月',aging:'short',age:'半日〜1日',peak:'12〜24時間',
+ win:[6,36],prof:{rise:5,decay:85,amino:52,spoil:75,nuc:'AMP'},
+ umami:['グリシン','アラニン','AMP','ベタイン'],pair:['塩','昆布','山葵','オリーブオイル'],
+ veg:['大葉','貝割れ','アボカド','セロリ'],
+ wa:['刺身','昆布締め','味噌汁'],yo:['カルパッチョ','タルタル'],chu:['紹興酒漬け','塩炒め'],
+ raw:'〆てから2日',rawNote:'甘エビに準じる。一晩置くと甘みが増す',
+ change:'甘エビ同様、半日〜1日で自己消化が進み遊離アミノ酸が増える。卵持ちは卵の鮮度が別に効く。',
+ note:'頭の味噌が値打ち。頭は必ず別に取って汁か揚げに。'},
+
+{n:'シャコ',k:'SHAKO',c:'crust',season:'4〜6月',aging:'no',age:'活け〜当日',peak:'茹で直後',
+ win:[0,10],prof:{rise:0,decay:26,amino:36,spoil:30,nuc:'AMP'},
+ umami:['グリシン','アラニン','AMP','タウリン'],pair:['塩','酢','醤油','詰め'],
+ veg:['胡瓜','葱','生姜','大葉'],
+ wa:['茹で','握り','天ぷら'],yo:['サラダ','フリット'],chu:['椒塩（塩胡椒揚げ）','酒蒸し'],
+ raw:'生食は活けのみ',rawNote:'死ぬと自己消化で身が溶ける。即茹でが原則',
+ change:'自己消化酵素が非常に強く、死後数十分で身が痩せる。活けから茹でるかどうかで別物になる。',
+ note:'活けで入らないなら茹で上がりを仕入れたほうが確実。'},
+
+{n:'タラバガニ',k:'TARABA',c:'crust',season:'11〜2月',aging:'no',age:'活け〜当日',peak:'〆た直後',
+ win:[0,10],prof:{rise:0,decay:28,amino:38,spoil:36,nuc:'AMP'},
+ umami:['グリシン','アラニン','AMP','ベタイン'],pair:['塩','酢','バター','昆布出汁'],
+ veg:['三つ葉','胡瓜','葱','アスパラ'],
+ wa:['茹で','焼き','しゃぶしゃぶ'],yo:['グリル・バター','グラタン'],chu:['上湯蒸し','葱姜炒め'],
+ raw:'活けのみ',rawNote:'死後は速やかに加熱',
+ change:'身が太く水分が多い。死後は水っぽくなり甘みが流出する。',
+ note:'焼くと水が飛んで甘みが凝縮する。茹でよりも焼きのほうが差が出る。'},
+
+{n:'毛ガニ',k:'KEGANI',c:'crust',season:'12〜4月',aging:'no',age:'活け〜当日',peak:'〆た直後',
+ win:[0,10],prof:{rise:0,decay:28,amino:38,spoil:34,nuc:'AMP'},
+ umami:['グリシン','アラニン','AMP','グルタミン酸'],pair:['塩','三杯酢','昆布出汁','酒'],
+ veg:['三つ葉','胡瓜','葱','水菜'],
+ wa:['茹で','蟹味噌','甲羅焼き'],yo:['サラダ','ビスク'],chu:['蟹肉炒蛋','上湯煮'],
+ raw:'活けのみ',rawNote:'味噌の鮮度が特に落ちやすい',
+ change:'味噌（中腸腺）のグルタミン酸が持ち味だが、最も早く劣化する部位でもある。',
+ note:'味噌を売りにするなら活け一択。'},
+
+/* ---------- イカ・タコ ---------- */
+{n:'ヤリイカ',k:'YARI-IKA',c:'ceph',season:'12〜3月',aging:'short',age:'1〜2日',peak:'24〜48時間',
+ win:[12,72],prof:{rise:14,decay:320,amino:100,spoil:250,nuc:'AMP'},
+ umami:['グリシン','アラニン','タウリン','ベタイン'],pair:['塩','スダチ','醤油','昆布'],
+ veg:['大葉','貝割れ','セロリ','アスパラ'],
+ wa:['刺身','煮付け','天ぷら'],yo:['グリル','フリット'],chu:['塩炒め','XO醤炒め'],
+ raw:'〆てから3日',rawNote:'アオリイカに準じるが持ちはやや短い',
+ change:'アオリほど劇的ではないが、1〜2日で遊離アミノ酸が増えて甘みが乗る。身が薄いので寝かせすぎると崩れる。',
+ note:'冬の主力イカ。細造りにすると甘みが分かりやすい。'},
+
+{n:'コウイカ（スミイカ）',k:'KOU-IKA',c:'ceph',season:'11〜3月',aging:'yes',age:'2〜3日',peak:'48時間',
+ win:[24,96],prof:{rise:18,decay:450,amino:120,spoil:350,nuc:'AMP'},
+ umami:['グリシン','アラニン','プロリン','ベタイン'],pair:['塩','山葵','醤油','昆布'],
+ veg:['大葉','貝割れ','セロリ','菜の花'],
+ wa:['握り','細造り','煮イカ'],yo:['グリル','スミのパスタ'],chu:['塩炒め','蒸し物'],
+ raw:'〆てから4日',rawNote:'身が厚く持ちが良い',
+ change:'身が厚く、2日目以降にアミノ酸がしっかり伸びる。歯切れと甘みが両立する数少ないイカ。',
+ note:'墨も使える。パスタやリゾットに回すと廃棄が減る。'},
+
+{n:'イイダコ',k:'IIDAKO',c:'ceph',season:'12〜3月',aging:'no',age:'茹でて1日',peak:'茹で後12時間',
+ win:[6,36],prof:{rise:7,decay:180,amino:80,spoil:160,nuc:'AMP'},
+ umami:['タウリン','グリシン','ベタイン'],pair:['醤油','味醂','生姜','酒'],
+ veg:['葱','大根','里芋','菜の花'],
+ wa:['煮付け','桜煮','おでん'],yo:['トマト煮','マリネ'],chu:['醤油煮','辣炒め'],
+ raw:'生食は非推奨',rawNote:'小型で加熱が基本',
+ change:'頭の飯（卵）が持ち味。加熱で卵が固まって食感が出る。生の熟成という概念は当てはまらない。',
+ note:'煮汁ごと一晩置くと味が入る。仕込みは前日に。'},
+
+/* ---------- 貝 ---------- */
+{n:'アサリ',k:'ASARI',c:'shell',season:'3〜5月',aging:'no',age:'活け',peak:'加熱直後',
+ win:[0,12],prof:{rise:0,decay:40,amino:45,spoil:50,nuc:'AMP'},
+ umami:['コハク酸','グルタミン酸','グリシン','タウリン'],pair:['酒','塩','バター','ニンニク'],
+ veg:['葱','三つ葉','菜の花','セロリ','トマト'],
+ wa:['味噌汁','酒蒸し','深川飯'],yo:['ボンゴレ','クラムチャウダー'],chu:['豆豉炒め','酒蒸し'],
+ raw:'生食は非推奨',rawNote:'加熱前提。活け以外は使わない',
+ change:'コハク酸が旨みの中心。砂抜き中も呼吸しているので、真水や高温では弱ってコハク酸を失う。',
+ note:'砂抜きは3%塩水・暗所・平ザル。重ねると下の貝が弱る。'},
+
+{n:'サザエ',k:'SAZAE',c:'shell',season:'4〜8月',aging:'no',age:'活け〜当日',peak:'剥いた直後',
+ win:[0,12],prof:{rise:0,decay:45,amino:45,spoil:55,nuc:'AMP'},
+ umami:['グルタミン酸','グリシン','タウリン','コハク酸'],pair:['醤油','酒','バター','塩'],
+ veg:['葱','三つ葉','大葉','セロリ'],
+ wa:['壺焼き','刺身','酒蒸し'],yo:['エスカルゴ風バター焼き','アヒージョ'],chu:['XO醤炒め','蒸し物'],
+ raw:'活け〜当日',rawNote:'肝は個体差が大きい。夏は特に注意',
+ change:'身は歯応え、肝は苦みとコク。時間が経つと肝の苦みが前に出て身が硬くなる。',
+ note:'肝の苦みを嫌う客も多い。分けて出せる構成にすると回転が良い。'},
+
+{n:'ホッキ貝',k:'HOKKIGAI',c:'shell',season:'12〜4月',aging:'no',age:'当日',peak:'湯引き直後',
+ win:[0,18],prof:{rise:0,decay:60,amino:50,spoil:70,nuc:'AMP'},
+ umami:['グリシン','アラニン','コハク酸','ベタイン'],pair:['醤油','山葵','酢味噌','塩'],
+ veg:['大葉','貝割れ','胡瓜','葱'],
+ wa:['湯引き刺身','握り','バター焼き'],yo:['カルパッチョ','ソテー'],chu:['塩炒め','湯引き葱油'],
+ raw:'当日',rawNote:'湯引きすると色と甘みが立つ',
+ change:'生では甘みが眠っている。さっと湯に通すとタンパクが変性し、赤く発色して甘みが表に出る。',
+ note:'湯引きの秒数が仕事。長いと硬く、短いと甘みが出ない。'},
+
+{n:'ミル貝',k:'MIRUGAI',c:'shell',season:'3〜6月',aging:'no',age:'当日',peak:'剥いた直後',
+ win:[0,14],prof:{rise:0,decay:50,amino:48,spoil:60,nuc:'AMP'},
+ umami:['グリシン','アラニン','グルタミン酸','ベタイン'],pair:['醤油','山葵','塩','酢味噌'],
+ veg:['大葉','胡瓜','貝割れ','わけぎ'],
+ wa:['刺身','握り','酢の物'],yo:['カルパッチョ','グリル'],chu:['湯引き葱油','塩炒め'],
+ raw:'当日',rawNote:'水管の皮を剥いてからは特に早い',
+ change:'甘みと磯の香りが持ち味。剥いた後は香りが最初に飛ぶ。',
+ note:'高価な貝。仕込みは注文の直前に寄せる。'},
+
+{n:'タイラギ',k:'TAIRAGI',c:'shell',season:'12〜4月',aging:'no',age:'当日',peak:'剥いた直後',
+ win:[0,18],prof:{rise:0,decay:55,amino:50,spoil:65,nuc:'AMP'},
+ umami:['グリシン','アラニン','グルタミン酸','コハク酸'],pair:['塩','バター','醤油','昆布'],
+ veg:['菜の花','アスパラ','葱','セロリ'],
+ wa:['刺身','炙り','天ぷら'],yo:['ソテー・バター','カルパッチョ'],chu:['塩炒め','上湯蒸し'],
+ raw:'当日',rawNote:'ホタテに準じるが水が出やすい',
+ change:'ホタテに似た甘み。炙ると香ばしさが加わり甘みが立つ。',
+ note:'水を出さないこと。切り置きすると味が抜ける。'},
+
+{n:'つぶ貝',k:'TSUBUGAI',c:'shell',season:'通年',aging:'no',age:'当日',peak:'剥いた直後',
+ win:[0,18],prof:{rise:0,decay:55,amino:48,spoil:70,nuc:'AMP'},
+ umami:['グリシン','タウリン','ベタイン','グルタミン酸'],pair:['醤油','塩','バター','酒'],
+ veg:['葱','大葉','貝割れ','セロリ'],
+ wa:['刺身','煮つぶ','串焼き'],yo:['アヒージョ','ブルゴーニュ風バター'],chu:['XO醤炒め','醤油煮'],
+ raw:'当日',rawNote:'唾液腺（あぶら）は必ず除去する',
+ change:'コリコリした食感が主。時間が経つと硬くなり、香りが落ちる。',
+ note:'唾液腺の除去は必須。テトラミンによる中毒を防ぐ。'},
+
+{n:'シジミ',k:'SHIJIMI',c:'shell',season:'1〜2月／7〜8月',aging:'no',age:'活け',peak:'加熱直後',
+ win:[0,12],prof:{rise:0,decay:40,amino:45,spoil:50,nuc:'AMP'},
+ umami:['コハク酸','グルタミン酸','アラニン','オルニチン'],pair:['味噌','酒','醤油','生姜'],
+ veg:['葱','三つ葉','大根','セロリ'],
+ wa:['味噌汁','酒蒸し','時雨煮'],yo:['スープ','ソース'],chu:['スープ','醤油漬け'],
+ raw:'生食不可',rawNote:'必ず加熱する',
+ change:'コハク酸とオルニチンが持ち味。一度冷凍すると細胞が壊れ、旨みが汁に出やすくなる。',
+ note:'冷凍してから使うと味が濃く出る、数少ない食材。'},
+
+{n:'岩牡蠣',k:'IWAGAKI',c:'shell',season:'6〜9月',aging:'no',age:'当日',peak:'剥いた直後',
+ win:[0,14],prof:{rise:0,decay:50,amino:50,spoil:48,nuc:'AMP'},
+ umami:['グルタミン酸','コハク酸','グリシン','グリコーゲン'],pair:['レモン','日本酒','ポン酢','塩'],
+ veg:['エシャロット','レモン','葱','セロリ'],
+ wa:['生','酢牡蠣','焼き'],yo:['生ガキ・ミニョネット','グラタン'],chu:['豆豉蒸し','オイスター煮'],
+ raw:'生食用は当日〜2日',rawNote:'夏が旬。生食用表示のあるものだけ',
+ change:'真牡蠣より身が大きく、水分も多い。旨みは濃いが劣化も速い。',
+ note:'真牡蠣と旬が逆。夏の生ガキが組める貴重な食材。'},
+
+/* ---------- その他 ---------- */
+{n:'イクラ',k:'IKURA',c:'other',season:'9〜11月',aging:'short',age:'漬けて1〜2日',peak:'漬け後24時間',
+ win:[12,72],prof:{rise:8,decay:250,amino:80,spoil:200,nuc:'AMP'},
+ umami:['グルタミン酸','アラニン','脂質由来の風味'],pair:['醤油','酒','出汁','柚子'],
+ veg:['大葉','貝割れ','きゅうり','葱'],
+ wa:['醤油漬け','親子丼','軍艦'],yo:['ブリニ','クリームパスタ'],chu:['蒸し卵','炒飯'],
+ raw:'漬けてから4日',rawNote:'塩分濃度で持ちが変わる。薄味ほど短い',
+ change:'漬け込むと浸透圧で調味液が入り、1日で味が乗る。それ以降は膜が硬くなる。',
+ note:'漬け時間より塩分濃度で管理する。薄味にするなら早く出し切る。'},
+
+{n:'白子（真鱈）',k:'SHIRAKO',c:'other',season:'12〜2月',aging:'no',age:'当日',peak:'—',
+ win:[0,12],prof:{rise:0,decay:45,amino:45,spoil:40,nuc:'AMP'},
+ umami:['グルタミン酸','アラニン','核酸（DNA由来）'],pair:['ポン酢','塩','酒','味噌'],
+ veg:['あさつき','大根おろし','葱','せり'],
+ wa:['ポン酢','焼き白子','天ぷら'],yo:['ムニエル','フリット','グラタン'],chu:['豆豉蒸し','唐揚げ'],
+ raw:'生食は非推奨',rawNote:'湯引きか加熱が基本。鮮度落ちが極端に速い',
+ change:'細胞が壊れやすく、時間が経つと崩れて水が出る。香りも真っ先に失われる。',
+ note:'仕入れた日に使い切る。血管の掃除を丁寧に。'},
+
+{n:'ホヤ',k:'HOYA',c:'other',season:'6〜8月',aging:'no',age:'当日',peak:'剥いた直後',
+ win:[0,10],prof:{rise:0,decay:40,amino:45,spoil:36,nuc:'AMP'},
+ umami:['グリシン','グルタミン酸','タウリン','オクタノール'],pair:['酢','塩','日本酒','醤油'],
+ veg:['胡瓜','大葉','茗荷','わけぎ'],
+ wa:['刺身','酢の物','塩辛'],yo:['カルパッチョ','マリネ'],chu:['冷菜'],
+ raw:'当日',rawNote:'剥いてからの劣化が極端に速い',
+ change:'独特の香りの元は不飽和アルコール。時間が経つと酸化して不快な臭みに変わる。',
+ note:'苦手な客が多い分、鮮度の良し悪しがそのまま評価になる。'},
+
+{n:'ナマコ',k:'NAMAKO',c:'other',season:'12〜2月',aging:'no',age:'当日',peak:'—',
+ win:[0,18],prof:{rise:0,decay:60,amino:45,spoil:70,nuc:'AMP'},
+ umami:['グリシン','グルタミン酸','コラーゲン'],pair:['三杯酢','柚子','醤油','塩'],
+ veg:['大根','柚子','葱','貝割れ'],
+ wa:['酢の物','このわた','和え物'],yo:['—'],chu:['海参の煮込み','オイスターソース煮'],
+ raw:'当日',rawNote:'食感が命。時間で硬さが変わる',
+ change:'コラーゲンが主体で旨みは淡い。酢に当てる時間で硬さが大きく変わる。',
+ note:'酢に長く漬けると硬くなる。提供直前に和える。'},
+
+{n:'シラウオ',k:'SHIRAUO',c:'other',season:'1〜4月',aging:'no',age:'当日',peak:'—',
+ win:[0,10],prof:{rise:0,decay:35,amino:42,spoil:30,nuc:'AMP'},
+ umami:['グリシン','グルタミン酸'],pair:['塩','ポン酢','出汁','卵'],
+ veg:['大葉','葱','三つ葉','貝割れ'],
+ wa:['踊り食い','卵とじ','天ぷら'],yo:['フリット','パスタ'],chu:['炒め物','スープ'],
+ raw:'当日',rawNote:'透明感が失われたら生食は終わり',
+ change:'極めて繊細で、数時間で透明感が濁りに変わる。旨みより見た目が商品価値。',
+ note:'見た目が値打ち。仕入れの当日に出し切る。'},
+
+{n:'メヒカリ',k:'MEHIKARI',c:'other',season:'10〜3月',aging:'no',age:'当日〜1日',peak:'12時間',
+ win:[0,24],prof:{rise:5,decay:110,amino:50,spoil:90,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','レモン','醤油','酒'],
+ veg:['レモン','大根おろし','葱','大葉'],
+ wa:['唐揚げ','干物','刺身'],yo:['フリット','エスカベッシュ'],chu:['椒塩揚げ'],
+ raw:'当日',rawNote:'脂が多く酸化が早い',
+ change:'脂が多く柔らかい。時間が経つと身が崩れ、脂の酸化臭が出る。',
+ note:'揚げが最も分かりやすい。骨まで食べられるので歩留まりが良い。'},
+
+/* ---------- 川魚 ---------- */
+{n:'アユ',k:'AYU',c:'river',season:'6〜9月',aging:'no',age:'当日',peak:'—',
+ win:[0,12],prof:{rise:5,decay:100,amino:50,spoil:80,nuc:'イノシン酸'},
+ umami:['グルタミン酸','イノシン酸','ジャスミン様香気'],pair:['塩','蓼酢','酒','味噌'],
+ veg:['蓼','胡瓜','茗荷','大葉'],
+ wa:['塩焼き','うるか','甘露煮'],yo:['ムニエル','コンフィ'],chu:['椒塩揚げ','清蒸'],
+ raw:'生食は非推奨',rawNote:'天然は横川吸虫のリスク。背ごしは伝統だが加熱を推奨',
+ change:'香りが最大の商品価値で、時間が経つと真っ先に失われる。腸のほろ苦さも鮮度次第。',
+ note:'香魚と書く通り、香りが落ちたら価値が半減する。串を打ったら早く焼く。'},
+
+{n:'ニジマス',k:'NIJIMASU',c:'river',season:'通年',aging:'short',age:'1〜2日',peak:'24時間',
+ win:[6,54],prof:{rise:7,decay:190,amino:70,spoil:190,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['レモン','塩','バター','ディル'],
+ veg:['ディル','玉葱','ズッキーニ','じゃがいも'],
+ wa:['塩焼き','南蛮漬け','甘露煮'],yo:['ムニエル','スモーク','マリネ'],chu:['清蒸','糖醋'],
+ raw:'養殖・冷凍処理品のみ',rawNote:'天然の生食は寄生虫のリスクで不可。管理養殖品に限る',
+ change:'養殖が中心で脂が安定。1日置くと脂と身が馴染むが、川魚特有の香りが出やすい。',
+ note:'生で出すなら流通経路を確認できるものだけ。基本は火を入れる。'},
+
+{n:'ヤマメ',k:'YAMAME',c:'river',season:'3〜9月',aging:'no',age:'当日〜1日',peak:'12時間',
+ win:[0,24],prof:{rise:6,decay:150,amino:55,spoil:150,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','酒','味噌','山椒'],
+ veg:['山菜','葱','蕗','木の芽'],
+ wa:['塩焼き','味噌焼き','唐揚げ'],yo:['ムニエル','ハーブ包み焼き'],chu:['清蒸','唐揚げ甘酢'],
+ raw:'生食不可',rawNote:'寄生虫のリスクがあり必ず加熱する',
+ change:'身が繊細で水分が多い。塩を当てて少し置くと水が抜けて焼き上がりが締まる。',
+ note:'串を打って遠火の強火。焦らず時間をかける。'},
+
+{n:'イワナ',k:'IWANA',c:'river',season:'3〜9月',aging:'no',age:'当日〜1日',peak:'12時間',
+ win:[0,24],prof:{rise:6,decay:150,amino:55,spoil:150,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','酒','味噌','山椒'],
+ veg:['山菜','葱','蕗の薹','木の芽'],
+ wa:['塩焼き','骨酒','甘露煮'],yo:['ムニエル','コンフィ'],chu:['清蒸','唐揚げ'],
+ raw:'生食不可',rawNote:'寄生虫のリスクがあり必ず加熱する',
+ change:'ヤマメより身が締まっている。焼き干しにすると骨から良い出汁が出る。',
+ note:'焼いた後の骨で骨酒が組める。一尾で二度使える。'},
+
+{n:'サクラマス',k:'SAKURAMASU',c:'river',season:'3〜6月',aging:'short',age:'1〜2日',peak:'24時間',
+ win:[6,54],prof:{rise:8,decay:200,amino:75,spoil:180,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','酒','味噌','柚子'],
+ veg:['菜の花','ふきのとう','玉葱','アスパラ'],
+ wa:['塩焼き','西京焼き','押し寿司'],yo:['ポワレ','マリネ','スモーク'],chu:['清蒸','紅焼'],
+ raw:'冷凍処理品のみ',rawNote:'海に降りる魚だが、生食には冷凍処理が必要',
+ change:'脂が乗り、1日置くと身と脂が馴染む。桜色は時間とともに褪せる。',
+ note:'春の主役に立てられる魚。押し寿司にすると保存も利く。'},
+
+{n:'ビワマス',k:'BIWAMASU',c:'river',season:'6〜9月',aging:'short',age:'1〜2日',peak:'24時間',
+ win:[6,48],prof:{rise:8,decay:190,amino:72,spoil:170,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','醤油','酒','山椒'],
+ veg:['玉葱','大葉','セロリ','アスパラ'],
+ wa:['塩焼き','あめのいおご飯','刺身'],yo:['ポワレ','マリネ'],chu:['清蒸','紅焼'],
+ raw:'冷凍処理品のみ',rawNote:'淡水産のため、生食には冷凍処理が必要',
+ change:'脂が非常に多く、加熱すると溶け出す。1日置くと脂と旨みが馴染む。',
+ note:'産地が限られる希少魚。焼きで脂を活かすのが素直。'},
+
+{n:'ウナギ',k:'UNAGI',c:'river',season:'6〜8月',aging:'no',age:'活け〜当日',peak:'—',
+ win:[0,12],prof:{rise:5,decay:110,amino:55,spoil:100,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','コラーゲン'],pair:['醤油','味醂','山椒','酒'],
+ veg:['胡瓜','山椒','葱','ごぼう'],
+ wa:['蒲焼き','白焼き','う巻き'],yo:['コンフィ','燻製'],chu:['紅焼','蒲焼き丼'],
+ raw:'生食不可',rawNote:'血液に毒性タンパクがあり、必ず加熱する',
+ change:'蒸してから焼くと脂が落ちて身がふっくらする。加熱の工程そのものが味を作る魚。',
+ note:'活けで捌いてすぐ焼くのが基本。生の熟成という考え方は当てはまらない。'},
+
+{n:'コイ',k:'KOI',c:'river',season:'11〜2月',aging:'no',age:'当日',peak:'—',
+ win:[0,18],prof:{rise:5,decay:120,amino:55,spoil:120,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['味噌','酒','生姜','山椒'],
+ veg:['牛蒡','葱','大根','生姜'],
+ wa:['鯉こく','あらい','旨煮'],yo:['—'],chu:['糖醋鯉魚','紅焼'],
+ raw:'洗いは当日・要注意',rawNote:'寄生虫のリスクがあり、養殖の管理品以外は加熱',
+ change:'泥臭さの元は環境由来。きれいな水に数日活かすと臭みが抜ける。',
+ note:'仕入れてすぐ使うより、活かして泥を抜く工程が味を決める。'},
+
+{n:'ワカサギ',k:'WAKASAGI',c:'river',season:'11〜3月',aging:'no',age:'当日',peak:'—',
+ win:[0,12],prof:{rise:4,decay:90,amino:45,spoil:70,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','レモン','南蛮酢','醤油'],
+ veg:['玉葱','人参','ピーマン','レモン'],
+ wa:['天ぷら','南蛮漬け','佃煮'],yo:['フリット','エスカベッシュ'],chu:['椒塩揚げ','甘酢漬け'],
+ raw:'生食不可',rawNote:'小型で加熱が基本',
+ change:'内臓ごと食べるため、鮮度が落ちると苦みが強く出る。',
+ note:'揚げ物の主力。南蛮漬けにすれば数日持つ。'},
+
+{n:'ナマズ',k:'NAMAZU',c:'river',season:'5〜8月',aging:'no',age:'当日',peak:'—',
+ win:[0,18],prof:{rise:5,decay:120,amino:55,spoil:110,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','コラーゲン'],pair:['醤油','味醂','味噌','山椒'],
+ veg:['牛蒡','葱','生姜','大葉'],
+ wa:['蒲焼き','天ぷら','味噌煮'],yo:['ムニエル','フリット'],chu:['紅焼','水煮魚'],
+ raw:'生食不可',rawNote:'必ず加熱する',
+ change:'皮のぬめりに臭みがあるので、塩か熱湯で徹底して落とす。身は白身で淡白。',
+ note:'ウナギの代替として使える。下処理の丁寧さがそのまま味になる。'},
+
+{n:'ドジョウ',k:'DOJOU',c:'river',season:'5〜8月',aging:'no',age:'当日',peak:'—',
+ win:[0,12],prof:{rise:4,decay:90,amino:50,spoil:80,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸','カルシウム由来のコク'],pair:['醤油','味醂','酒','山椒'],
+ veg:['牛蒡','葱','卵','三つ葉'],
+ wa:['柳川鍋','丸鍋','唐揚げ'],yo:['フリット'],chu:['唐揚げ','煮込み'],
+ raw:'生食不可',rawNote:'必ず加熱する',
+ change:'骨ごと食べるため、下茹でで骨を柔らかくする工程が味を決める。',
+ note:'泥抜きを数日かける。手間の分だけ味が変わる。'},
+
+{n:'ヒメマス',k:'HIMEMASU',c:'river',season:'6〜9月',aging:'short',age:'1日',peak:'18時間',
+ win:[6,42],prof:{rise:7,decay:170,amino:65,spoil:160,nuc:'イノシン酸'},
+ umami:['イノシン酸','グルタミン酸'],pair:['塩','レモン','バター','醤油'],
+ veg:['玉葱','ディル','アスパラ','ズッキーニ'],
+ wa:['塩焼き','南蛮漬け','味噌漬け'],yo:['ムニエル','マリネ','スモーク'],chu:['清蒸','紅焼'],
+ raw:'冷凍処理品のみ',rawNote:'淡水産のため、生食には冷凍処理が必要',
+ change:'身は鮮やかな朱色で脂が乗る。1日置くと脂が馴染むが、色は褪せていく。',
+ note:'湖沼の限られた産地のみ。焼きかスモークで香りを立てる。'}
+];
+
+FISH.push(...FISH2);
+FISH.forEach(f=>{if(!f.method)f.method=[...(f.wa||[]),...(f.yo||[])].slice(0,3);});
+
+/* 追加データ：生食可能期間 / 相性の良い野菜 / 和・洋・中の仕事 */
+const EXTRA = {
+'ヒラメ':{raw:'〆てから3日',rawNote:'2日目までが安心。3日目は身の緩みが判断材料',
+  veg:['大根','あさつき','ラディッシュ','フェンネル','紫蘇'],
+  wa:['薄造り＋ポン酢','昆布締め','潮汁'],yo:['カルパッチョ','ムニエル','セビーチェ'],chu:['清蒸（葱と生姜の蒸し魚）','魚片の湯引き']},
+'マダイ':{raw:'〆てから3日',rawNote:'2〜3日目は表面の状態を見て判断',
+  veg:['大根','蓴菜','木の芽','茗荷','水菜'],
+  wa:['鯛茶漬け','松皮造り','鯛めし'],yo:['アクアパッツァ','ポワレ','塩釜焼き'],chu:['清蒸鮮魚','鯛の粥']},
+'スズキ':{raw:'〆てから1日',rawNote:'水分が多く、翌日以降は火を入れる',
+  veg:['胡瓜','大葉','茗荷','クレソン','トマト'],
+  wa:['洗い','薄造り','唐揚げ'],yo:['ポワレ・皮パリパリ','アクアパッツァ'],chu:['糖醋魚（甘酢あんかけ）','蒸し魚']},
+'カワハギ':{raw:'〆てから2日（肝は当日）',rawNote:'肝は必ず当日。身のみなら翌日可',
+  veg:['あさつき','大根','葱','せり'],
+  wa:['肝醤油の薄造り','鍋','煮付け'],yo:['肝のムース','フリット'],chu:['肝入り豆豉蒸し']},
+'クエ':{raw:'〆てから5日',rawNote:'大型で分解が遅く、生食可能期間も長い',
+  veg:['白菜','葱','春菊','椎茸','大根'],
+  wa:['薄造り','クエ鍋','唐揚げ'],yo:['ロースト','ブイヤベース'],chu:['清蒸','紅焼（醤油煮込み）']},
+'アンコウ':{raw:'生食は非推奨',rawNote:'寄生虫と身質の観点から加熱が基本。肝も蒸す',
+  veg:['大根','白菜','葱','牛蒡','春菊'],
+  wa:['どぶ汁','あん肝','共酢'],yo:['ロースト','アメリケーヌソース'],chu:['紅焼あんこう','唐揚げ甘酢']},
+'ホウボウ':{raw:'〆てから3日',rawNote:'白身の中では安定している部類',
+  veg:['大根','葱','蕪','セロリ','人参'],
+  wa:['昆布締め','潮汁','薄造り'],yo:['ブイヤベース','ポワレ'],chu:['清蒸','魚湯（白湯スープ）']},
+'キンメダイ':{raw:'〆てから3日',rawNote:'脂が多く、酸化の兆候を優先して判断',
+  veg:['牛蒡','葱','生姜','蕪'],
+  wa:['煮付け','湯霜造り','しゃぶしゃぶ'],yo:['ポワレ','アクアパッツァ'],chu:['紅焼','豆豉蒸し']},
+'トラフグ':{raw:'〆てから3日',rawNote:'免許者のみ。1日目以降が食べ頃',
+  veg:['あさつき','水菜','白菜','葱','大根'],
+  wa:['てっさ','てっちり','白子焼き'],yo:['フリット','白子のポワレ'],chu:['白子の煮込み','刺身の湯引き']},
+'メバル':{raw:'〆てから2日',rawNote:'小型で劣化が早め',
+  veg:['葱','生姜','木の芽','蕪'],
+  wa:['煮付け','塩焼き','薄造り'],yo:['アクアパッツァ','フリット'],chu:['清蒸','糖醋']},
+'本マグロ（赤身）':{raw:'〆てから7日',rawNote:'低温・脱気管理が前提。色よりも香りで判断',
+  veg:['山葵','葱','貝割れ','アボカド','大葉'],
+  wa:['刺身','漬け丼','ねぎとろ'],yo:['タルタル','タリアータ','ステーキ'],chu:['麻辣まぐろ','葱油和え']},
+'本マグロ（中トロ）':{raw:'〆てから5日',rawNote:'脂の酸化が先に来る。赤身より短い',
+  veg:['葱','大根おろし','山葵','貝割れ'],
+  wa:['炙り','ねぎま鍋','漬け'],yo:['タタキ','カルパッチョ'],chu:['焼き物の甘辛だれ']},
+'カツオ':{raw:'当日',rawNote:'ヒスタミンのリスクが高く、翌日に持ち越さない',
+  veg:['玉葱','大蒜','生姜','大葉','茗荷','葱'],
+  wa:['藁焼きたたき','刺身','角煮'],yo:['タタキのカルパッチョ','マリネ'],chu:['麻辣たたき','葱生姜和え']},
+'ブリ':{raw:'〆てから3日',rawNote:'血合いの状態で判断。臭いが出たら加熱へ',
+  veg:['大根','葱','生姜','柚子','水菜'],
+  wa:['ぶり大根','刺身','照り焼き'],yo:['ステーキ','グリル・バルサミコ'],chu:['紅焼ぶり','黒酢あんかけ']},
+'カンパチ':{raw:'〆てから3日',rawNote:'身が締まって水分が少なく、持ちが良い',
+  veg:['胡瓜','大葉','玉葱','ルッコラ','貝割れ'],
+  wa:['刺身','漬け','兜焼き'],yo:['カルパッチョ','セビーチェ'],chu:['湯引き葱油がけ']},
+'マアジ':{raw:'当日',rawNote:'アニサキス確認必須。翌日は火か酢へ',
+  veg:['葱','生姜','大葉','茗荷','胡瓜'],
+  wa:['なめろう','刺身','南蛮漬け'],yo:['マリネ','エスカベッシュ','フリット'],chu:['糖醋（甘酢あんかけ）','葱油和え']},
+'マイワシ':{raw:'当日',rawNote:'自己消化が最速。数時間で判断が変わる',
+  veg:['生姜','大葉','梅','玉葱','トマト'],
+  wa:['刺身','梅煮','つみれ'],yo:['オイル漬け','マリネ','パン粉焼き'],chu:['豆豉蒸し','唐揚げ甘酢']},
+'サバ':{raw:'当日（要冷凍処理）',rawNote:'アニサキス対策で−20℃24時間以上の冷凍が原則',
+  veg:['生姜','葱','大根','胡瓜','茗荷'],
+  wa:['〆鯖','味噌煮','棒寿司'],yo:['マリネ','グリル・マスタード'],chu:['豆豉蒸し','紅焼']},
+'サンマ':{raw:'当日',rawNote:'内臓の酵素が身に回るため翌日は不可',
+  veg:['大根おろし','生姜','葱','蕪'],
+  wa:['刺身','塩焼き','蒲焼き'],yo:['マリネ','コンフィ'],chu:['甘辛炒め','豆豉煮']},
+'シマアジ':{raw:'〆てから3日',rawNote:'青魚だが身質は白身寄りで持つ',
+  veg:['胡瓜','大葉','セロリ','ルッコラ'],
+  wa:['刺身','昆布締め','握り'],yo:['カルパッチョ','セビーチェ'],chu:['湯引き葱生姜']},
+'サワラ':{raw:'〆てから3日',rawNote:'2日目からが本領。表面の乾き具合で見る',
+  veg:['大葉','葱','蕪','菜の花','セロリ'],
+  wa:['藁焼きたたき','西京焼き','幽庵焼き'],yo:['ポワレ','ハーブグリル'],chu:['清蒸','葱油淋']},
+'タチウオ':{raw:'〆てから2日',rawNote:'身が繊細で崩れやすい',
+  veg:['大葉','葱','レモン','ズッキーニ'],
+  wa:['炙り造り','塩焼き','天ぷら'],yo:['ムニエル','フリット'],chu:['紅焼帯魚','糖醋']},
+'伊勢海老':{raw:'活け〜当日',rawNote:'〆た瞬間が頂点。翌日への持ち越しは加熱で',
+  veg:['大葉','三つ葉','アスパラ','トマト','葱'],
+  wa:['活け造り','鬼殻焼き','具足煮'],yo:['ビスク','グリル・ブールブラン','テルミドール'],chu:['上湯蒸し','葱姜炒め']},
+'車海老':{raw:'活け〜当日',rawNote:'活けのみ。死後は速やかに加熱',
+  veg:['三つ葉','アスパラ','空豆','葱'],
+  wa:['踊り','天ぷら','鬼殻焼き'],yo:['ソテー・ガーリック','ビスク'],chu:['油爆蝦','エビチリ']},
+'甘エビ':{raw:'〆てから2日',rawNote:'一晩置くと甘みが増す例外。それ以上は溶ける',
+  veg:['大葉','貝割れ','アボカド','玉葱'],
+  wa:['刺身','昆布締め','頭の唐揚げ'],yo:['カルパッチョ','タルタル'],chu:['紹興酒漬け','塩炒め']},
+'ズワイガニ':{raw:'活け〜当日',rawNote:'活けのみ生食可。以降は茹でる',
+  veg:['三つ葉','胡瓜','葱','水菜'],
+  wa:['茹で','焼き','蟹味噌'],yo:['グラタン','サラダ・レムラード'],chu:['蟹肉炒蛋','上湯蟹']},
+'アオリイカ':{raw:'〆てから4日',rawNote:'熟成向きで持ちも良い。白濁は正常な変化',
+  veg:['大葉','貝割れ','セロリ','アスパラ','葱'],
+  wa:['細造り','塩辛','天ぷら'],yo:['カルパッチョ','グリル・レモン'],chu:['塩胡椒炒め','XO醤炒め']},
+'スルメイカ':{raw:'〆てから2日（要冷凍処理）',rawNote:'アニサキスが多い。生食は冷凍処理を推奨',
+  veg:['葱','生姜','大葉','セロリ'],
+  wa:['刺身','ワタ焼き','煮付け'],yo:['フリット','トマト煮'],chu:['葱爆イカ','XO醤炒め']},
+'マダコ':{raw:'茹でて2日',rawNote:'生食は稀。茹でて冷蔵が基本',
+  veg:['胡瓜','セロリ','トマト','ジャガイモ','大葉'],
+  wa:['薄造り','煮ダコ','唐揚げ'],yo:['ガリシア風','カルパッチョ','タコとポテトのサラダ'],chu:['葱油和え','XO醤炒め']},
+'ホタテ':{raw:'〆てから2日',rawNote:'ドリップが出たらそこで判断',
+  veg:['アスパラ','菜の花','葱','セロリ','じゃがいも'],
+  wa:['刺身','炙り','唐揚げ'],yo:['ソテー・バターレモン','カルパッチョ','グラタン'],chu:['貝柱と青菜の炒め','上湯蒸し']},
+'ハマグリ':{raw:'生食は非推奨',rawNote:'加熱前提。活け以外は使わない',
+  veg:['三つ葉','葱','菜の花','セロリ'],
+  wa:['潮汁','焼き','酒蒸し'],yo:['ボンゴレ','白ワイン蒸し'],chu:['葱姜炒め','酒蒸し']},
+'アワビ':{raw:'当日（生）',rawNote:'生は当日のみ。蒸せば2日',
+  veg:['三つ葉','大根','菜の花','セロリ'],
+  wa:['薄造り','酒蒸し','肝ソース'],yo:['ステーキ・バター','ムニエル'],chu:['鮑の姿煮','オイスターソース煮']},
+'赤貝':{raw:'剥いて当日',rawNote:'殻付きで保管し、直前に開ける',
+  veg:['大葉','葱','胡瓜','わけぎ'],
+  wa:['刺身','ぬた','握り'],yo:['カルパッチョ'],chu:['葱油和え','酒漬け']},
+'真牡蠣':{raw:'生食用は当日〜2日',rawNote:'生食用表示のあるものだけ。加熱用は必ず火を通す',
+  veg:['レモン','エシャロット','ほうれん草','葱','セロリ'],
+  wa:['酢牡蠣','土手鍋','フライ'],yo:['生ガキ・ミニョネット','グラタン','ロックフェラー'],chu:['牡蠣の豆豉炒め','オイスター煮込み']},
+'ウニ':{raw:'開けてから当日',rawNote:'無添加は特に短い。崩れはじめが限界',
+  veg:['大葉','三つ葉','アスパラ','枝豆'],
+  wa:['軍艦','そのまま','茶碗蒸し'],yo:['冷製パスタ','ウニのソース','リゾット'],chu:['ウニ入り炒飯','蒸し卵']},
+'シラス':{raw:'水揚げ当日',rawNote:'全魚介で最短。数時間で判断が変わる',
+  veg:['大根おろし','大葉','葱','ルッコラ','トマト'],
+  wa:['生しらす','しらす丼','釜揚げ'],yo:['ペペロンチーノ','ブルスケッタ'],chu:['青菜炒め','炒飯']},
+'サーモン（トラウト）':{raw:'〆てから3日',rawNote:'養殖・冷凍流通が中心で安定している',
+  veg:['ディル','玉葱','アボカド','ケーパー','ズッキーニ'],
+  wa:['刺身','漬け','西京焼き'],yo:['ムニエル','マリネ','スモーク'],chu:['甘酢あんかけ','葱油蒸し']}
+};
+
+FISH.forEach(f=>Object.assign(f, EXTRA[f.n]||{}));
+const ORDER=['white','red','crust','ceph','shell','river','other'];
+FISH.sort((a,b)=>ORDER.indexOf(a.c)-ORDER.indexOf(b.c));
+
+/* ---------- 成分辞典 ---------- */
+const GLOSS = [
+ {n:'ATP（アデノシン三リン酸）',c:'核酸系・前駆体',d:'それ自体は無味。生きた筋肉に蓄えられ、死後に分解されて旨み成分に変わる「旨みの元本」。',t:'〆る瞬間が最大。暴れる・弱る・温度が上がると急速に消費され、その分だけ後の旨みが減る。'},
+ {n:'AMP（アデニル酸）',c:'核酸系',d:'旨みに甘みが乗った味。エビ・カニ・貝・イカでは分解がここで止まり、旨みの主役になる。',t:'魚類では数時間でイノシン酸へ移行。甲殻類・貝類では〆た直後が頂点で、以後は減る一方。'},
+ {n:'イノシン酸（IMP）',c:'核酸系',d:'鰹節の旨みの正体。魚肉の旨みの中心で、グルタミン酸と合わせると相乗的に強まる。',t:'死後に増加し、白身で18〜24時間、赤身で6〜12時間前後で頂点。以後ゆっくり減る。'},
+ {n:'グアニル酸（GMP）',c:'核酸系',d:'干し椎茸・干し貝柱の旨み。生鮮ではほとんど効かないが、乾燥で大きく増える。',t:'乾燥・加熱の工程で生成。生の魚では考慮しなくてよい。'},
+ {n:'ヒポキサンチン',c:'核酸系・分解物',d:'イノシン酸が分解しきった先にできる、苦みと古さを感じさせる物質。鮮度指標のK値はこれで測る。',t:'時間とともに一方向に増える。減ることはない。低温で増加を遅らせるしかない。'},
+ {n:'グルタミン酸',c:'アミノ酸',d:'昆布の旨み。核酸系と組み合わせると旨みが数倍に感じられる（相乗効果）。',t:'タンパク質の分解で緩やかに増加。1〜3日の熟成で伸びる、熟成の主役。'},
+ {n:'グリシン',c:'アミノ酸',d:'はっきりした甘み。エビ・カニ・ホタテ・ウニの甘さの中心。',t:'元から遊離状態で存在するため増えない。水溶性で、ドリップと一緒に流出する。'},
+ {n:'アラニン',c:'アミノ酸',d:'まろやかな甘み。グリシンと組んで甲殻類・貝の甘さを作る。',t:'ほぼ横ばい。流出だけが敵。'},
+ {n:'アルギニン',c:'アミノ酸',d:'甘みの後にわずかな苦み。エビ・イカに多い。',t:'長時間経つとアミン類に分解し、臭みの原因になる。'},
+ {n:'プロリン',c:'アミノ酸',d:'穏やかな甘み。ウニやエビの後味の丸さに寄与する。',t:'タンパク質分解で緩やかに増える。'},
+ {n:'メチオニン・バリン',c:'アミノ酸',d:'苦み・コク。ウニの複雑さの一部だが、多すぎると欠点になる。',t:'鮮度低下とともに相対的に目立ってくる。'},
+ {n:'タウリン',c:'含硫アミノ酸様',d:'コクとかすかな甘み。イカ・タコ・貝・青魚の血合いに多い。',t:'比較的安定。水に溶けるので茹で汁に移る。'},
+ {n:'ベタイン',c:'第四級アンモニウム',d:'甲殻類・軟体類の「丸い甘み」。エビが甘いと感じる理由の大きな部分。',t:'安定していて分解しにくい。流出にだけ注意すればよい。'},
+ {n:'コハク酸',c:'有機酸',d:'貝の旨みの本体。アサリ・ハマグリ・カキ・ホタテに多い。',t:'貝が弱る過程や低温保存で一時的に増え、加熱すると汁に出る。'},
+ {n:'乳酸',c:'有機酸',d:'酸味とpH低下。多いと身の保水力が落ち、旨みが水と一緒に逃げる。',t:'暴れて死んだ魚（苦悶死）で急増。活け〆・神経〆はこれを防ぐための技術。'},
+ {n:'トリメチルアミン（TMA）',c:'アミン類',d:'いわゆる「生臭さ」。もとは無臭のTMAOが細菌に分解されて生じる。',t:'時間と温度に比例して増加。冷やす以外に止める手立てはない。'},
+ {n:'ヒスタミン',c:'アミン類',d:'カツオ・サバ・マグロなど赤身に多いヒスチジンが細菌で変化したもの。食中毒の原因で、加熱しても消えない。',t:'常温放置で急増。一度できたら戻せない。温度管理が唯一の対策。'},
+ {n:'グリコーゲン',c:'多糖',d:'牡蠣のコクと甘みの源。旬による差が最も大きい成分。',t:'産卵前に蓄積し、産卵後に激減する。季節そのものが味を決める。'},
+ {n:'遊離脂肪酸',c:'脂質分解物',d:'脂の酸敗臭。トロ・ブリ・サンマなど脂の多い魚の劣化はここから始まる。',t:'酸素との接触時間に比例して増える。真空・脱気が効く。'}
+];
+
+/* ---------- 扱いの原則 ---------- */
+const HOW = [
+ {n:'一、暴れさせない',c:'ATPを残す',d:'活け締めの前に氷水で15〜30分静かにさせる。暴れるとATPを消費し、乳酸が溜まってpHが下がり、保水力が落ちる。旨みの元本を減らさないことが、後のどんな技術よりも効く。',t:'伊勢海老・活魚・エビ全般'},
+ {n:'二、血を抜き、神経を抜く',c:'臭みを断つ',d:'血合いに残った血は酸化して臭みの中心になる。神経〆は死後硬直の進行を遅らせ、熟成に使える時間を稼ぐ。',t:'すべての活魚'},
+ {n:'三、水に触れさせない',c:'甘みを逃さない',d:'グリシン・アラニン・ベタイン・タウリンはいずれも水溶性。真水で洗う、ドリップを放置する、氷が直接当たる——どれも甘みを流す。',t:'ホタテ・エビ・白身全般'},
+ {n:'四、塩は立て塩で',c:'脱水しすぎない',d:'直接強い塩を当てると、水と一緒に甘みのアミノ酸まで抜ける。3%前後の塩水（立て塩）に短時間くぐらせれば、身は締まって味は残る。',t:'伊勢海老・白身の造り'},
+ {n:'五、昆布を合わせる',c:'相乗効果',d:'魚介の核酸系（イノシン酸・AMP）に昆布のグルタミン酸を足すと、旨みは足し算ではなく掛け算で立ち上がる。昆布締め、昆布塩、昆布水——形は問わない。',t:'白身・イカ・甲殻類'},
+ {n:'六、酸素を切る',c:'脂を守る',d:'脂の多い魚の劣化は脂質の酸化から始まる。空気に触れる面積を減らし、切り置きをしない。寝かせるなら密閉する。',t:'トロ・ブリ・サンマ・サーモン'},
+ {n:'七、冷やしきって出さない',c:'味の知覚',d:'低温では甘みと旨みの感じ方が鈍る。締めた後、提供直前に10〜12℃まで戻すと、同じ身でも甘みがはっきり立つ。',t:'刺身全般・特に甲殻類'},
+ {n:'八、魚に合わせて日を数える',c:'熟成の可否',d:'白身は半日〜2日、大型の白身は3〜5日、イカは2〜3日、赤身は1〜3日。青魚と甲殻類と貝は寝かせない。同じ「熟成」でも中身が違う。',t:'仕入れ計画そのもの'}
+];
+
+/* ============================================================
+   グラフ（模式図）
+============================================================ */
+const T_MAX = 168;
+const KNOTS = [[0,0],[6,.28],[24,.55],[72,.80],[168,1]];
+function tx(h){
+  for(let i=1;i<KNOTS.length;i++){
+    const [h0,p0]=KNOTS[i-1],[h1,p1]=KNOTS[i];
+    if(h<=h1) return p0+(h-h0)/(h1-h0)*(p1-p0);
+  }
+  return 1;
+}
+function nuc(h,p){
+  if(p.rise===0) return Math.exp(-h/p.decay);
+  const up=1-Math.exp(-h/p.rise);
+  return up*Math.exp(-h/p.decay);
+}
+const amino=(h,p)=>1-Math.exp(-h/p.amino);
+const spoil=(h,p)=>1-Math.exp(-h/p.spoil);
+
+function path(fn,p,W,H,pad){
+  let d='';
+  for(let i=0;i<=200;i++){
+    const h=T_MAX*i/200;
+    const x=pad.l+tx(h)*(W-pad.l-pad.r);
+    const y=H-pad.b-fn(h,p)*(H-pad.t-pad.b);
+    d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1);
+  }
+  return d;
+}
+
+function chart(f){
+  const W=760,H=230,pad={l:8,r:8,t:14,b:26};
+  const px=h=>pad.l+tx(h)*(W-pad.l-pad.r);
+  const marks=[0,6,12,24,48,72,120,168];
+  const lab={0:'〆',6:'6h',12:'12h',24:'1日',48:'2日',72:'3日',120:'5日',168:'7日'};
+  let g='';
+  marks.forEach(m=>{
+    g+=`<line x1="${px(m)}" y1="${pad.t}" x2="${px(m)}" y2="${H-pad.b}" stroke="rgba(14,33,43,.09)"/>`;
+    g+=`<text x="${px(m)}" y="${H-8}" text-anchor="middle" font-family="var(--mono)" font-size="9.5" fill="#8A999F">${lab[m]}</text>`;
+  });
+  const w0=px(f.win[0]),w1=px(f.win[1]);
+  const band=`<rect x="${w0}" y="${pad.t}" width="${Math.max(w1-w0,2)}" height="${H-pad.t-pad.b}" fill="rgba(107,122,60,.13)"/>
+    <line x1="${w0}" y1="${pad.t}" x2="${w0}" y2="${H-pad.b}" stroke="#6B7A3C" stroke-dasharray="3 3"/>
+    <line x1="${w1}" y1="${pad.t}" x2="${w1}" y2="${H-pad.b}" stroke="#6B7A3C" stroke-dasharray="3 3"/>
+    <text x="${(w0+w1)/2}" y="${pad.t+12}" text-anchor="middle" font-family="var(--mono)" font-size="9.5" fill="#6B7A3C">食べ頃</text>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+      aria-label="${f.n}の成分推移の模式図">
+    ${g}${band}
+    <path d="${path(nuc,f.prof,W,H,pad)}" fill="none" stroke="#A8342B" stroke-width="2.2"/>
+    <path d="${path(amino,f.prof,W,H,pad)}" fill="none" stroke="#6B7A3C" stroke-width="2.2"/>
+    <path d="${path(spoil,f.prof,W,H,pad)}" fill="none" stroke="#8A999F" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <line class="cur" x1="-99" y1="${pad.t}" x2="-99" y2="${H-pad.b}" stroke="#0E212B" stroke-width="1"/>
+  </svg>`;
+}
+
+function hourFromX(r,cx){
+  const W=760,pad={l:8,r:8};
+  const u=(cx-r.left)/r.width;
+  const p=Math.min(Math.max((u*W-pad.l)/(W-pad.l-pad.r),0),1);
+  for(let i=1;i<KNOTS.length;i++){
+    const [h0,p0]=KNOTS[i-1],[h1,p1]=KNOTS[i];
+    if(p<=p1) return h0+(p-p0)/(p1-p0)*(h1-h0);
+  }
+  return T_MAX;
+}
+const fmtH=h=>h<1?'〆た直後':h<24?Math.round(h)+'時間後':(h/24).toFixed(h<48?1:0)+'日後';
+
+/* ============================================================
+   描画
+============================================================ */
+let cur=FISH[0], filt='all', kw='';
+const $=s=>document.querySelector(s);
+
+function drawFilters(){
+  const box=$('#filters');
+  const keys=['all',...Object.keys(CAT)];
+  box.innerHTML=keys.map(k=>{
+    const l=k==='all'?'すべて':CAT[k].label;
+    return `<button class="f-btn" data-c="${k}" aria-pressed="${k===filt}">${l}</button>`;
+  }).join('');
+  box.querySelectorAll('button').forEach(b=>b.onclick=()=>{filt=b.dataset.c;drawFilters();drawList();});
+}
+
+function drawList(){
+  const box=$('#list');
+  const hit=FISH.filter(f=>
+    (filt==='all'||f.c===filt) &&
+    (!kw||f.n.includes(kw)||f.k.toLowerCase().includes(kw.toLowerCase()))
+  );
+  let html='',last='';
+  hit.forEach(f=>{
+    if(f.c!==last){html+=`<div class="grp">${CAT[f.c].label}</div>`;last=f.c;}
+    const v=f.aging==='no'?'寝かせない':f.aging==='short'?'短時間':'熟成向き';
+    html+=`<button class="fish-item" data-n="${f.n}" aria-current="${f===cur}">
+      <span>${f.n}</span><span class="tag">${v}</span></button>`;
+  });
+  box.innerHTML=html||'<div class="grp">該当なし</div>';
+  box.querySelectorAll('.fish-item').forEach(b=>b.onclick=()=>{
+    cur=FISH.find(x=>x.n===b.dataset.n);drawList();drawDetail();
+    if(window.innerWidth<=920) $('#detail').scrollIntoView({behavior:'smooth',block:'start'});
+  });
+}
+
+function drawDetail(){
+  const f=cur;
+  const vc=f.aging==='no'?'v-no':f.aging==='short'?'v-short':'v-yes';
+  const vt=f.aging==='no'?'寝かせない':f.aging==='short'?'短時間だけ':'熟成向き';
+  $('#detail').innerHTML=`
+    <div class="d-head">
+      <div class="d-kana">${f.k} ／ ${CAT[f.c].label}</div>
+      <div class="d-name">${f.n}<span class="verdict ${vc}">${vt}</span></div>
+      <div class="d-meta">
+        <span>旬 ${f.season}</span>
+        <span>置く時間 ${f.age}</span>
+        <span>ピーク ${f.peak}</span>
+        <span style="color:var(--chiai)">生食 ${f.raw}</span>
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">
+        <h3>〆てからの変化</h3>
+        <div class="legend">
+          <span><i style="background:#A8342B"></i>${f.prof.nuc}</span>
+          <span><i style="background:#6B7A3C"></i>遊離アミノ酸</span>
+          <span><i style="background:#8A999F"></i>鮮度低下</span>
+        </div>
+      </div>
+      ${chart(f)}
+      <div class="readout" id="ro">グラフをなぞると、その時点の状態が出ます。</div>
+    </div>
+
+    <div class="blocks">
+      <div class="block wide">
+        <h4>時間とともに何が起きるか</h4>
+        <p>${f.change}</p>
+      </div>
+      <div class="block">
+        <h4>主な旨み成分</h4>
+        <div class="chips">${f.umami.map(u=>`<span class="chip">${u}</span>`).join('')}</div>
+      </div>
+      <div class="block">
+        <h4>相性のよい素材</h4>
+        <div class="chips">${f.pair.map(p=>`<span class="chip k">${p}</span>`).join('')}</div>
+      </div>
+      <div class="block wide">
+        <h4>生食できる期間</h4>
+        <p><b style="color:var(--chiai)">${f.raw}</b> — ${f.rawNote}</p>
+      </div>
+      <div class="block wide">
+        <h4>相性のよい野菜</h4>
+        <div class="chips">${f.veg.map(v=>`<span class="chip v">${v}</span>`).join('')}</div>
+      </div>
+      <div class="block wide">
+        <h4>向く仕事</h4>
+        <div class="cuis">
+          <div class="cu"><span class="cu-l">和</span><div class="chips">${f.wa.map(m=>`<span class="chip">${m}</span>`).join('')}</div></div>
+          <div class="cu"><span class="cu-l">洋</span><div class="chips">${f.yo.map(m=>`<span class="chip">${m}</span>`).join('')}</div></div>
+          <div class="cu"><span class="cu-l">中</span><div class="chips">${f.chu.map(m=>`<span class="chip">${m}</span>`).join('')}</div></div>
+        </div>
+      </div>
+      <div class="block wide">
+        <h4>現場メモ</h4>
+        <div class="note">${f.note}</div>
+      </div>
+    </div>`;
+  bindChart();
+}
+
+function bindChart(){
+  const svg=$('.chart'); if(!svg) return;
+  const ro=$('#ro'), line=svg.querySelector('.cur');
+  const move=e=>{
+    const cx=(e.touches?e.touches[0].clientX:e.clientX);
+    const r=svg.getBoundingClientRect();
+    const h=hourFromX(r,cx), p=cur.prof;
+    const W=760,pad={l:8,r:8};
+    line.setAttribute('x1',pad.l+tx(h)*(W-pad.l-pad.r));
+    line.setAttribute('x2',pad.l+tx(h)*(W-pad.l-pad.r));
+    const inWin=h>=cur.win[0]&&h<=cur.win[1];
+    ro.innerHTML=`<b>${fmtH(h)}</b> ／ ${p.nuc} <b>${Math.round(nuc(h,p)*100)}%</b>`
+      +` ・ 遊離アミノ酸 <b>${Math.round(amino(h,p)*100)}%</b>`
+      +` ・ 鮮度低下 <b>${Math.round(spoil(h,p)*100)}%</b><br>`
+      +(inWin?'食べ頃の窓の中。':'食べ頃の窓の外 — '+(h<cur.win[0]?'まだ旨みが乗りきっていない。':'旨みより劣化が勝ちはじめる。'));
+    if(e.cancelable) e.preventDefault();
+  };
+  svg.addEventListener('mousemove',move);
+  svg.addEventListener('touchstart',move,{passive:false});
+  svg.addEventListener('touchmove',move,{passive:false});
+  svg.addEventListener('mouseleave',()=>{
+    line.setAttribute('x1',-99);line.setAttribute('x2',-99);
+    ro.textContent='グラフをなぞると、その時点の状態が出ます。';
+  });
+}
+
+function drawTable(){
+  const rows=[...FISH].sort((a,b)=>a.win[1]-b.win[1]).map(f=>{
+    const v=f.aging==='no'?'不可':f.aging==='short'?'短時間':'向き';
+    return `<tr>
+      <td><span class="dot" style="background:${CAT[f.c].color}"></span>${f.n}</td>
+      <td>${CAT[f.c].label}</td>
+      <td class="num">${v}</td>
+      <td class="num">${f.age}</td>
+      <td class="num" style="color:var(--chiai)">${f.raw}</td>
+      <td>${f.umami.slice(0,3).join('・')}</td>
+      <td>${f.pair.slice(0,3).join('・')}</td>
+      <td>${f.veg.slice(0,3).join('・')}</td>
+      <td>${f.wa.join('・')}</td>
+      <td>${f.yo.join('・')}</td>
+      <td>${f.chu.join('・')}</td>
+    </tr>`;
+  }).join('');
+  $('#tbody').innerHTML=rows;
+}
+
+function drawGloss(){
+  $('#gloss').innerHTML=GLOSS.map(g=>`<div class="item">
+    <div class="cls">${g.c}</div><h5>${g.n}</h5>
+    <p>${g.d}</p><div class="tl">${g.t}</div></div>`).join('');
+  $('#how').innerHTML=HOW.map(h=>`<div class="item">
+    <div class="cls">${h.c}</div><h5>${h.n}</h5>
+    <p>${h.d}</p><div class="tl">効く場面：${h.t}</div></div>`).join('');
+}
+
+/* tabs */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.setAttribute('aria-selected',x===b));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.id===b.dataset.p));
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+$('#q').addEventListener('input',e=>{kw=e.target.value.trim();drawList();});
+
+drawFilters();drawList();drawDetail();drawTable();drawGloss();
+</script>
+</body>
+</html>
