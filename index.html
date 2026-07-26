@@ -450,6 +450,17 @@ nav{display:flex;gap:2px}
           <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 曜日別 人気メニュー TOP5（デザート以外）</summary>
           <div id="ch-big-weekday" style="margin-top:6px;overflow-x:auto"></div>
         </details>
+        <details id="ch-limited-wrap" open style="display:none;margin-top:8px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--accent3);user-select:none;font-weight:700">🍱 数量限定 出数の推移（曜日別）</summary>
+          <div id="ch-limited-weekday" style="margin-top:6px;overflow-x:auto"></div>
+          <div class="ch-update-row" id="ch-limited-edit" style="display:none">
+            <div style="flex:1;min-width:220px">
+              <div class="ch-update-label">対象商品（1行に1つ・部分一致で集計）</div>
+              <textarea class="ch-inp" id="ch-limited-inp" rows="3" placeholder="恵比寿御膳&#10;吉祥膳" style="width:100%;resize:vertical;font-size:13px;line-height:1.5"></textarea>
+            </div>
+            <button class="btn btn-y" onclick="saveLimitedItems()">保存して再集計</button>
+          </div>
+        </details>
         <div class="ch-update-row" id="ch-big-edit" style="display:none">
           <div><div class="ch-update-label">今月実績（税込）</div><input class="ch-inp" type="number" id="ch-big-inp-current" placeholder="例: 2500000"></div>
           <div><div class="ch-update-label" id="ch-big-base-label">比較基準（前年同月）</div><input class="ch-inp" type="number" id="ch-big-inp-base" placeholder="例: 2200000"></div>
@@ -2475,7 +2486,7 @@ function renderChallenge(fixedShopKey) {
 
   // 管理者編集フォーム表示切替（今月のみ）
   var showAdmin = adminUnlocked && isCurrentMonth;
-  ['big','mission','spot'].forEach(function(k) {
+  ['big','mission','spot','limited'].forEach(function(k) {
     var el = document.getElementById('ch-' + k + '-edit');
     if (el) el.style.display = showAdmin ? 'flex' : 'none';
   });
@@ -2753,6 +2764,30 @@ function updateChallengUI(d, shopKey) {
     }
   }
 
+  // 数量限定 出数の推移（曜日別・指定商品）— 本店のみ
+  var limWrap = document.getElementById('ch-limited-wrap');
+  if (limWrap) {
+    var limData = d.limited_weekday;
+    var limNamesCur = (d.limited_names && d.limited_names.length) ? d.limited_names : DEFAULT_LIMITED_NAMES;
+    if (isMarco) {
+      // マルコ側では非表示
+      limWrap.style.display = 'none';
+    } else {
+      limWrap.style.display = 'block';
+      var limEl = document.getElementById('ch-limited-weekday');
+      if (limEl) {
+        if (limData && limData.items && limData.items.length > 0) {
+          limEl.innerHTML = chWeekdayBlockHTML(limData, limData.items.length, '指定した数量限定商品のみを集計。日別CSV（Daily_Item_Sales）取込時に更新されます。対象商品は下の編集欄で変更できます。');
+        } else {
+          limEl.innerHTML = '<div style="padding:8px 10px;background:#fef3c7;border-radius:6px;font-size:11.5px;color:#92400e">対象商品（' + limNamesCur.map(function(n){ return String(n).replace(/</g,'&lt;'); }).join('・') + '）の出数がまだありません。日別CSVを取り込むと集計されます。</div>';
+        }
+      }
+      // 編集欄に現在のリストを反映
+      var limInp = document.getElementById('ch-limited-inp');
+      if (limInp && document.activeElement !== limInp) limInp.value = limNamesCur.join('\n');
+    }
+  }
+
   // 高単価アイテムの出数（本店: spot_high_items ／ マルコ: big_item_wd から導出）
   var shItems = d.spot_high_items || [];
   if (biFull) {
@@ -3003,6 +3038,21 @@ function saveChallengeData(type) {
 
   getChRef(shopKey).update(upd).then(function() {
     // Firebase onValue が自動で画面更新するので何もしなくてOK
+  });
+}
+
+function saveLimitedItems() {
+  if (!db) return;
+  var shopKey = getChShopKey();
+  var raw = document.getElementById('ch-limited-inp').value || '';
+  var names = raw.split(/\r?\n/)
+    .map(function(s){ return s.trim(); })
+    .filter(function(s){ return s.length > 0; });
+  if (names.length === 0) names = DEFAULT_LIMITED_NAMES.slice();
+  getChRef(shopKey).update({ limited_names: names }).then(function() {
+    showToast('✅ 対象商品を保存しました。日別CSVをもう一度取り込むと再集計されます');
+  }).catch(function(e) {
+    alert('保存エラー: ' + e.message);
   });
 }
 
@@ -3386,6 +3436,8 @@ function parseCSVAuto(text, sep) {
 // 後方互換
 function parseCSV(text, sep) { return parseCSVAuto(text, sep); }
 
+var DEFAULT_LIMITED_NAMES = ['恵比寿御膳', '吉祥膳'];
+
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
   var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoSnapshotFile || results.marcoItemFiles.length > 0;
@@ -3393,6 +3445,17 @@ function processCsvResults(results, shopKey) {
     alert('売上CSVが見つかりませんでした。\n\n【本店】売上実績CSV + Daily_Item_Sales CSV\n【マルコ】年間売上CSV + aggregateMenu CSV\n\n勤怠CSVは下の「💰インセンティブ試算」から読み込んでください。');
     return;
   }
+  // 数量限定リストなど既存データを先読みしてから本体を実行
+  getChRef(shopKey).once('value').then(function(snap) {
+    var existingCh = snap.val() || {};
+    processCsvResultsCore(results, shopKey, existingCh);
+  }).catch(function() {
+    processCsvResultsCore(results, shopKey, {});
+  });
+}
+
+function processCsvResultsCore(results, shopKey, existingCh) {
+  var isMarco = shopKey === 'marco';
 
   var upd = {};
   var now = new Date();
@@ -3554,6 +3617,48 @@ function processCsvResults(results, shopKey) {
       foodGrand += it.total;
     });
     upd.big_item_weekday = { items: foodItems, totals: foodTotals, grand: foodGrand };
+
+    // ── 数量限定 出数（曜日別・指定商品のみ） ──
+    // 保存済みの limited_names（無ければ既定）にマッチする商品の曜日別出数を集計
+    var limNames = (existingCh && existingCh.limited_names && existingCh.limited_names.length)
+      ? existingCh.limited_names : DEFAULT_LIMITED_NAMES;
+    var byLim = {};
+    for (var lj = 1; lj < dRows.length; lj++) {
+      var lRow = dRows[lj];
+      if (!lRow[dIdxName]) continue;
+      var lName = lRow[dIdxName].replace(/\u3000/g,' ').trim();
+      var lNorm = lName.replace(/\s/g,'');
+      // 指定名のいずれかを含む商品だけ対象（部分一致）
+      var matched = null;
+      for (var lm = 0; lm < limNames.length; lm++) {
+        var key = String(limNames[lm]||'').replace(/\s/g,'');
+        if (key && lNorm.indexOf(key) !== -1) { matched = limNames[lm]; break; }
+      }
+      if (!matched) continue;
+      var lfm = String(lRow[dIdxDate]||'').match(/[（(]([月火水木金土日])[)）]/);
+      if (!lfm) continue;
+      var lwi = WD.indexOf(lfm[1]);
+      if (lwi === -1) continue;
+      var lQty = parseInt((lRow[dIdxQty]||'0').replace(/,/g,'')) || 0;
+      // 表示名は指定キーワードでまとめる（同一商品の表記ゆれを集約）
+      if (!byLim[matched]) byLim[matched] = [0,0,0,0,0,0,0];
+      byLim[matched][lwi] += lQty;
+    }
+    // 指定順を保つ（limNamesの並び順で表示）
+    var limItems = limNames.map(function(n){
+      var w = byLim[n] || [0,0,0,0,0,0,0];
+      return { name: n, w: w, total: w.reduce(function(a,b){ return a+b; }, 0) };
+    }).filter(function(it){ return it.total > 0; });
+    var limTotals = [0,0,0,0,0,0,0], limGrand = 0;
+    limItems.forEach(function(it){
+      for (var lk = 0; lk < 7; lk++) { limTotals[lk] += it.w[lk] || 0; }
+      limGrand += it.total;
+    });
+    upd.limited_weekday = { items: limItems, totals: limTotals, grand: limGrand };
+    // 既定名しか無い場合も、リストが未保存なら初期値を保存しておく
+    if (!(existingCh && existingCh.limited_names && existingCh.limited_names.length)) {
+      upd.limited_names = DEFAULT_LIMITED_NAMES;
+    }
 
     // ── 高単価アイテムの出数（客単価チャレンジの提案支援） ──
     // 平均単価が SPOT_HIGH_MIN 以上の品目を単価順に。テイクアウトと除外品は対象外。
