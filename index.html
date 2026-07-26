@@ -3615,7 +3615,9 @@ function processCsvResults(results, shopKey) {
       var sPrice = parseInt(String(sRow[sP]||'').replace(/[¥,]/g,'')) || 0;
       if (sQty > 0) snapItems.push({ name: sName, qty: sQty, price: sPrice });
     }
-    var MD_S = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ'];
+    var MD_S = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ','ジェラート','ソルベ','パンナコッタ'];
+    // ドルチェセット内の選択品目は重複計上になるため除外
+    var MD_S_EXCLUDE = ['自家製ティラミス','自家製チーズケーキ'];
     var MX_S = ['お通し','サラダバー','ドリンクバー','大盛り','特盛'];
     var WD_GETDAY = ['日','月','火','水','木','金','土']; // Date.getDay()順
     var MARCO_CLOSED = ['木'];                             // マルコ定休日
@@ -3635,10 +3637,28 @@ function processCsvResults(results, shopKey) {
     });
     snapDrinkItems.sort(function(x,y){ return y.qty - x.qty; });
 
+    // 【修正 R8.7.26】デザート合計・品目内訳も累計CSV（スナップショット全体）から直接計上する。
+    // 従来は日々の差分の積み上げだったため、初回スナップショット以前の出数や
+    // 取込漏れ日の分が合計から欠落していた（ドリンクと同じ方式に統一）。
+    // 同名品目（通常版とセット用¥0版など）は合算する。
+    var snapDesAgg = {};
+    snapItems.forEach(function(it){
+      if (it.name.indexOf('無し') !== -1) return;
+      if (MD_S_EXCLUDE.indexOf(it.name) !== -1) return;
+      if (MD_S.some(function(t){ return it.name.indexOf(t) !== -1; })) {
+        snapDesAgg[it.name] = (snapDesAgg[it.name] || 0) + (it.qty || 0);
+      }
+    });
+    var snapDes = 0;
+    var snapDesItems = Object.keys(snapDesAgg).map(function(n){
+      snapDes += snapDesAgg[n];
+      return { name: n, qty: snapDesAgg[n] };
+    }).sort(function(x,y){ return y.qty - x.qty; });
+
     getChRef(shopKey).once('value').then(function(snap) {
       var cur = snap.val() || {};
       var prev = cur.snapshot || null;
-      var updS = { snapshot: { end: sEnd, items: snapItems, at: ts }, mission_drink: snapDrink, mission_drink_items: snapDrinkItems };
+      var updS = { snapshot: { end: sEnd, items: snapItems, at: ts }, mission_drink: snapDrink, mission_drink_items: snapDrinkItems, mission_dessert: snapDes, mission_dessert_items: snapDesItems, mission_updated: ts };
 
       if (!prev || !prev.end) {
         return getChRef(shopKey).update(updS).then(function() {
@@ -3676,7 +3696,7 @@ function processCsvResults(results, shopKey) {
       snapItems.forEach(function(it) {
         var dq = (it.qty || 0) - (prevMap[it.name] || 0);
         if (dq <= 0) return;
-        var isD = MD_S.some(function(t){ return it.name.indexOf(t) !== -1; });
+        var isD = MD_S_EXCLUDE.indexOf(it.name) === -1 && MD_S.some(function(t){ return it.name.indexOf(t) !== -1; });
         if (isD) deltaDes.push({ name: it.name, qty: dq });
         else if ((it.price || 0) > 0 && !MX_S.some(function(t){ return it.name.indexOf(t) !== -1; })) {
           deltaFood.push({ name: it.name, qty: dq, price: it.price });
@@ -3698,24 +3718,8 @@ function processCsvResults(results, shopKey) {
       }
       updS['mission_dessert_wd/' + wdChar] = addToCol((cur.mission_dessert_wd || {})[wdChar], deltaDes, false);
       updS['big_item_wd/' + wdChar] = addToCol((cur.big_item_wd || {})[wdChar], deltaFood, true);
-      var WDX = ['月','火','水','木','金','土','日'];
-      var totS = 0, aggS = {};
-      for (var wz = 0; wz < 7; wz++) {
-        var colz = updS['mission_dessert_wd/' + WDX[wz]] !== undefined
-          ? updS['mission_dessert_wd/' + WDX[wz]]
-          : ((cur.mission_dessert_wd || {})[WDX[wz]] || []);
-        for (var cz = 0; cz < (colz ? colz.length : 0); cz++) {
-          var cit = colz[cz];
-          if (!cit || !cit.name) continue;
-          totS += cit.qty || 0;
-          aggS[cit.name] = (aggS[cit.name] || 0) + (cit.qty || 0);
-        }
-      }
-      updS.mission_dessert = totS;
-      updS.mission_dessert_items = Object.keys(aggS)
-        .map(function(n){ return { name: n, qty: aggS[n] }; })
-        .sort(function(a,b){ return b.qty - a.qty; });
-      updS.mission_updated = ts;
+      // 【修正 R8.7.26】合計・品目内訳は累計CSVから直接計上済み（updS定義時）。
+      // 曜日別（仕込み用）のみ差分ベースで更新する。
       var desSum = 0;
       for (var dz = 0; dz < deltaDes.length; dz++) desSum += deltaDes[dz].qty;
       return getChRef(shopKey).update(updS).then(function() {
@@ -3727,7 +3731,8 @@ function processCsvResults(results, shopKey) {
   }
 
   if (results.marcoItemFiles && results.marcoItemFiles.length > 0 && isMarco) {
-    var MARCO_DESSERT = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ'];
+    var MARCO_DESSERT = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ','ジェラート','ソルベ','パンナコッタ'];
+    var MARCO_DESSERT_EXCLUDE = ['自家製ティラミス','自家製チーズケーキ']; // ドルチェセット内の選択品目
     var MARCO_EXCLUDE = ['お通し','サラダバー','ドリンクバー','大盛り','特盛'];  // 全品目集計の除外（単価¥0の指示行は自動除外）
     var WD_M = ['月','火','水','木','金','土','日'];
 
@@ -3765,7 +3770,7 @@ function processCsvResults(results, shopKey) {
           var aq = parseInt((aRow[aNQty]||'0').replace(/,/g,'')) || 0;
           var ap = parseInt(String(aRow[aNPrice]||'').replace(/[¥,]/g,'')) || 0;
           if (aq <= 0) continue;
-          var isD = MARCO_DESSERT.some(function(t){ return aName.indexOf(t) !== -1; });
+          var isD = MARCO_DESSERT_EXCLUDE.indexOf(aName) === -1 && MARCO_DESSERT.some(function(t){ return aName.indexOf(t) !== -1; });
           if (isD) wdDessertArr.push({ name: aName, qty: aq });
           // 全品目：単価¥0（普通・大盛り・○○無し等の指示行）と除外品は数えない
           if (!isD && ap > 0 && !MARCO_EXCLUDE.some(function(t){ return aName.indexOf(t) !== -1; })) {
@@ -3782,7 +3787,7 @@ function processCsvResults(results, shopKey) {
           var aRow2 = aRows[ar2];
           if (!aRow2[aNName]) continue;
           var aName2 = aRow2[aNName].replace(/\u3000/g,' ').trim();
-          var isD2 = MARCO_DESSERT.some(function(t){ return aName2.indexOf(t) !== -1; });
+          var isD2 = MARCO_DESSERT_EXCLUDE.indexOf(aName2) === -1 && MARCO_DESSERT.some(function(t){ return aName2.indexOf(t) !== -1; });
           if (isD2) {
             var aq2 = parseInt((aRow2[aNQty]||'0').replace(/,/g,'')) || 0;
             mDessert += aq2;
