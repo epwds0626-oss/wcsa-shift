@@ -411,6 +411,7 @@ nav{display:flex;gap:2px}
             📊 売上CSVから更新
             <input type="file" accept=".csv" multiple style="display:none" onchange="handleCsvImport(event)">
           </label>
+          <button class="btn btn-s" style="font-size:11px;padding:5px 10px;margin-left:6px;color:#c0392b;border-color:#c0392b" onclick="resetDessertMission()">🧹 デザート集計リセット</button>
         </div>
       </div>
     </div>
@@ -3220,6 +3221,26 @@ function isDrinkExcluded(name) {
   if (/[ 　]ｗ$/.test(name)) return true;
   if (name === 'グラス') return true;  // 提供形態の指定（グラスワイン等の商品名は残る）
   return false;
+}
+
+// 【追加 R8.7.26】デザート集計のリセット（管理者用）
+// 曜日別データが誤取込等で壊れた場合に、当月のデザート集計と
+// スナップショットを初期化する。リセット後に累計CSVを差分取込すると
+// 初回スナップショットとして合計・品目内訳が正しく再計上される。
+function resetDessertMission() {
+  var shopKey = getChShopKey();
+  if (!confirm('デザート集計（合計・品目内訳・曜日別・スナップショット）をリセットします。\n\nリセット後、最新の累計CSV（aggregateMenu）を「差分取込」で読み込み直してください。\n\nよろしいですか？')) return;
+  getChRef(shopKey).update({
+    mission_dessert: 0,
+    mission_dessert_items: null,
+    mission_dessert_wd: null,
+    mission_dessert_weekday: null,
+    snapshot: null,
+    mission_updated: Date.now()
+  }).then(function() {
+    showToast('🧹 デザート集計をリセットしました。累計CSVを取り込み直してください');
+    renderChallenge(shopKey);
+  }).catch(function(e) { alert('リセットエラー: ' + e.message); });
 }
 
 function handleCsvImport(event) {
