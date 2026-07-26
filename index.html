@@ -412,6 +412,7 @@ nav{display:flex;gap:2px}
             <input type="file" accept=".csv" multiple style="display:none" onchange="handleCsvImport(event)">
           </label>
           <button class="btn btn-s" style="font-size:11px;padding:5px 10px;margin-left:6px;color:#c0392b;border-color:#c0392b" onclick="resetDessertMission()">🧹 デザート集計リセット</button>
+          <button class="btn btn-s" style="font-size:11px;padding:5px 10px;margin-left:6px;color:#fff;background:#c0392b;border-color:#c0392b" onclick="resetChallengeAll()">🧨 全体集計リセット</button>
         </div>
       </div>
     </div>
@@ -3239,6 +3240,26 @@ function resetDessertMission() {
     mission_updated: Date.now()
   }).then(function() {
     showToast('🧹 デザート集計をリセットしました。累計CSVを取り込み直してください');
+    renderChallenge(shopKey);
+  }).catch(function(e) { alert('リセットエラー: ' + e.message); });
+}
+
+// 【追加 R8.7.26】全体集計リセット（管理者用）
+// 当月の challenge/{shopKey}/{monthKey} ノードを丸ごと初期化する。
+// デザート集計リセットが消すのはデザート系のみだが、こちらは
+// mission_total・ドリンク系・曜日別TOP5(big_item_weekday)・snapshot まで
+// すべて消えるため、集計が根本的に壊れた時の最終手段。
+// 二段確認＋「リセット」入力で誤操作を防ぐ。リセット後は当月分の
+// 累計CSV(aggregateMenu)と各CSVを取り込み直すこと。
+function resetChallengeAll() {
+  var shopKey = getChShopKey();
+  var shopName = (shopKey === 'enya') ? '本店' : 'マルコ';
+  var monthKey = getMonthKey();
+  if (!confirm('⚠ 【' + shopName + '】' + monthKey + ' の集計を完全リセットします。\n\n消えるもの：\n・今月実績（合計売上）\n・デザート／ドリンク集計と品目内訳\n・曜日別 人気メニューTOP5\n・累計スナップショット（差分取込の基準）\n\nこの操作は元に戻せません。よろしいですか？')) return;
+  var ans = prompt('確認のため「リセット」と入力してください。');
+  if (ans !== 'リセット') { showToast('リセットを中止しました'); return; }
+  getChRef(shopKey).remove().then(function() {
+    showToast('🧨 【' + shopName + '】' + monthKey + ' の集計を全リセットしました。CSVを取り込み直してください');
     renderChallenge(shopKey);
   }).catch(function(e) { alert('リセットエラー: ' + e.message); });
 }
