@@ -4212,7 +4212,7 @@ function renderCal() {
       ['before','lunch','dinner'].forEach(function(sk){ (sh[sk]||[]).forEach(function(s){ if(s.name===filterName) myShifts.push(s); }); });
       if (myShifts.length > 0) {
         dots = '';
-        myShifts.forEach(function(s){ dots += '<div class="shift-dot" style="color:var(--accent);font-size:10px">' + s.start + '-' + s.end + '</div>'; });
+        myShifts.forEach(function(s){ dots += '<div class="shift-dot" style="color:#111122;font-size:10px">' + s.start + '-' + s.end + '</div>'; });
       } else if (status !== 'closed') {
         dots = '';
       }
