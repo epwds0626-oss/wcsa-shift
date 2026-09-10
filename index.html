@@ -2075,10 +2075,8 @@ window.addEventListener('resize', function(){
   ['fish-wrapper','study-wrapper','cooking-wrapper'].forEach(function(id){
     var fw = document.getElementById(id);
     if (fw && fw.style.display === 'block') {
-      var fh = document.getElementById('main-header');
-      var fhh = fh ? fh.getBoundingClientRect().height : 82;
-      fw.style.top = fhh + 'px';
-      fw.style.height = (window.innerHeight - fhh) + 'px';
+      fw.style.top = '0';
+      fw.style.height = window.innerHeight + 'px';
     }
   });
 });
@@ -2101,19 +2099,22 @@ function switchMode(mode, shopIdx) {
   if (studyWrapper) studyWrapper.style.display = 'none';
   var cookingWrapper = document.getElementById('cooking-wrapper');
   if (cookingWrapper) cookingWrapper.style.display = 'none';
+  // ヘッダーは一旦表示に戻す（全画面帳を開く分岐内で改めて隠す）
+  var mainHeaderReset = document.getElementById('main-header');
+  if (mainHeaderReset) mainHeaderReset.style.display = '';
 
   if (mode === 'fish') {
     if (musubuWrapper) musubuWrapper.style.display = 'none';
-    var fh = document.getElementById('main-header');
-    var fhh = fh ? fh.getBoundingClientRect().height : 82;
+    var mainHeaderF = document.getElementById('main-header');
+    if (mainHeaderF) mainHeaderF.style.display = 'none';
     if (fishWrapper) {
       fishWrapper.style.position = 'fixed';
-      fishWrapper.style.top = fhh + 'px';
+      fishWrapper.style.top = '0';
       fishWrapper.style.left = '0';
       fishWrapper.style.right = '0';
       fishWrapper.style.bottom = '0';
-      fishWrapper.style.height = (window.innerHeight - fhh) + 'px';
-      fishWrapper.style.zIndex = '50';
+      fishWrapper.style.height = window.innerHeight + 'px';
+      fishWrapper.style.zIndex = '200';
       fishWrapper.style.display = 'block';
       fishWrapper.style.webkitTransform = 'translateZ(0)';
     }
@@ -2129,16 +2130,16 @@ function switchMode(mode, shopIdx) {
 
   if (mode === 'study') {
     if (musubuWrapper) musubuWrapper.style.display = 'none';
-    var sh = document.getElementById('main-header');
-    var shh = sh ? sh.getBoundingClientRect().height : 82;
+    var mainHeaderS = document.getElementById('main-header');
+    if (mainHeaderS) mainHeaderS.style.display = 'none';
     if (studyWrapper) {
       studyWrapper.style.position = 'fixed';
-      studyWrapper.style.top = shh + 'px';
+      studyWrapper.style.top = '0';
       studyWrapper.style.left = '0';
       studyWrapper.style.right = '0';
       studyWrapper.style.bottom = '0';
-      studyWrapper.style.height = (window.innerHeight - shh) + 'px';
-      studyWrapper.style.zIndex = '50';
+      studyWrapper.style.height = window.innerHeight + 'px';
+      studyWrapper.style.zIndex = '200';
       studyWrapper.style.display = 'block';
       studyWrapper.style.webkitTransform = 'translateZ(0)';
     }
@@ -2154,16 +2155,16 @@ function switchMode(mode, shopIdx) {
 
   if (mode === 'cooking') {
     if (musubuWrapper) musubuWrapper.style.display = 'none';
-    var ch = document.getElementById('main-header');
-    var chh = ch ? ch.getBoundingClientRect().height : 82;
+    var mainHeaderC = document.getElementById('main-header');
+    if (mainHeaderC) mainHeaderC.style.display = 'none';
     if (cookingWrapper) {
       cookingWrapper.style.position = 'fixed';
-      cookingWrapper.style.top = chh + 'px';
+      cookingWrapper.style.top = '0';
       cookingWrapper.style.left = '0';
       cookingWrapper.style.right = '0';
       cookingWrapper.style.bottom = '0';
-      cookingWrapper.style.height = (window.innerHeight - chh) + 'px';
-      cookingWrapper.style.zIndex = '50';
+      cookingWrapper.style.height = window.innerHeight + 'px';
+      cookingWrapper.style.zIndex = '200';
       cookingWrapper.style.display = 'block';
       cookingWrapper.style.webkitTransform = 'translateZ(0)';
     }
