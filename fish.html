@@ -41,8 +41,7 @@ a{color:inherit}
 header{
   border-bottom:1px solid var(--line);
   background:linear-gradient(180deg,#F4F7F8,var(--ice));
-  position:sticky;top:0;z-index:40;
-  backdrop-filter:blur(6px);
+  position:relative;z-index:40;
 }
 .head-in{max-width:1240px;margin:0 auto;padding:14px 20px 0}
 .brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
@@ -74,7 +73,7 @@ main{max-width:1240px;margin:0 auto;padding:22px 20px 80px}
 .split{display:grid;grid-template-columns:268px 1fr;gap:28px;align-items:start}
 
 /* ---------- filters + list ---------- */
-.rail{position:sticky;top:118px;max-height:calc(100vh - 140px);display:flex;flex-direction:column}
+.rail{position:sticky;top:12px;max-height:calc(100vh - 24px);display:flex;flex-direction:column}
 .search{
   width:100%;padding:9px 12px;border:1px solid var(--line);
   background:#fff;border-radius:2px;font-family:var(--sans);font-size:14px;color:var(--ink);
@@ -1493,4 +1492,3 @@ document.getElementById('backWcsa').onclick=function(){
 </script>
 </body>
 </html>
-
