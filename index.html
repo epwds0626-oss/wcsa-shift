@@ -240,6 +240,7 @@ nav{display:flex;gap:2px}
       <button class="shop-btn" id="modeStudy" onclick="switchMode('study')">📖</button>
       <button class="shop-btn" id="modeCooking" onclick="switchMode('cooking')">🍳</button>
       <button class="shop-btn" id="modeOtoshi" onclick="switchMode('otoshi')">🍱</button>
+      <button class="shop-btn" id="modeManual" onclick="switchMode('manual')">📋</button>
     </div>
     <nav style="margin-left:auto;flex-shrink:0;">
       <button class="nav-btn active" id="nav0" onclick="showPage('calendar')">カレンダー</button>
@@ -816,6 +817,11 @@ nav{display:flex;gap:2px}
   <iframe id="otoshi-frame" src="otoshi.html" style="width:100%;height:100%;border:none;background:#E6EBED" loading="lazy"></iframe>
 </div>
 <!-- ===== /お通し小鉢帳 ===== -->
+<!-- ===== マニュアルノート ===== -->
+<div id="manual-wrapper" style="display:none;position:fixed;top:82px;left:0;right:0;bottom:0;z-index:50;overflow:hidden;background:#eef1f3;">
+  <iframe id="manual-frame" src="manual.html" style="width:100%;height:100%;border:none;background:#eef1f3" loading="lazy"></iframe>
+</div>
+<!-- ===== /マニュアルノート ===== -->
 
 <div id="musubu-wrapper" style="display:none;position:fixed;top:82px;left:0;right:0;bottom:0;z-index:50;overflow:hidden;">
 <style>
@@ -2078,7 +2084,7 @@ var SHOPS = [
 var currentShop = 0;
 
 window.addEventListener('resize', function(){
-  ['fish-wrapper','study-wrapper','cooking-wrapper','otoshi-wrapper'].forEach(function(id){
+  ['fish-wrapper','study-wrapper','cooking-wrapper','otoshi-wrapper','manual-wrapper'].forEach(function(id){
     var fw = document.getElementById(id);
     if (fw && fw.style.display === 'block') {
       fw.style.top = '0';
@@ -2093,7 +2099,7 @@ function switchMode(mode, shopIdx) {
   var pdfBtn = document.querySelector('.pdf-btn');
 
   // 全モードボタンをリセット
-  ['modeShift','modeMusubu','modeChallenge','modeFish','modeStudy','modeCooking'].forEach(function(id) {
+  ['modeShift','modeMusubu','modeChallenge','modeFish','modeStudy','modeCooking','modeOtoshi','modeManual'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.className = 'shop-btn'; el.style.cssText = ''; }
   });
@@ -2107,6 +2113,8 @@ function switchMode(mode, shopIdx) {
   if (cookingWrapper) cookingWrapper.style.display = 'none';
   var otoshiWrapper = document.getElementById('otoshi-wrapper');
   if (otoshiWrapper) otoshiWrapper.style.display = 'none';
+  var manualWrapper = document.getElementById('manual-wrapper');
+  if (manualWrapper) manualWrapper.style.display = 'none';
   // ヘッダーは一旦表示に戻す（全画面帳を開く分岐内で改めて隠す）
   var mainHeaderReset = document.getElementById('main-header');
   if (mainHeaderReset) mainHeaderReset.style.display = '';
@@ -2183,6 +2191,32 @@ function switchMode(mode, shopIdx) {
     if (pdfBtn) pdfBtn.style.display = 'none';
     var mc = document.getElementById('modeCooking');
     if (mc) { mc.className = 'shop-btn active'; mc.style.cssText = 'background:var(--accent);color:#0a0a0f'; }
+    return;
+  }
+
+  if (mode === 'manual') {
+    if (musubuWrapper) musubuWrapper.style.display = 'none';
+    var mainHeaderMn = document.getElementById('main-header');
+    if (mainHeaderMn) mainHeaderMn.style.display = 'none';
+    var manualWrapper2 = document.getElementById('manual-wrapper');
+    if (manualWrapper2) {
+      manualWrapper2.style.position = 'fixed';
+      manualWrapper2.style.top = '0';
+      manualWrapper2.style.left = '0';
+      manualWrapper2.style.right = '0';
+      manualWrapper2.style.bottom = '0';
+      manualWrapper2.style.height = window.innerHeight + 'px';
+      manualWrapper2.style.zIndex = '200';
+      manualWrapper2.style.display = 'block';
+      manualWrapper2.style.webkitTransform = 'translateZ(0)';
+    }
+    ['page-calendar','page-wish','page-admin','page-admin-lock','page-challenge'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    if (headerNav) headerNav.style.display = 'none';
+    if (pdfBtn) pdfBtn.style.display = 'none';
+    var mmn = document.getElementById('modeManual');
+    if (mmn) { mmn.className = 'shop-btn active'; mmn.style.cssText = 'background:var(--accent);color:#0a0a0f'; }
     return;
   }
 
