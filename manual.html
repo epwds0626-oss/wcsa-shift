@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<title>マニュアルノート</title>
+<style>
+:root{
+  --bg:#eef1f3; --surface:#ffffff; --surface2:#f1f2f6; --surface3:#e7e9ef;
+  --border:#d7dae2; --text:#1a1c22; --text2:#5b6070; --text3:#8c92a4;
+  --accent:#b07d00; --accent-soft:rgba(176,125,0,0.12);
+  --warn:#c0001a; --warn-soft:#fdecec; --limit:#1a5fa0; --limit-soft:#e9f1fb;
+  --shadow:0 1px 3px rgba(20,25,40,0.06),0 4px 16px rgba(20,25,40,0.06);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Yu Gothic','Noto Sans JP',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#app{display:flex;flex-direction:column;height:100%}
+.mhead{position:sticky;top:0;z-index:30;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 6px rgba(20,25,40,0.05)}
+.mhead-row{display:flex;align-items:center;gap:8px;padding:9px 12px}
+.mtitle{font-size:15px;font-weight:800;letter-spacing:.02em;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.mtitle .em{font-size:17px}
+.spacer{flex:1}
+.lockbtn{border:1px solid var(--border);background:var(--surface2);color:var(--text2);width:34px;height:32px;border-radius:9px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;flex-shrink:0}
+.lockbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.seg{display:flex;background:var(--surface3);border-radius:10px;padding:3px;gap:2px;flex-shrink:0}
+.seg button{border:none;background:transparent;color:var(--text2);font-family:inherit;font-size:12px;font-weight:700;padding:6px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;transition:.15s;letter-spacing:.02em}
+.seg button.active{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.mhead-row2{display:flex;gap:8px;padding:0 12px 10px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.mbody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 12px 40px}
+.mwrap{max-width:760px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:560px){.grid{grid-template-columns:repeat(3,1fr)}}
+.pcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:15px 14px;cursor:pointer;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s;position:relative;min-height:78px;display:flex;flex-direction:column;justify-content:center}
+.pcard:active{transform:scale(.97)}
+.pcard .pc-name{font-size:15px;font-weight:800;line-height:1.25}
+.pcard .pc-meta{font-size:11px;color:var(--text3);margin-top:5px;font-weight:600}
+.pcard .pc-arrow{position:absolute;right:11px;bottom:9px;color:var(--text3);font-size:13px}
+.pcard.add{border-style:dashed;background:var(--surface2);align-items:center;color:var(--accent);font-weight:800}
+.pcard .pcard-tools{position:absolute;top:7px;right:7px;display:flex;gap:4px}
+.sec-label{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin:2px 2px 12px}
+.detail-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.backbtn{border:1px solid var(--border);background:var(--surface);border-radius:9px;padding:7px 12px;font-size:13px;font-weight:700;color:var(--text2);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px}
+.backbtn:active{background:var(--surface2)}
+.detail-title{font-size:20px;font-weight:900;letter-spacing:.01em}
+.note-box{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:12px;padding:13px 15px;margin-bottom:18px;box-shadow:var(--shadow)}
+.note-box .nb-label{font-size:11px;font-weight:800;color:var(--accent);letter-spacing:.08em;margin-bottom:5px}
+.note-box .nb-text{font-size:13.5px;color:var(--text);white-space:pre-wrap;line-height:1.6}
+.note-box .nb-text.empty{color:var(--text3)}
+.block-title{font-size:12px;font-weight:800;color:var(--text2);letter-spacing:.1em;margin:22px 2px 12px;display:flex;align-items:center;gap:7px}
+.block-title::before{content:'';width:4px;height:14px;background:var(--accent);border-radius:2px}
+.tl{position:relative;padding-left:18px}
+.tl::before{content:'';position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--border)}
+.tl-item{position:relative;margin-bottom:12px}
+.tl-item::before{content:'';position:absolute;left:-16px;top:16px;width:11px;height:11px;border-radius:50%;background:var(--dot,var(--accent));border:2.5px solid var(--surface);box-shadow:0 0 0 1px var(--border)}
+.tl-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 13px;box-shadow:var(--shadow)}
+.tl-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px}
+.time-chip{font-size:13px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.slot-chip{font-size:10.5px;font-weight:800;color:#fff;padding:2px 9px;border-radius:20px;letter-spacing:.04em}
+.tl-task{font-size:14px;font-weight:600;color:var(--text);line-height:1.55;white-space:pre-wrap}
+.tl-tags{display:flex;flex-direction:column;gap:6px;margin-top:9px}
+.tag{display:flex;align-items:flex-start;gap:7px;font-size:12.5px;line-height:1.5;border-radius:8px;padding:7px 10px}
+.tag.warn{background:var(--warn-soft);color:#8a0012}
+.tag.limit{background:var(--limit-soft);color:#0f3f6e}
+.tag .ti{font-size:12px;flex-shrink:0;margin-top:1px}
+.tag .tl-label{font-weight:800;flex-shrink:0}
+.tl-empty{text-align:center;color:var(--text3);padding:30px 20px;font-size:13px}
+.man-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:10px;box-shadow:var(--shadow)}
+.man-card .mc-h{font-size:14px;font-weight:800;color:var(--text);margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.man-card .mc-h::before{content:'▪';color:var(--accent);font-size:12px}
+.man-card .mc-body{font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.65}
+.editbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.ebtn{border:none;border-radius:9px;padding:9px 14px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:5px}
+.ebtn.pri{background:var(--accent);color:#fff}
+.ebtn.sec{background:var(--surface3);color:var(--text2)}
+.ebtn:active{opacity:.8}
+.row-tools{display:flex;gap:5px;margin-top:10px;padding-top:9px;border-top:1px dashed var(--border);justify-content:flex-end}
+.icon-btn{border:1px solid var(--border);background:var(--surface2);border-radius:7px;width:30px;height:28px;font-size:12px;cursor:pointer;color:var(--text2);display:inline-flex;align-items:center;justify-content:center}
+.icon-btn.del{color:var(--warn);border-color:#f0c9c9}
+.icon-btn:disabled{opacity:.3}
+.overlay{position:fixed;inset:0;background:rgba(15,18,28,.55);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.overlay.show{display:flex}
+@media(min-width:560px){.overlay{align-items:center;padding:20px}}
+.sheet{background:var(--surface);width:100%;max-width:540px;border-radius:18px 18px 0 0;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 -8px 40px rgba(0,0,0,.25)}
+@media(min-width:560px){.sheet{border-radius:18px}}
+.sheet-head{position:sticky;top:0;background:var(--surface);padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;z-index:2}
+.sheet-head h3{font-size:16px;font-weight:800}
+.sheet-close{border:none;background:var(--surface3);width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--text2)}
+.sheet-body{padding:16px 18px 22px}
+.field{margin-bottom:15px}
+.field label{display:block;font-size:12px;font-weight:800;color:var(--text2);margin-bottom:6px;letter-spacing:.02em}
+.field .hint{font-weight:500;color:var(--text3);font-size:11px;margin-left:5px}
+.inp,.ta,.sel{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:15px;font-family:inherit;color:var(--text);background:var(--surface);transition:border-color .15s}
+.inp:focus,.ta:focus,.sel:focus{outline:none;border-color:var(--accent)}
+.ta{min-height:80px;resize:vertical;line-height:1.5}
+.two{display:flex;gap:10px}.two>*{flex:1}
+.save-row{display:flex;gap:10px;margin-top:6px}
+.save-row .ebtn{flex:1;justify-content:center;padding:12px}
+.pw-sheet{max-width:340px;border-radius:18px}
+.pw-sheet .sheet-body{text-align:center}
+.pw-err{color:var(--warn);font-size:12.5px;margin-top:8px;display:none;font-weight:700}
+.saving-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1a1c22;color:#fff;padding:9px 18px;border-radius:22px;font-size:13px;font-weight:700;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.saving-toast.show{opacity:1}
+.conn-warn{background:#fff4e5;border:1px solid #f5d199;color:#8a5a00;font-size:12px;font-weight:600;padding:8px 12px;border-radius:10px;margin-bottom:12px;display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="mhead">
+    <div class="mhead-row">
+      <div class="mtitle"><span class="em">&#128203;</span>マニュアルノート</div>
+      <div class="spacer"></div>
+      <button class="lockbtn" id="lockBtn" onclick="toggleLock()" title="管理者編集">&#128274;</button>
+    </div>
+    <div class="mhead-row2">
+      <div class="seg" id="shopSeg">
+        <button data-shop="enya" class="active" onclick="setShop('enya')">本店</button>
+        <button data-shop="marco" onclick="setShop('marco')">マルコ</button>
+      </div>
+      <div class="seg" id="secSeg">
+        <button data-sec="kitchen" class="active" onclick="setSec('kitchen')">&#127859; キッチン</button>
+        <button data-sec="hall" onclick="setSec('hall')">&#128717; ホール</button>
+        <button data-sec="ops" onclick="setSec('ops')">&#9881; オペレ</button>
+      </div>
+    </div>
+  </div>
+  <div class="mbody">
+    <div class="mwrap">
+      <div class="conn-warn" id="connWarn">&#9888; オフライン表示中（初期テンプレート）。編集内容は保存されません。</div>
+      <div id="view"></div>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeSheet()"><div class="sheet" id="sheet"></div></div>
+<div class="saving-toast" id="toast">保存しました</div>
+<script>
+var firebaseConfig={apiKey:"AIzaSyA3YVQwyAudMEZJs_rfEW8IHfxh4Grvlbw",authDomain:"wcsa-shift.firebaseapp.com",databaseURL:"https://wcsa-shift-default-rtdb.firebaseio.com",projectId:"wcsa-shift",storageBucket:"wcsa-shift.firebasestorage.app",messagingSenderId:"521554404721",appId:"1:521554404721:web:f59a570dd7e10f3aed82d0"};
+var db=null;
+try{ if(!firebase.apps.length)firebase.initializeApp(firebaseConfig); db=firebase.database(); }catch(e){ db=null; }
+var ADMIN_PASS="0626";
+var SHOP_COLORS={enya:"#b07d00",marco:"#1a7fbf"};
+var SHOP_SOFT={enya:"rgba(176,125,0,0.12)",marco:"rgba(26,127,191,0.12)"};
+var SLOT_COLORS={"仕込み":"#0a7d4f","準備":"#0a7d4f","開店準備":"#0a7d4f","ディナー準備":"#c77d0a","ランチ営業":"#1a5fa0","ランチ":"#1a5fa0","営業開始":"#1a5fa0","営業中":"#c0001a","ディナー営業":"#c0001a","ディナー":"#c0001a","揚げ作業":"#c0001a","調理":"#c0001a","洗浄":"#1a5fa0","提供":"#c77d0a","仕上げ":"#c77d0a","ミーティング":"#7a5cc0","電話応対":"#1a5fa0","予約":"#1a5fa0","案内":"#1a5fa0","会計":"#7a5cc0","清掃":"#555","清掃(毎日)":"#555","清掃(週1)":"#555","閉店作業":"#555","閉店":"#555","クローズ":"#555","厨房":"#555","デシャップ":"#555","ホール":"#555","戸締まり":"#333"};
+function slotColor(slot){ return SLOT_COLORS[slot]||SHOP_COLORS[state.shop]; }
+
+/* ==== 本店マニュアル実データ（WCSAノート「マニュアル」フォルダ 2026-04-17 より） ==== */
+/* position = {name, note, timeline:[{time,slot,task,caution,limit}], manual:[{h,body}]} */
+var DEFAULTS={
+ enya:{
+  kitchen:[
+   {name:"刺場",note:"鮮度の高い刺身の提供／衛生的な調理環境の維持／適切な在庫管理と食材ロスの削減。",
+    timeline:[
+     {time:"開店前",slot:"準備",task:"包丁の研ぎ出し、まな板の消毒、ネタケースの温度管理",caution:"手洗い・消毒を省略しない",limit:""},
+     {time:"営業中",slot:"調理",task:"魚の下処理 → 適切な切り方で調理 → 盛り付け",caution:"魚の温度管理を怠らない／包丁を放置しない",limit:""},
+     {time:"閉店",slot:"清掃(毎日)",task:"まな板消毒・包丁洗浄・作業台清掃・床掃除",caution:"",limit:""},
+     {time:"週1",slot:"清掃",task:"水槽清掃・海水入れ替え・器具の総点検",caution:"",limit:""},
+     {time:"月1",slot:"清掃",task:"設備の大掃除・在庫の総点検",caution:"",limit:""}
+    ],
+    manual:[
+     {h:"禁止事項",body:"・包丁の放置\n・まな板の洗浄不足\n・魚の温度管理の怠り\n・手洗い・消毒の省略"},
+     {h:"注意点（安全）",body:"包丁の取扱い／手の位置確認／作業場の整理整頓"},
+     {h:"注意点（衛生）",body:"手洗い・消毒／器具の消毒／適切な保管温度の維持"},
+     {h:"寿司カウンター",body:"目的：最高品質の鮨・刺身の提供、お客様との適切なコミュニケーション、清潔で効率的な作業環境の維持。\n準備：カウンターネタケースの準備／薬味の仕込みと補充／ネタの仕込み／器具の準備と消毒／シャリの味見。\nシャリ管理：適切な温度管理（体温より若干低め）／適度な硬さ／出数の把握と補充／古いシャリの廃棄判断。\n禁止：手洗い・消毒の省略／シャリの温度管理の怠り／不適切な姿勢での接客／ネタの放置。"}
+    ]},
+   {name:"煮焼場",note:"一定の味と品質の維持／安全で効率的な調理／食材ロス削減と原価管理。煮方と焼き場を担当。",
+    timeline:[
+     {time:"開店前",slot:"仕込み",task:"出汁の仕込み・食材の下処理・調味料の計量／グリルの温度管理",caution:"味見をせずに提供しない",limit:""},
+     {time:"営業中",slot:"調理",task:"適切な火加減の管理、味の確認と調整、火通りの確認、焼き加減とタイミングの調整",caution:"煮込み中・焼き中の放置禁止／タイマー必須",limit:""},
+     {time:"提供",slot:"仕上げ",task:"適切な保温管理・盛り付け・最終確認",caution:"生焼けでの提供禁止",limit:""},
+     {time:"閉店",slot:"清掃(毎日)",task:"調理器具・ガス台・焼き台の洗浄、作業台清掃、床掃除",caution:"",limit:""}
+    ],
+    manual:[
+     {h:"煮方 禁止事項",body:"・味見をせずに提供\n・レシピを無視した調理\n・煮込み中の放置\n・タイマーをかけずに調理"},
+     {h:"だしの取り方",body:"1. 水から昆布を入れる\n2. 沸騰前にかつお節を入れる\n3. アクを取り除く\n4. しっかり洗浄したザルで濾して完成（油浮防止）"},
+     {h:"焼き場 魚の焼き方",body:"魚の下処理 → たて塩（3％の塩水に厚みにより10分前後漬ける）→ 網の温度確認 → 適切な焼き加減 → 火通りの確認。\n焼き網は使用後に清掃・こびり付き除去・乾燥。"},
+     {h:"注意点",body:"安全：やけど防止／蒸気への注意／重い鍋の取扱い／換気・消火器の確認。\n衛生：調理器具の洗浄・消毒／適切な温度管理／作業台の清潔保持。"},
+     {h:"清掃スケジュール",body:"週1：換気扇フィルター清掃・棚の整理・焼き台分解清掃。\n月1：設備の総点検・大掃除。"}
+    ]},
+   {name:"揚場",note:"安全で効率的な揚げ物調理／品質の一貫性の確保／油の適切な管理による経費削減。",
+    timeline:[
+     {time:"開店前",slot:"準備",task:"フライヤー点火の確認、出数データと合わせ仕込み数量を決定、出数の多い順に食材・食器・道具を準備",caution:"",limit:""},
+     {time:"営業中",slot:"揚げ作業",task:"適正温度の確認 → 火の通り具合を計算して揚げる → 途中で裏返す",caution:"水気の多い食材をそのまま投入しない／その場を離れない／タイマー必須",limit:"揚げ上がりから3分以内に提供"},
+     {time:"提供",slot:"仕上げ",task:"しっかり油切り、揚げカスを都度取り上げる",caution:"",limit:""},
+     {time:"閉店",slot:"清掃(毎日)",task:"油のろ過、フライヤー内部清掃、周辺機器・床の清掃",caution:"使用済みの油を排水溝に流さない／高温のまま清掃しない",limit:""}
+    ],
+    manual:[
+     {h:"天ぷらの揚げ方",body:"1. 油温175℃に設定\n2. 衣をつけたらすぐに油へ\n3. 途中で裏返して全体を均一に\n4. きつね色になったら取り出し"},
+     {h:"油の管理方法",body:"1. 使用前の油の色と香りの確認\n2. 適切な温度管理（175〜180℃）\n3. ろ過作業の実施\n4. 定期的な油の交換"},
+     {h:"注意点",body:"安全：清掃時の怪我／油はね／火災対策の確認。\n衛生：油の定期的な交換／清潔な作業着／使用器具の洗浄・消毒。"},
+     {h:"清掃スケジュール",body:"毎日：油ろ過・フライヤー内部・周辺機器・床。\n週1：フライヤー周辺・換気扇フィルター。\n月1：設備の総点検。"}
+    ]},
+   {name:"洗い場",note:"衛生的で安全な食器洗浄／効率的な作業による店舗運営のサポート／食器の破損防止と長期使用。",
+    timeline:[
+     {time:"営業中",slot:"洗浄",task:"食器の分類（グラス/皿/カトラリー）→ 残菜除去・水ですすぐ → 同じ形・大きさで洗浄しラックを無駄なく埋める",caution:"バット・ボール等かさばる物は洗浄機に入れない／食器を乱暴に扱わない",limit:"ピーク時に食器切れを起こさない"},
+     {time:"随時",slot:"乾燥・収納",task:"ラックで自然乾燥 → 拭きあげ → 指定場所へ収納",caution:"未洗浄の食器を清潔な場所に置かない／不安定な積み重ね禁止",limit:""},
+     {time:"閉店",slot:"清掃(毎日)",task:"床掃除・シンク洗浄・作業台拭き取り",caution:"床の水はこまめに拭き取る",limit:""}
+    ],
+    manual:[
+     {h:"グラス類の洗浄手順",body:"1. 水ですすいで残渣を除去\n2. 専用スポンジで優しく洗浄\n3. 清潔な水で十分にすすぎ\n4. 専用の水切りかごで上下逆さまに置いて乾燥"},
+     {h:"食器破損時の対応",body:"1. 破片を安全に処理\n2. 責任者に報告\n3. 事故報告書の記入\n4. 在庫確認と補充依頼"},
+     {h:"注意点",body:"安全：滑り止め付きの靴の着用／床の水をこまめに拭く／破損食器の適切な処理。\n衛生：作業前後の手洗い・消毒／清潔な作業着／洗浄槽の水換え。"},
+     {h:"清掃スケジュール",body:"週1：排水溝清掃・棚の拭き掃除。\n月1：換気扇清掃・壁面清掃。"}
+    ]},
+   {name:"デシャップ",note:"キッチンとホールの司令塔。営業前準備〜提供指示〜片付けまで。お客様目線で先回りして動く。",
+    timeline:[
+     {time:"営業前",slot:"開店準備",task:"ダスター準備／電解水ボトル入替(毎週金・月)／トイレ清掃／お座敷掃除がけ／テーブル拭き上げ(電解水)",caution:"",limit:""},
+     {time:"営業前",slot:"開店準備",task:"iPad設置(充電・アプリ起動確認)／幟・外メニュー設置＋玄関前椅子拭き／テラス席清掃／ドリンクバー準備",caution:"夏場の氷はオープン10分前にカウンターセット",limit:""},
+     {time:"10:55",slot:"開店準備",task:"照明を全て点灯し営業準備完了",caution:"デシャップ周辺の薬味・タルタル・天汁等を補充",limit:""},
+     {time:"11:00",slot:"営業開始",task:"のれん設置 → 営業開始",caution:"",limit:""},
+     {time:"営業中",slot:"営業中",task:"オーダー確認(iPad即確認・提供順序)／料理チェック(盛付・薬味・ソース、不備は厨房へ即報告)／呼び出し・連携(大人数は揃えて提供)",caution:"迷ったら ①会計・案内 →②料理提供 →③トイレチェック →④下膳＋セッティング の順",limit:""},
+     {time:"営業後",slot:"閉店作業",task:"薬味・ソース類を廃棄/保管/翌日仕込みへ仕分け／器具洗浄・消毒／カウンター拭き上げ／iPad回収・充電",caution:"未精算テーブルなしを確認",limit:""}
+    ],
+    manual:[
+     {h:"優先度と緊急度",body:"会計・案内（優先度高×緊急度低）／料理提供（優先度高×緊急度高）／トイレチェック（優先度低×緊急度低）／下膳＋セッティング（優先度低×緊急度高、予約時は優先）。"},
+     {h:"注意点",body:"クレームは落ち着いて対応し責任者に報告／複数依頼は優先順位を整理／常に笑顔・声出しで安心感を。ホール・厨房との報連相を徹底。"},
+     {h:"翌日引き継ぎ",body:"翌日仕込みリスト作成／iPad・POS稼働チェック／電解水残量確認／問題点・改善点を店長へ報告。最終確認：照明・空調・音楽オフ、戸締まり、売上・金庫確認（責任者立会い）。"}
+    ]},
+   {name:"衛生・清掃（共通）",note:"「食の安心と信頼」は最大のサービス。食中毒は起きる前に防ぐのがプロの責任。清潔さも料理の一部。",
+    timeline:[
+     {time:"営業前",slot:"清掃",task:"上から下へ清掃（天井→棚→作業台→床）。全ての生鮮食材を適切な保管場所へ。営業前点検で全清掃箇所をチェック",caution:"清掃用具は専用のものを使い交差汚染を防止",limit:""},
+     {time:"ランチ後",slot:"清掃",task:"まな板洗浄・消毒／カウンター面を電解水で拭き上げ・仕上げ消毒／調味料容器も拭く",caution:"角や継ぎ目など汚れが溜まる場所は念入りに",limit:""},
+     {time:"ディナー後",slot:"清掃",task:"徹底的な清掃と翌日の準備",caution:"",limit:""},
+     {time:"週1",slot:"清掃",task:"冷蔵庫内・食器棚・まな板・ネタケースの清掃と乾燥",caution:"随時：グリーストラップの清掃",limit:""}
+    ],
+    manual:[
+     {h:"衛生管理6つの約束",body:"1. 手洗いの励行と電解水消毒\n2. 電解水の積極的活用（器具・まな板・手指・床）\n3. 1%追加の清掃ルーティーン\n4. 食材は必ず先入れ先出し（FIFO）\n5. 仕込み日＋4日ルールの徹底（ラベル管理）\n6. 味見とチェックは“愛情”"},
+     {h:"電解水（微酸性電解水）",body:"pH5.0〜6.5・有効成分 次亜塩素酸・殺菌力99.9%以上（20〜30秒接触）。全てのアルコールを電解水に代用、入れ替えは毎週月・金。器具は使用後洗剤で洗浄→営業後に浸漬。手指は石けん洗浄後20〜30秒消毒。冷蔵庫・床・作業台は営業後に拭き取り。"},
+     {h:"食材管理ルール",body:"納品時に温度・状態・日付・産地を確認→速やかに冷蔵/冷凍。開封後は密閉＋日付ラベル。冷蔵2℃以下・冷凍-18℃以下を毎日チェック。仕込みは小ロット＋賞味期限は仕込み日＋4日明記。FIFO徹底。食材ロスはStock記録、廃棄は店長・原に共有。"},
+     {h:"緊急時対応",body:"食中毒疑い→提供停止＋店長報告＋保健所連絡。異物混入・体調不良→即報告、証拠保存。加熱は65℃以上・冷却は5℃以下。"}
+    ]},
+   {name:"閉店作業（共通）",note:"順番を決めて確実に。バラバラに確認すると抜けが出る。携帯で写真を撮りながらだと二重で安心。",
+    timeline:[
+     {time:"閉店",slot:"厨房",task:"ブラストチラー電源OFF／真空機OFF／揚場の両側ホース水道OFF／蒸し機(ダイヤル止め・給水コック・水止めレバー・ガス元栓)／ネタケース電源OFF",caution:"元栓の向きを指差し確認",limit:""},
+     {time:"閉店",slot:"厨房",task:"コンロ元栓・オーブンダイヤルOFF・温度0／ご飯釜元栓(左2箇所・右1箇所)／焼き台元栓・焼き場ネタケースOFF・焼き場ホース水道／ボイラー・換気ダクトOFF",caution:"",limit:""},
+     {time:"閉店",slot:"デシャップ",task:"給湯機 長押し電源OFF／タブレット充電コード抜く／ご飯ジャー・スープ保温機コンセント抜く／焼き場裏ホース水道OFF",caution:"",limit:""},
+     {time:"閉店",slot:"ホール",task:"タブレット充電／ロボ充電／鍵閉め",caution:"",limit:""},
+     {time:"最後",slot:"戸締まり",task:"扉の鍵閉め／トラックの鍵2台分／洗い場洗浄機ブレーカー下向きでOFF",caution:"全項目を確認してから店を出る",limit:""}
+    ],
+    manual:[
+     {h:"注意点",body:"1. スタートを決めゴールを決める！\n2. バラバラに確認すると抜ける場所が出てくる → 順番通りに確認\n3. 携帯で写真を撮りながらだと二重で安心"}
+    ]}
+  ],
+  hall:[
+   {name:"ホール（フロア）",note:"快適な食事環境の提供／効率的なサービス／清潔で安全な店内環境の維持。呼ばれる前に動く。",
+    timeline:[
+     {time:"10:00",slot:"準備",task:"エアコン設定・ドリンクバー準備開始・食器類の準備",caution:"",limit:""},
+     {time:"10:15",slot:"準備",task:"調味料補充・メニュー確認・タブレット起動確認",caution:"",limit:""},
+     {time:"10:20-10:30",slot:"全体清掃",task:"テーブル・椅子の消毒／床掃除／テーブルセッティング／トイレ清掃",caution:"",limit:""},
+     {time:"10:30-10:35",slot:"ミーティング",task:"本日の予約確認・メニュー変更確認・注意事項共有",caution:"",limit:""},
+     {time:"11:00",slot:"ランチ営業",task:"開店。優先順位＝①お客様案内 ②料理の配膳 ③トイレチェック(随時) ④下膳",caution:"混雑時は案内と配膳を最優先／10分毎にドリンクバー補充",limit:""},
+     {time:"14:00",slot:"ランチ",task:"ラストオーダー案内・追加注文確認",caution:"",limit:""},
+     {time:"17:00-17:25",slot:"ディナー準備",task:"エアコン・ドリンクバー・食器・調味料補充 → 全体清掃・セッティング → ミーティング(予約・メニュー・注意事項)",caution:"",limit:""},
+     {time:"17:30",slot:"ディナー営業",task:"開店。案内→配膳→トイレチェック→下膳。30分毎にドリンクバー補充",caution:"常に店内を見渡し状況把握を怠らない",limit:""},
+     {time:"20:00",slot:"ディナー",task:"新規のお客様受付終了・追加注文確認",caution:"",limit:""},
+     {time:"20:30",slot:"ディナー",task:"ラストオーダー・キッチンへの連絡",caution:"",limit:""},
+     {time:"全客退店後",slot:"クローズ",task:"椅子拭き・椅子上げ・床清掃・最終確認",caution:"",limit:""},
+     {time:"22:00",slot:"クローズ",task:"閉店作業完了・全スタッフ退勤",caution:"",limit:""}
+    ],
+    manual:[
+     {h:"禁止事項",body:"・お客様をお待たせする行為\n・不適切な言葉遣いや態度\n・清掃・整理整頓の怠り"},
+     {h:"作業の優先順位",body:"緊急度高×重要：安全に関わる事項（こぼれ物等）／お客様の要望対応／料理の提供。\n緊急度低×重要：定期的な衛生管理／在庫管理／スタッフ教育。\n常にお客様を優先し、状況に応じて柔軟に対応。"},
+     {h:"注意点",body:"安全：通路の確保／床の水滴の即時処理／お客様の動線確保。\n衛生：定期的な手指消毒／テーブル・椅子の消毒／ドリンクバーエリアの清潔維持。"},
+     {h:"予約席のセッティング",body:"ご予約席はテーブルセッティングの際にオーダー端末を枠から外してテーブルに置く（お客様には外せない／予約席の判別がつく）。設置枠のない所は予約札を配置。土日は案内が混雑するため、フリーのお客様もスムーズに案内できるよう工夫する。"}
+    ]},
+   {name:"案内・電話対応",note:"第一印象を決めるポジション。丁寧で正確な電話対応とAI予約システムとの円滑な連携。",
+    timeline:[
+     {time:"受電時",slot:"電話応対",task:"「えんやどっと丸 担当の清水でございます」と明るく応答／用件を正確に確認／メモを取りながら対応",caution:"3コール以上お待たせしない／不確実な情報を提供しない",limit:"3コール以内に応答"},
+     {time:"予約対応",slot:"予約",task:"日時→人数→お名前・連絡先→特別なご要望(慶事・法事・誕生日等)を確認 → 予約内容を復唱 → システム入力",caution:"必ず復唱して確認",limit:""},
+     {time:"変更・取消",slot:"予約",task:"予約情報の確認 → 変更内容の確認 → 復唱 → システム入力",caution:"",limit:""},
+     {time:"来店時",slot:"案内",task:"システムで配席／おしぼり準備／テーブルまでご案内",caution:"土日はフリー客もスムーズに",limit:""}
+    ],
+    manual:[
+     {h:"AI予約からの転送時",body:"AIシステムでの対応内容を確認／お客様の具体的なご要望を把握／システムで対応できなかった事項を解決。"},
+     {h:"トラブル対応",body:"システム障害時は手書きでの対応も実施／不明点は店長に確認／クレーム時は店長に取り次ぐ／営業電話は会社名・担当者名・電話番号・趣旨を聞いて折り返し。"},
+     {h:"新規案内時の提供時間説明",body:"混雑時、新規のお客様に料理提供時間を説明：10名まで20分／10名以上〜30分。具体的な時間を提示しスタッフ全体で把握。"}
+    ]},
+   {name:"団体・フリー対応",note:"団体様利用の30分前準備と、フリー（当日）様へのクレーム防止配慮を徹底する。",
+    timeline:[
+     {time:"団体30分前",slot:"準備",task:"現状OD分の調理状況を把握 → 混雑時どのテーブルまで提供を優先するか決める（店長指示）",caution:"",limit:""},
+     {time:"団体30分前",slot:"準備",task:"団体様の料理完了時間を把握（予約分の所要時間を想定し開始時刻を決定：各調理担当）",caution:"提供が遅れそうなテーブルへ説明（店長・案内係）",limit:""},
+     {time:"来店時",slot:"案内",task:"新規ご案内のお客様に料理提供時間を説明（10名まで20分／10名以上〜30分）",caution:"",limit:""}
+    ],
+    manual:[
+     {h:"目的",body:"前ODは時間通りのお料理提供に努める／当日ODのお客様にクレームにならない配慮を徹底／具体的な時間を提示しスタッフ全体が把握できる状態にする。"}
+    ]},
+   {name:"持ち込み・料金",note:"ドリンク・ケーキの持ち込み料と、ホールケーキ注文の受付基準。",
+    timeline:[
+     {time:"随時",slot:"会計",task:"ドリンク持ち込み料：1升瓶￥10,000／4合瓶￥5,000／その他ワイン・ウイスキー・焼酎ボトル￥5,000（1本につき）",caution:"",limit:""},
+     {time:"随時",slot:"会計",task:"ケーキ持ち込み料：￥1,500。要予約でホールケーキ注文もOK（人数・サイズで価格変動、4〜5人前￥4,000程度〜）",caution:"",limit:""}
+    ],
+    manual:[]}
+  ]
+ },
+ marco:{
+  kitchen:[
+   {name:"パスタ場",note:"（仮）茹で時間とソースの同期が命。マルコの実マニュアルは未登録のため、0626で編集してください。",
+    timeline:[
+     {time:"仕込み",slot:"準備",task:"パスタ用湯沸かし、各ソースの仕込み、食材のポーション分け",caution:"塩分濃度を毎日味見して統一",limit:""},
+     {time:"営業中",slot:"営業中",task:"オーダーごとに茹で〜ソース和え〜盛付け",caution:"茹で上がりとソースの完成を合わせる",limit:"茹で始めから提供まで最大10分"}
+    ],manual:[]},
+   {name:"前菜・デザート場",note:"（仮）冷製と甘味の担当。0626で編集してください。",
+    timeline:[
+     {time:"仕込み",slot:"準備",task:"前菜の盛付けパーツ、ドルチェの仕込み、皿を冷やす",caution:"生ものは時間管理を徹底",limit:""},
+     {time:"営業中",slot:"営業中",task:"前菜・サラダ・ドルチェを提供",caution:"",limit:"前菜はオーダーから5分以内"}
+    ],manual:[]},
+   {name:"洗い場",note:"（仮）少人数運営。溜めずに回す。0626で編集してください。",
+    timeline:[
+     {time:"営業中",slot:"洗浄",task:"下げ物洗浄・食器補充・調理器具の洗浄",caution:"パスタ鍋・フライパンは即洗い",limit:"ピーク時に皿切れを起こさない"}
+    ],manual:[]}
+  ],
+  hall:[
+   {name:"ホール・案内",note:"（仮）少人数でも心地よい接客を。0626で編集してください。",
+    timeline:[
+     {time:"開店前",slot:"準備",task:"席セット、予約確認、メニュー・釣銭準備",caution:"本日のおすすめ・品切れを共有",limit:""},
+     {time:"営業中",slot:"営業中",task:"案内〜オーダー〜配膳〜会計まで一連対応",caution:"オーダーは復唱",limit:"来店から案内まで最大3分"}
+    ],manual:[]},
+   {name:"レジ・ドリンク",note:"（仮）会計とドリンクを兼務。0626で編集してください。",
+    timeline:[
+     {time:"営業中",slot:"営業中",task:"ドリンク作成・提供、会計対応",caution:"会計は金額を復唱",limit:"ドリンクはオーダーから3分以内"}
+    ],manual:[]}
+  ]
+ }
+};
+
+
+/* ==== オペレーション（Musubu ops カテゴリ）実データ ==== */
+var OPS_ENYA=[
+ {name:"ホールの基本動作",note:"「動く理由が無くても動く」。レジ1名常駐、他は常にラウンド。気づく人がホールの空気を決める。",
+  timeline:[
+   {time:"営業中",slot:"営業中",task:"料理提供・下膳時は必ずヘルプに回る",caution:"立ったまま動かないのは何も生まれない",limit:""},
+   {time:"随時",slot:"営業中",task:"お客様がトイレへ→即トイレチェック・清掃／ドリンクバー使用→周辺・カップ・床の確認",caution:"",limit:""},
+   {time:"手が空いたら",slot:"営業中",task:"テーブル・椅子の拭き上げ→棚・備品の整頓→箸入れ補充・伝票整理・在庫確認",caution:"",limit:""}
+  ],
+  manual:[
+   {h:"動き方指針（営業中）",body:"レジに1名常駐（佳澄・清水がいればOK）、他は常にラウンド。\n1.料理提供・下膳→必ずヘルプ 2.トイレ→即チェック 3.ドリンクバー→周辺確認 4.途切れたらテーブル/椅子拭き 5.落ち着いたら棚・備品清掃 6.箸入れ・伝票・在庫。\nレジの人は「声の拠点」、ラウンドの人は「目の拠点」。目的は『気持ちよく食べてもらう』一点。"},
+   {h:"優先順位（配膳最優先）",body:"営業中は配膳が最優先。次いでトイレチェック→バッシング→セッティング。\nお待ちのお客様がいても（予約は別）バッシングよりトイレチェックを優先。トイレの清掃状況で信頼感が大きく変わる。\nバッシングは大きいテーブルから、複数人で。終えたらセッティングまで完遂。"},
+   {h:"配膳＞バッシング",body:"案内担当の指示がない限り、バッシングより配膳を優先。必要なところにできる限りのことを。\n提供・トイレ・下膳：手が空いているスタッフは優先して料理提供を手伝う。下膳は大きいテーブルから複数人で。"},
+   {h:"ラウンドでの声かけ",body:"ラウンドしながらアフター確認・空き皿下げ・アルコール/デザート等の追加注文の声かけ・タブレット操作の案内。お客様からではなく、こちらから声をかける。"}
+  ]},
+ {name:"配膳・提供ルール",note:"和食の配膳・提供の型を全員で統一。テーブル単位でまとめて提供する。",
+  timeline:[],
+  manual:[
+   {h:"配膳の向き",body:"和食の配膳ルールでは右奥が主菜。小鍋は右（メニュー写真も小鍋は右）。火をつける前にお客様に確認するのも可。全員で統一する。"},
+   {h:"取り皿",body:"単品料理などは必ず取り皿をセットで持っていく。卓の人数を伝票・チップで確認し同じ枚数を。お客様から言われる前に。"},
+   {h:"前オーダーの伝票",body:"前ODの料理には伝票をつけて保管。配膳時に卓番と料理を必ず確認。伝票が無い時はデシャップに伝え分かるように保管。"},
+   {h:"人数と数量の確認",body:"レジ案内・案内フォロワー・デシャップの3役は利用人数と食事数量を確認。数量が人数と合わない時は「お食事の内容はこちらで宜しいでしょうか？」と声かけ。"},
+   {h:"混雑時の伝票対応（デシャップ連携）",body:"混雑時ほど個別提供せずテーブル単位で動く。追加注文が入った卓は「デシャップ印刷」でまとめ、提供状況・アフター個数を上書き。提供完了後は『〇番アフターのみ』とキッチンに報告。キッチンはテーブル単位で同時完成するよう調整（例：煮魚提供時に揚場へ『〇番の茶碗蒸しお願いします』）。情報が止まると遅延・ミスが出るので常時連絡。"},
+   {h:"アフター提供漏れ対策",body:"会計で立ち上がったお客様を席に戻す事象が発生。対策：デシャップ及び補助への意識付け強化／ホールは中間バッシングでアフター有無を確認／定期的にお茶周り。"}
+  ]},
+ {name:"案内・配席",note:"案内は動線・工数を最小に。配席は回転率と人数で最適化する。",
+  timeline:[
+   {time:"来店時",slot:"案内",task:"ターミナルでテーブル決定 → おしぼりのみ用意して案内（お茶・お冷の提供は取り止め）",caution:"レジ案内が席入力＋おしぼり準備→案内フォロワーへ引き継ぎ。フォロワーはレジ案内の指示が最優先",limit:""}
+  ],
+  manual:[
+   {h:"案内の簡素化",body:"案内時のお茶・お冷の提供を取り止め、おしぼりのみで案内。代替として全お客様がドリンクバー利用可（ポットと湯呑みをカウンターに配置）。着席時に『すべてのお料理にドリンクバーがついております』と声かけ。お食事をされない方は利用不可。コースも例外なく声かけ。"},
+   {h:"配席ルール",body:"平日ランチ・土日祝＝回転率を意識した配席（例外：極端に客数が少ない日・終了間際は16-19卓へ）。平日ディナーは2名以上を16-19優先、お一人様は2名席→カウンターの順。2名は2名席、4名は4名席に（予約×新規×席のパズルを組む）。"},
+   {h:"常連様対応",body:"常連・顔見知りは他作業より優先。特に来店時・お帰り時の挨拶を最優先、お名前で声かけ。苦手な食材や好きなネタをトレタに入力し情報共有。"},
+   {h:"予約確認事項",body:"名前・電話番号・来店日時を確認。時間や日程が曖昧な時は営業日程・営業時間も案内。"},
+   {h:"数量限定ランチ",body:"数量限定ランチ・日替わりランチは当日先着順のみ。電話予約・団体では承らない。"}
+  ]},
+ {name:"ドリンクバー・追加注文",note:"待たせない準備と、こちらからの声かけで単価アップ。",
+  timeline:[
+   {time:"オープン前",slot:"開店準備",task:"ホットコーヒーを2回分(15杯)作り置き。土日祝・予約数を考慮し多めに在庫",caution:"",limit:""},
+   {time:"営業中",slot:"営業中",task:"各ドリンクが半分以下で補充。配膳・下膳時に必ず確認",caution:"白い皿・カップは汚れが目立つ。目視確認",limit:"待たせる時は卓番・数量を聞き、1〜4杯はドリップ3〜5分と伝える"}
+  ],
+  manual:[
+   {h:"声かけ運動（追加注文）",body:"追加注文・ビールのおかわりなど、こちらから声かけ。丁寧な接客と信頼の積み上げの上で効果を生む。例：『こちらのはまなす膳にはデザートが食後についております。煮魚膳にもご一緒にいかがですか？今日は手作りチーズケーキです！』。押し付けず『気がきく』と感じてもらう。"},
+   {h:"おすすめデザート",body:"在庫確認時に本日のおすすめデザートを決めておく。デザート付きの在庫と、おすすめデザートの在庫数量を分けて共有し、説明と提供の相違をなくす。"}
+  ]},
+ {name:"仕込み・食材管理",note:"段取り＝資産・利益。味見と賞味期限ラベルを徹底し、ムリ・ムラ・ムダを減らす。",
+  timeline:[
+   {time:"営業前",slot:"仕込み",task:"客数見込みに合わせ仕込み（土日祝最大160＝ランチ120/ディナー40、御膳約9割で約140／平日はその半分）。アレクサのアナウンスに沿って数量決定",caution:"営業中はオーダー最優先。仕込みは後回し",limit:""},
+   {time:"営業後",slot:"閉店作業",task:"翌日仕込みの段取りと優先順位を記入（3分程度）",caution:"在庫を見ながら記入しダブり・漏れ・発注ミスを防ぐ",limit:""}
+  ],
+  manual:[
+   {h:"味見・賞味期限ラベル",body:"食材は使用前に必ず味見（不明は店長・原へ）。仕込み済み野菜は賞味期限ラベル添付＝仕込み日＋4日（真空の肉・魚・加工品は2週間）。期限切れは賄い使用か廃棄（廃棄は店長確認＋STOCKに名称と0.25刻み数量を記録）。"},
+   {h:"仕込みの調整",body:"1回の数量を減らし頻度を上げる（例：つま→週1で大根1本を、週2で1/2本ずつ）。最小限の廃棄で済むよう調整。※わさび→大根の使用は中止。"},
+   {h:"翌日仕込みシートの効果",body:"1.仕込みのダブり・漏れ解消 2.発注ミス軽減 3.段取りを決め仕込み時間削減 4.口伝え・雰囲気仕込みから『段取り＝資産・利益』へ移行。"},
+   {h:"日付・FIFO管理",body:"作る人も使う人も必ず日付を確認し定期的に並べ替え（めんつゆで7/26の劣化品が発生）。FIFO＝手前に古いもの、奥に新しいもの。残った野菜は真空保存。"}
+  ]},
+ {name:"清掃・衛生（オペレーション）",note:"101%の清掃を。お客様の視界に入るもの・口につけるものは特に。",
+  timeline:[
+   {time:"随時",slot:"清掃",task:"衛生チェック（手洗い・器具清掃・ふきん洗浄）はアレクサのアナウンスに合わせて実施",caution:"電解水(pH150)ボトルは金・月に入替",limit:""},
+   {time:"営業後",slot:"清掃",task:"ランチ・ディナー各営業後に101%清掃（100%では劣化する）",caution:"",limit:""},
+   {time:"水曜(店休前)",slot:"清掃",task:"生ビール・サワーのスポンジ洗浄／和室用含む掃除機のゴミパック清掃",caution:"",limit:""}
+  ],
+  manual:[
+   {h:"台車・カート",body:"台車は一度使ったら全面拭き上げ→電解水。汚れているだけで料理・店の評価が下がる。"},
+   {h:"食器の目視確認",body:"白いお皿・コーヒーカップは汚れが目立つ。拭き上げ・補充時は必ず目視（汚れたマグカップが複数見つかった実例あり）。"},
+   {h:"茶碗蒸し等の提供チェック",body:"卵液を入れたら器を拭き、餡を入れたら器を拭く。提供前に汚れ・チップ（器の欠け）をチェック。他の料理も同様にお客様目線で。"},
+   {h:"デシャップ衛生",body:"しゃもじ・レードル・水換え・冷蔵庫・製氷機の取っ手を電解水で拭き上げ。"},
+   {h:"テラス席",body:"テラス（テーブル・イス）は毎日拭き掃除（雨天除く）。休み前はブロアーで落ち葉を植木側へ飛ばしてから拭く＋お待ちイスも。"}
+  ]},
+ {name:"開店・閉店・照明",note:"点灯・消灯時間と夜の撤収の型。撤収ムードは出さない。",
+  timeline:[
+   {time:"10:55 / 17:20",slot:"開店準備",task:"照明点灯：ランチ=営業開始5分前(10:55)／ディナー=10分前(17:20)",caution:"",limit:""},
+   {time:"20:00〜",slot:"閉店作業",task:"厨房全体は20時から清掃スタート。フライヤーは最後に清掃(100%の状態で迎える)",caution:"刺場はカウンターのお客様が退店するまで片付けを始めない（音の出る作業NG・撤収ムードを出さない）",limit:""},
+   {time:"退店後",slot:"クローズ",task:"消灯：ランチ=お客様退店後／ディナー=駐車場からお出になったのを確認してから",caution:"",limit:""}
+  ],
+  manual:[
+   {h:"夜の撤収作業",body:"刺場はカウンター客の退店まで片付け開始しない（見えない所でも空気は伝わる）。厨房は20時清掃開始。フライヤーは最後に清掃＝提供遅れを清掃の言い訳にしない、常時2層使える状態に（1層だけ稼働はNG）。"},
+   {h:"ロボット掃除機オペレーション",body:"営業終了後：キッチン清掃→椅子上げ→キッチンとホールの区切り扉を閉める（カウンター内に入らないよう）→ロボ稼働→退勤。出勤後：早番がモップ清掃と水補充。椅子はあげない運用に変更、毎週休み前(水/火)に手動掃除機がけ。"}
+  ]},
+ {name:"コスト・原価改善",note:"「期待成果」を店内外に探す。同質低価格への置き換えでムダを無くす。",
+  timeline:[],
+  manual:[
+   {h:"備品の単価表示",body:"備品（ビニール袋・割り箸・醤油等）の配置場所にテプラで1個あたり単価を貼る。コスト意識が上がり、同質低額品への置換提案・棚卸しにも有効。"},
+   {h:"大葉→ナプキン",body:"地魚丼・マグロ丼の器の下敷きを大葉→四つ折りナプキンに（大葉7円/枚→0.51円/枚、年間約12万円削減）。"},
+   {h:"チーズケーキの原価改善",body:"クリームチーズの30〜50%を水切りヨーグルトに置換（1200〜1400g→一晩水切りで600g＋クリチ400g）。コクは残りバレにくい。チーズケーキ40〜50%・ティラミス30〜40%原価削減、年間約58,000円。仕入は旧美野里町オミタマヨーグルト（5kg/ロット）。"},
+   {h:"醤油・ソースの使い切り",body:"期限シールを作成。醤油の期限間近→焼き場の煮汁で使用、ソース→ミックスフライのソースに混ぜて使い切る。濃口ボトルはラベルを剥がし薄口と区別。"},
+   {h:"ごはん大盛・おかわり有料化",body:"大盛+100円、おかわり200円。仕込み量の変化を出数データで確認。"},
+   {h:"利益が溶ける3原因",body:"1.ピーク準備が間に合わない→提供遅れ→回転率低下→取りこぼし。2.ピーク後の指示が遅い（誰が/どこを/どこまで）→次客を案内できない。3.予約×配席が甘い（4名席に1名）→機会損失。段取りで潰す。"}
+  ]},
+ {name:"チーム・教育・ミス共有",note:"「ミスを出さない店」より「ミスを共有できる店」。教える側・教わる側の型を持つ。",
+  timeline:[],
+  manual:[
+   {h:"日報とDOTポイント制度",body:"日報で改善の気づきを共有し会社の成果に繋げる。就業中2分以内の書き込みは許可、店長・マネージャーはコメント。重要な日報に社内通貨DOT付与（付与権限は社長のみ、1DOT=100円、GOOD=100DOT/EXCELLENT=300DOT）。日報の数量・内容は人事評価と連動。"},
+   {h:"ミス・クレーム共有の目的",body:"1.責めるのではなく『どうすれば防げたか』を追求し全員で共有 2.具体的に正直に（どういう流れで起きたか） 3.解決策をセットで提案。小さなことも『気づいたらシェア』。"},
+   {h:"同じミスを繰り返さない7原因",body:"1.やり方を理解していない 2.最終チェックをしていない 3.人の話を聞いていない 4.段取りができていない 5.リスクを意識していない 6.謝るだけで終わる 7.言い訳して認めない。工夫：間違いノート／10分早く出勤／ルーティン化／聞く→書く→確認／チェックリスト。『謝るより、繰り返さない』。"},
+   {h:"教える側10か条",body:"①できて当たり前と思わない ②1回で覚えると思わない ③なぜやるかを伝える ④自分のクセ/省略を押しつけない ⑤指摘の前に確認 ⑥自分も育成中 ⑦観察と気づき ⑧感謝と承認 ⑨『自分たちの店』を一緒に作る ⑩最初の1ヶ月で“好きにさせる”。"},
+   {h:"教えられる側10ヶ条",body:"『知ってるつもり』を捨てる／なぜを考える／メモは再現メモ／わからないを早めに言う／観察して盗む／『理解したか』で確認／自分の癖を知る／感謝と敬意／失敗を隠さない／次に教えるつもりで覚える。"},
+   {h:"新人受け入れルール",body:"1.挨拶は自分から 2.役割を明確に（何をやる/やらないを決めて共有）3.『何か困ってる？』とこちらから声かけ 4.初めての作業は“なぜ”まで説明 5.慣れるまで一人にしない（離職率低下）。"},
+   {h:"詰まったらヘルプ",body:"調理に詰まったら周りを使う。恥ずかしがらず・遠慮せず、全体最適（早い提供＝全体の利益）のためヘルプの声かけを。お客様の満足に最大限の意識を。"},
+   {h:"お客様リクエスト最優先",body:"お客様のリクエスト＞お店・自分の作業。例：T10あら煮×2提供後、T15の注文があれば他の仕込み鍋をあけてでも注文を最優先に。"},
+   {h:"マカナイのルール",body:"賄いは無料提供（チェックシートに食/不食を✔）。食べる側＝食べる→洗う→拭く→仕舞うまでがセット。作る側＝前日の余りを準備、提供できない食材を工夫して美味しく、1食原価200円以内を把握。"}
+  ]},
+ {name:"設備・システム",note:"アレクサ・iPad・掃除ロボ等で工数を減らし、抜け漏れを防ぐ。",
+  timeline:[],
+  manual:[
+   {h:"厨房アレクサ運用",body:"音声アナウンスで衛生チェック・アフター確認の抜け防止、炊飯等の時間/残量管理、クレーム減少とストレス軽減（言った言わない・一人責任を防ぐ）。例『10:30 手洗いチェック』『17:00 炊飯確認』『閉店後 冷蔵庫温度チェック』。失敗も含めてデータ、まず“やってみて改善”。"},
+   {h:"iPad / タブレット",body:"朝の設置時にテーブル番号とタブレット番号の一致・起動を確認。セッティング時はホームボタンを押しアクセスガイド有効を確認（起動：ホーム3回押し→パスコード1111→右上『再開』）。"},
+   {h:"検品フロー（誤納品対策）",body:"①Fax注文書(📠扉添付)を用意 ②注文書を読み上げ ③相違なければ納品書にサイン（納品と納品書の確認は配送担当に）。"},
+   {h:"防犯（トラック盗難）",body:"大洗付近で軽トラ・箱トラの盗難多発。トラックの鍵を閉めて帰る。"},
+   {h:"洗い場の勤務時間",body:"洗い場担当：平日〜14:00／土日〜15:00。以降はキッチンスタッフ（各補助）で回す。"}
+  ]},
+ {name:"料理の基準（共有）",note:"数量が出るものほど基準を統一。安定して美味しいものを提供する。",
+  timeline:[],
+  manual:[
+   {h:"お吸い物",body:"1.客数分をリマインダーに従い作る 2.野菜・昆布を入れ火にかける 3.沸騰後、水洗い＋選別したアラを入れる 4.酒を加えアクをしっかり取る 5.塩・薄口で調整 6.店長・原が味見 7.OKで保温機へ。※アクが残ると時間経過で臭みが出る→衛生チェック時に味見、生姜の絞り汁で臭み取り。"},
+   {h:"天丼・かき揚げ丼",body:"一度丼タレに浸してから盛り付け。タレは常温に戻して使用。営業終わりに丼タレを漉して加熱（殺菌＋味の調整）。"},
+   {h:"熟成魚（神経じめ・ウロコを残す）",body:"①神経じめ（脳締め→尾側切断→神経を水で抜く）②血抜き ③内臓処理・血合い除去・水分拭き取り ④鱗は落とさず表面のぬめりのみ除去（鱗＝天然の真空パック）⑤弱真空(0.5〜0.7気圧)で包装 ⑥0〜2℃保存・1日1回ドリップチェック（白身3〜7日/青魚2〜4日/脂の強い魚5〜10日）⑦使用直前に開封・この時点で鱗を落とす→1.6〜1.8%氷塩水に1kgあたり10分。温度が最重要。"},
+   {h:"幕内弁当・分量メモ",body:"日替わり幕内弁当：左上主菜は西京焼or煮魚（在庫過多品）、右上は揚げ物2種（在庫過多品）。常連リクエストに最大限対応（例：和田様→毎回西京焼弁当）。厚焼き玉子1本=18取り。チーズケーキ1ホール=24等分（台紙を敷いてカット）。"}
+  ]}
+];
+var OPS_MARCO=[
+ {name:"（未登録）",note:"マルコのオペレーションはノート未登録です。0626で追加してください。",timeline:[],manual:[]}
+];
+
+DEFAULTS.enya.ops=OPS_ENYA; DEFAULTS.marco.ops=OPS_MARCO;
+
+var state={shop:"enya",sec:"kitchen",admin:false,sel:null,data:{enya:{kitchen:null,hall:null,ops:null},marco:{kitchen:null,hall:null,ops:null}}};
+var listeners={};
+function refPath(shop,sec){return 'manualv2/'+shop+'/'+sec;}
+function attach(shop,sec){
+  var key=shop+'/'+sec;
+  if(!db){ state.data[shop][sec]=deepcopy(DEFAULTS[shop][sec]); showConn(true); if(current(shop,sec))render(); return; }
+  if(listeners[key])return;
+  listeners[key]=db.ref(refPath(shop,sec)).on('value',function(snap){
+    var v=snap.val();
+    if(v&&v.positions){ state.data[shop][sec]=normalize(v.positions); }
+    else { state.data[shop][sec]=deepcopy(DEFAULTS[shop][sec]); }
+    if(current(shop,sec))render();
+  },function(){ state.data[shop][sec]=deepcopy(DEFAULTS[shop][sec]); showConn(true); if(current(shop,sec))render(); });
+}
+function current(shop,sec){return state.shop===shop&&state.sec===sec;}
+function curList(){return state.data[state.shop][state.sec]||[];}
+function normalize(arr){
+  if(!Array.isArray(arr))return [];
+  return arr.filter(Boolean).map(function(p){
+    return {name:p.name||"",note:p.note||"",
+      timeline:(Array.isArray(p.timeline)?p.timeline:[]).filter(Boolean).map(function(t){return {time:t.time||"",slot:t.slot||"",task:t.task||"",caution:t.caution||"",limit:t.limit||""};}),
+      manual:(Array.isArray(p.manual)?p.manual:[]).filter(Boolean).map(function(m){return {h:m.h||"",body:m.body||""};})};
+  });
+}
+function deepcopy(o){return JSON.parse(JSON.stringify(o));}
+function showConn(on){var w=document.getElementById('connWarn');if(w)w.style.display=on?'block':'none';}
+function save(){
+  var list=curList();
+  if(!db){ toast('オフラインのため保存できません'); return; }
+  db.ref(refPath(state.shop,state.sec)).set({positions:list,updatedAt:Date.now()}).then(function(){toast('保存しました');}).catch(function(){toast('保存に失敗しました');});
+}
+function applyTheme(){document.documentElement.style.setProperty('--accent',SHOP_COLORS[state.shop]);document.documentElement.style.setProperty('--accent-soft',SHOP_SOFT[state.shop]);}
+function render(){
+  applyTheme();
+  var v=document.getElementById('view');
+  if(state.sel!==null && state.sel<curList().length){ v.innerHTML=renderDetail(curList()[state.sel]); }
+  else { state.sel=null; v.innerHTML=renderList(); }
+}
+function renderList(){
+  var list=curList();
+  var shopName=state.shop==='enya'?'本店':'マルコ';
+  var secName=state.sec==='kitchen'?'キッチン':(state.sec==='ops'?'オペレーション':'ホール');
+  var h='<div class="sec-label">'+shopName+' / '+secName+'　ポジションを選択</div><div class="grid">';
+  list.forEach(function(p,i){
+    var n=(p.timeline?p.timeline.length:0);
+    h+='<div class="pcard" onclick="openPos('+i+')">';
+    if(state.admin){h+='<div class="pcard-tools" onclick="event.stopPropagation()"><button class="icon-btn" onclick="editPos('+i+')">&#9999;</button><button class="icon-btn del" onclick="delPos('+i+')">&#128465;</button></div>';}
+    h+='<div class="pc-name">'+esc(p.name)+'</div><div class="pc-meta">'+n+' ステップ'+((p.manual&&p.manual.length)?' ・ 詳細あり':'')+'</div><div class="pc-arrow">&#8250;</div></div>';
+  });
+  if(state.admin){h+='<div class="pcard add" onclick="addPos()">＋ ポジション追加</div>';}
+  h+='</div>';
+  if(list.length===0&&!state.admin){h+='<div class="tl-empty">まだ登録されていません。右上の&#128274;から管理者ログイン（0626）で追加できます。</div>';}
+  return h;
+}
+function renderDetail(p){
+  var h='<div class="detail-head"><button class="backbtn" onclick="backToList()">&#8249; 一覧</button><div class="detail-title">'+esc(p.name)+'</div></div>';
+  if(state.admin){h+='<div class="editbar"><button class="ebtn pri" onclick="addRow()">＋ ステップ</button><button class="ebtn sec" onclick="editNote()">&#128221; 要点</button><button class="ebtn sec" onclick="addMan()">＋ 詳細マニュアル</button></div>';}
+  if(p.note||state.admin){h+='<div class="note-box"><div class="nb-label">&#128204; このポジションの要点</div><div class="nb-text'+(p.note?'':' empty')+'">'+(p.note?esc(p.note):'（未記入）')+'</div></div>';}
+  var tl=p.timeline||[];
+  h+='<div class="block-title">タイムライン</div>';
+  if(tl.length===0){h+='<div class="tl-empty">ステップがまだありません。'+(state.admin?'「＋ ステップ」から追加。':'')+'</div>';}
+  else{
+    h+='<div class="tl">';
+    tl.forEach(function(t,i){
+      var col=slotColor(t.slot);
+      h+='<div class="tl-item" style="--dot:'+col+'"><div class="tl-card"><div class="tl-top">';
+      if(t.time)h+='<span class="time-chip">'+esc(t.time)+'</span>';
+      if(t.slot)h+='<span class="slot-chip" style="background:'+col+'">'+esc(t.slot)+'</span>';
+      h+='</div>';
+      if(t.task)h+='<div class="tl-task">'+esc(t.task)+'</div>';
+      var tags='';
+      if(t.caution)tags+='<div class="tag warn"><span class="ti">&#9888;</span><span><span class="tl-label">注意 </span>'+esc(t.caution)+'</span></div>';
+      if(t.limit)tags+='<div class="tag limit"><span class="ti">&#9201;</span><span><span class="tl-label">制限時間 </span>'+esc(t.limit)+'</span></div>';
+      if(tags)h+='<div class="tl-tags">'+tags+'</div>';
+      if(state.admin){h+='<div class="row-tools"><button class="icon-btn" onclick="moveRow('+i+',-1)" '+(i===0?'disabled':'')+'>&#9650;</button><button class="icon-btn" onclick="moveRow('+i+',1)" '+(i===tl.length-1?'disabled':'')+'>&#9660;</button><button class="icon-btn" onclick="editRow('+i+')">&#9999;</button><button class="icon-btn del" onclick="delRow('+i+')">&#128465;</button></div>';}
+      h+='</div></div>';
+    });
+    h+='</div>';
+  }
+  var man=p.manual||[];
+  if(man.length||state.admin){
+    h+='<div class="block-title">詳細マニュアル</div>';
+    man.forEach(function(m,i){
+      h+='<div class="man-card"><div class="mc-h">'+esc(m.h)+'</div><div class="mc-body">'+esc(m.body)+'</div>';
+      if(state.admin){h+='<div class="row-tools"><button class="icon-btn" onclick="moveMan('+i+',-1)" '+(i===0?'disabled':'')+'>&#9650;</button><button class="icon-btn" onclick="moveMan('+i+',1)" '+(i===man.length-1?'disabled':'')+'>&#9660;</button><button class="icon-btn" onclick="editMan('+i+')">&#9999;</button><button class="icon-btn del" onclick="delMan('+i+')">&#128465;</button></div>';}
+      h+='</div>';
+    });
+    if(man.length===0)h+='<div class="tl-empty">詳細マニュアルは未登録。「＋ 詳細マニュアル」から追加。</div>';
+  }
+  return h;
+}
+function setShop(s){state.shop=s;state.sel=null;segActive('shopSeg','shop',s);applyTheme();attach(s,state.sec);render();}
+function setSec(s){state.sec=s;state.sel=null;segActive('secSeg','sec',s);attach(state.shop,s);render();}
+function segActive(segId,attr,val){var seg=document.getElementById(segId);Array.prototype.forEach.call(seg.querySelectorAll('button'),function(b){b.classList.toggle('active',b.getAttribute('data-'+attr)===val);});}
+function openPos(i){state.sel=i;document.querySelector('.mbody').scrollTop=0;render();}
+function backToList(){state.sel=null;render();}
+function toggleLock(){if(state.admin){state.admin=false;document.getElementById('lockBtn').className='lockbtn';document.getElementById('lockBtn').textContent='🔒';render();return;}openPwSheet();}
+function openPwSheet(){
+  var s=document.getElementById('sheet');s.className='sheet pw-sheet';
+  s.innerHTML='<div class="sheet-head"><h3>&#128274; 管理者ログイン</h3><button class="sheet-close" onclick="closeSheet()">&times;</button></div><div class="sheet-body"><div class="field" style="margin-bottom:8px"><input class="inp" id="pwInp" type="tel" inputmode="numeric" placeholder="パスワード" style="text-align:center;letter-spacing:4px;font-size:20px" autocomplete="off"></div><div class="pw-err" id="pwErr">パスワードが違います</div><div class="save-row"><button class="ebtn pri" onclick="checkPw()">ログイン</button></div></div>';
+  openSheet();setTimeout(function(){var el=document.getElementById('pwInp');if(el){el.focus();el.onkeydown=function(e){if(e.key==='Enter')checkPw();};}},100);
+}
+function checkPw(){var raw=(document.getElementById('pwInp').value||'').replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);}).trim();if(raw===ADMIN_PASS){state.admin=true;document.getElementById('lockBtn').className='lockbtn on';document.getElementById('lockBtn').textContent='🔓';closeSheet();render();}else{document.getElementById('pwErr').style.display='block';}}
+function addPos(){var name=prompt('新しいポジション名');if(!name)return;name=cleanKey(name);curList().push({name:name,note:"",timeline:[],manual:[]});save();render();}
+function editPos(i){var p=curList()[i];var name=prompt('ポジション名を編集',p.name);if(name===null)return;name=cleanKey(name);if(!name)return;p.name=name;save();render();}
+function delPos(i){var p=curList()[i];if(!confirm('「'+p.name+'」を削除しますか？'))return;curList().splice(i,1);save();render();}
+function editNote(){
+  var p=curList()[state.sel];var s=document.getElementById('sheet');s.className='sheet';
+  s.innerHTML='<div class="sheet-head"><h3>&#128221; '+esc(p.name)+' の要点</h3><button class="sheet-close" onclick="closeSheet()">&times;</button></div><div class="sheet-body"><div class="field"><label>このポジションで一番大事なこと</label><textarea class="ta" id="fNote" style="min-height:110px">'+esc(p.note)+'</textarea></div><div class="save-row"><button class="ebtn sec" onclick="closeSheet()">キャンセル</button><button class="ebtn pri" onclick="saveNote()">保存</button></div></div>';
+  openSheet();
+}
+function saveNote(){curList()[state.sel].note=document.getElementById('fNote').value.trim();closeSheet();save();render();}
+var SLOT_PRESETS=["仕込み","準備","開店準備","ランチ営業","営業中","ディナー準備","ディナー営業","提供","清掃","閉店作業","クローズ"];
+function rowSheet(title,onsave,cur){
+  cur=cur||{time:"",slot:"",task:"",caution:"",limit:""};
+  var opts='<option value=""></option>';SLOT_PRESETS.forEach(function(sl){opts+='<option value="'+sl+'"'+(sl===cur.slot?' selected':'')+'>'+sl+'</option>';});
+  var s=document.getElementById('sheet');s.className='sheet';
+  s.innerHTML='<div class="sheet-head"><h3>'+title+'</h3><button class="sheet-close" onclick="closeSheet()">&times;</button></div><div class="sheet-body">'
+   +'<div class="two"><div class="field"><label>時刻/時間帯<span class="hint">例 11:30 / 営業前</span></label><input class="inp" id="fTime" value="'+esc(cur.time)+'"></div>'
+   +'<div class="field"><label>区分</label><input class="inp" id="fSlot" list="slotList" value="'+esc(cur.slot)+'"><datalist id="slotList">'+opts+'</datalist></div></div>'
+   +'<div class="field"><label>やること</label><textarea class="ta" id="fTask">'+esc(cur.task)+'</textarea></div>'
+   +'<div class="field"><label>&#9888; 注意点<span class="hint">任意</span></label><textarea class="ta" id="fCaution" style="min-height:56px">'+esc(cur.caution)+'</textarea></div>'
+   +'<div class="field"><label>&#9201; 制限時間<span class="hint">任意</span></label><input class="inp" id="fLimit" value="'+esc(cur.limit)+'"></div>'
+   +'<div class="save-row"><button class="ebtn sec" onclick="closeSheet()">キャンセル</button><button class="ebtn pri" id="rowSaveBtn">保存</button></div></div>';
+  openSheet();
+  document.getElementById('rowSaveBtn').onclick=function(){var row={time:v('fTime'),slot:v('fSlot'),task:v('fTask'),caution:v('fCaution'),limit:v('fLimit')};if(!row.time&&!row.task){toast('時刻かやることを入力');return;}onsave(row);closeSheet();save();render();};
+  function v(id){return (document.getElementById(id).value||'').trim();}
+}
+function addRow(){rowSheet('＋ ステップ追加',function(r){curList()[state.sel].timeline.push(r);});}
+function editRow(i){var t=curList()[state.sel].timeline[i];rowSheet('&#9999; ステップ編集',function(r){curList()[state.sel].timeline[i]=r;},t);}
+function delRow(i){var tl=curList()[state.sel].timeline;if(!confirm('このステップを削除しますか？'))return;tl.splice(i,1);save();render();}
+function moveRow(i,d){var tl=curList()[state.sel].timeline;var j=i+d;if(j<0||j>=tl.length)return;var t=tl[i];tl[i]=tl[j];tl[j]=t;save();render();}
+function manSheet(title,onsave,cur){
+  cur=cur||{h:"",body:""};
+  var s=document.getElementById('sheet');s.className='sheet';
+  s.innerHTML='<div class="sheet-head"><h3>'+title+'</h3><button class="sheet-close" onclick="closeSheet()">&times;</button></div><div class="sheet-body">'
+   +'<div class="field"><label>見出し</label><input class="inp" id="mH" value="'+esc(cur.h)+'" placeholder="例：禁止事項 / 清掃スケジュール"></div>'
+   +'<div class="field"><label>本文</label><textarea class="ta" id="mB" style="min-height:140px">'+esc(cur.body)+'</textarea></div>'
+   +'<div class="save-row"><button class="ebtn sec" onclick="closeSheet()">キャンセル</button><button class="ebtn pri" id="manSaveBtn">保存</button></div></div>';
+  openSheet();
+  document.getElementById('manSaveBtn').onclick=function(){var m={h:(document.getElementById('mH').value||'').trim(),body:(document.getElementById('mB').value||'').trim()};if(!m.h&&!m.body){toast('見出しか本文を入力');return;}onsave(m);closeSheet();save();render();};
+}
+function addMan(){manSheet('＋ 詳細マニュアル追加',function(m){if(!curList()[state.sel].manual)curList()[state.sel].manual=[];curList()[state.sel].manual.push(m);});}
+function editMan(i){var m=curList()[state.sel].manual[i];manSheet('&#9999; 詳細マニュアル編集',function(x){curList()[state.sel].manual[i]=x;},m);}
+function delMan(i){var man=curList()[state.sel].manual;if(!confirm('この項目を削除しますか？'))return;man.splice(i,1);save();render();}
+function moveMan(i,d){var man=curList()[state.sel].manual;var j=i+d;if(j<0||j>=man.length)return;var t=man[i];man[i]=man[j];man[j]=t;save();render();}
+function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function cleanKey(s){return String(s).replace(/[.#$\[\]\/]/g,'').trim();}
+function openSheet(){document.getElementById('overlay').classList.add('show');}
+function closeSheet(){document.getElementById('overlay').classList.remove('show');}
+var toastTimer;
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove('show');},1600);}
+applyTheme();attach('enya','kitchen');render();
+</script>
+</body>
+</html>
