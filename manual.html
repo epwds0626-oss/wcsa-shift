@@ -23,6 +23,9 @@ body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Yu Goth
 .mtitle{font-size:15px;font-weight:800;letter-spacing:.02em;display:flex;align-items:center;gap:6px;white-space:nowrap}
 .mtitle .em{font-size:17px}
 .spacer{flex:1}
+.homebtn{border:1px solid var(--border);background:var(--surface2);color:var(--text2);height:32px;padding:0 12px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:2px;transition:.15s;flex-shrink:0;font-family:inherit;white-space:nowrap}
+.homebtn:hover{background:var(--surface3);color:var(--text);border-color:var(--accent)}
+.homebtn:active{transform:scale(.96)}
 .lockbtn{border:1px solid var(--border);background:var(--surface2);color:var(--text2);width:34px;height:32px;border-radius:9px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;flex-shrink:0}
 .lockbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .seg{display:flex;background:var(--surface3);border-radius:10px;padding:3px;gap:2px;flex-shrink:0}
@@ -110,6 +113,7 @@ body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Yu Goth
 <div id="app">
   <div class="mhead">
     <div class="mhead-row">
+      <button class="homebtn" id="homeBtn" onclick="goHome()" title="ホームに戻る">&#8592; ホーム</button>
       <div class="mtitle"><span class="em">&#128203;</span>マニュアルノート</div>
       <div class="spacer"></div>
       <button class="lockbtn" id="lockBtn" onclick="toggleLock()" title="管理者編集">&#128274;</button>
@@ -546,6 +550,13 @@ function setSec(s){state.sec=s;state.sel=null;segActive('secSeg','sec',s);attach
 function segActive(segId,attr,val){var seg=document.getElementById(segId);Array.prototype.forEach.call(seg.querySelectorAll('button'),function(b){b.classList.toggle('active',b.getAttribute('data-'+attr)===val);});}
 function openPos(i){state.sel=i;document.querySelector('.mbody').scrollTop=0;render();}
 function backToList(){state.sel=null;render();}
+function goHome(){
+  try{
+    if(window.parent && window.parent!==window && typeof window.parent.switchMode==='function'){ window.parent.switchMode('shift'); return; }
+  }catch(e){}
+  // フォールバック：単体で開いている場合はWCSA本体へ
+  try{ window.top.location.href='./'; }catch(e){ location.href='./'; }
+}
 function toggleLock(){if(state.admin){state.admin=false;document.getElementById('lockBtn').className='lockbtn';document.getElementById('lockBtn').textContent='🔒';render();return;}openPwSheet();}
 function openPwSheet(){
   var s=document.getElementById('sheet');s.className='sheet pw-sheet';
