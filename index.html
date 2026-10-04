@@ -686,6 +686,7 @@ nav{display:flex;gap:2px}
 <div class="page" id="page-admin">
   <div class="page-header">
     <div class="page-title">ADMIN <span>PANEL</span></div>
+    <button class="btn btn-y" style="margin-left:auto;width:auto;padding:8px 14px" onclick="switchMode('labor')">💴 日別人件費</button>
   </div>
   <!-- 希望一覧 -->
   <div class="acard" style="margin-bottom:18px">
@@ -797,6 +798,11 @@ nav{display:flex;gap:2px}
 </div>
 
 <!-- MUSUBU WRAPPER (統合版 v3) -->
+<!-- ===== 日別人件費（管理者専用・データは端末内のみ） ===== -->
+<div id="labor-wrapper" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:400;overflow:hidden;background:#f3f0e9;">
+  <iframe id="labor-frame" style="width:100%;height:100%;border:none;background:#f3f0e9"></iframe>
+</div>
+<!-- ===== /日別人件費 ===== -->
 <!-- ===== 魚台帳 ===== -->
 <div id="fish-wrapper" style="display:none;position:fixed;top:82px;left:0;right:0;bottom:0;z-index:50;overflow:hidden;background:#E6EBED;">
   <iframe id="fish-frame" src="fish.html" style="width:100%;height:100%;border:none;background:#E6EBED" loading="lazy"></iframe>
@@ -2084,7 +2090,7 @@ var SHOPS = [
 var currentShop = 0;
 
 window.addEventListener('resize', function(){
-  ['fish-wrapper','study-wrapper','cooking-wrapper','otoshi-wrapper','manual-wrapper'].forEach(function(id){
+  ['fish-wrapper','study-wrapper','cooking-wrapper','otoshi-wrapper','manual-wrapper','labor-wrapper'].forEach(function(id){
     var fw = document.getElementById(id);
     if (fw && fw.style.display === 'block') {
       fw.style.top = '0';
@@ -2115,6 +2121,8 @@ function switchMode(mode, shopIdx) {
   if (otoshiWrapper) otoshiWrapper.style.display = 'none';
   var manualWrapper = document.getElementById('manual-wrapper');
   if (manualWrapper) manualWrapper.style.display = 'none';
+  var laborWrapper = document.getElementById('labor-wrapper');
+  if (laborWrapper) laborWrapper.style.display = 'none';
   // ヘッダーは一旦表示に戻す（全画面帳を開く分岐内で改めて隠す）
   var mainHeaderReset = document.getElementById('main-header');
   if (mainHeaderReset) mainHeaderReset.style.display = '';
@@ -2191,6 +2199,27 @@ function switchMode(mode, shopIdx) {
     if (pdfBtn) pdfBtn.style.display = 'none';
     var mc = document.getElementById('modeCooking');
     if (mc) { mc.className = 'shop-btn active'; mc.style.cssText = 'background:var(--accent);color:#0a0a0f'; }
+    return;
+  }
+
+  if (mode === 'labor') {
+    // 管理者ログイン済みのときだけ開ける（人件費ページ側でも専用パスワードを要求）
+    if (!adminUnlocked) { showPage('admin'); return; }
+    if (musubuWrapper) musubuWrapper.style.display = 'none';
+    var mainHeaderLb = document.getElementById('main-header');
+    if (mainHeaderLb) mainHeaderLb.style.display = 'none';
+    var lf = document.getElementById('labor-frame');
+    if (lf && !lf.getAttribute('src')) lf.setAttribute('src', 'labor.html');
+    if (laborWrapper) {
+      laborWrapper.style.top = '0';
+      laborWrapper.style.height = window.innerHeight + 'px';
+      laborWrapper.style.display = 'block';
+    }
+    ['page-calendar','page-wish','page-admin','page-admin-lock','page-challenge'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    if (headerNav) headerNav.style.display = 'none';
+    if (pdfBtn) pdfBtn.style.display = 'none';
     return;
   }
 
