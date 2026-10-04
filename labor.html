@@ -119,7 +119,7 @@ td.rt{border-right:1px solid var(--line)} tr.subrow td{color:var(--sub);font-siz
 <div id="toast" class="al" hidden role="status" style="max-width:1060px;margin:12px auto 0;position:sticky;top:0;z-index:20"></div>
 <div id="empty" class="emptyb" hidden><h2>まだデータがありません</h2>
   <p>右上のボタンから次のCSVを読み込んでください。読み込んだデータはこの端末の中だけに保存され、WCSAのサーバーやGitHubには送られません。</p>
-  <ol><li>打刻管理CSV（給与システムの打刻管理 → CSV出力）</li><li>（単価は給与システムの従業員マスタから自動取得）</li><li>本店 売上実績CSV（当年日付・当年実績）</li><li>マルコ 日報一覧CSV（aggregateRegiPaymentList）</li></ol></div>
+  <ol><li>打刻管理CSV（給与システムの打刻管理 → CSV出力）</li><li>（単価は給与システムの従業員マスタから自動取得）</li><li>売上はWCSAのチャレンジ「売上CSVから更新」で取り込めば自動で反映（本店：売上実績CSV、マルコ：日報一覧CSV）</li></ol></div>
 <main id="app" hidden>
   <section>
     <div class="sum" id="sum"></div>
@@ -269,6 +269,28 @@ async function loadPayrollMaster(){
     renderMasterStatus();return true;
   }catch(e){masterStatus="給与システムから取得できませんでした（スタッフマスタCSVで代用できます）";renderMasterStatus();return false}
 }
+// ===== WCSAチャレンジで取り込んだ日別売上（Firebase: sales_daily）を読む =====
+let fbSales=null, fbSalesStatus="";
+async function loadDailySalesFB(){
+  try{
+    const r=await fetch(`${PAYROLL_DB}/sales_daily.json`);if(!r.ok)throw 0;
+    fbSales=await r.json()||{};applyFbSales();
+    const n=Object.keys(fbSales.honten||{}).length+Object.keys(fbSales.marco||{}).length;
+    fbSalesStatus=n?`WCSAから日別売上を取得（${n}日分）`:"WCSAに日別売上がまだありません（チャレンジの「売上CSVから更新」で取り込むと保存されます）";
+  }catch(e){fbSalesStatus="WCSAの日別売上を取得できませんでした（売上CSVで代用できます）"}
+  if(rows.length)renderDaily();
+}
+function applyFbSales(){
+  if(!fbSales)return;
+  cfg.sales=cfg.sales||{};cfg.salesCol=cfg.salesCol||{};
+  const k2d=k=>`${k.slice(0,4)}/${k.slice(4,6)}/${k.slice(6,8)}`;
+  const H=fbSales.honten||{},M=fbSales.marco||{};
+  Object.keys(H).forEach(k=>{const d=k2d(k);cfg.sales[d]=cfg.sales[d]||{};cfg.sales[d]["本店"]=num(H[k].sales)});
+  Object.keys(M).forEach(k=>{const d=k2d(k);cfg.sales[d]=cfg.sales[d]||{};cfg.sales[d]["マルコ"]=num((cfg.tax||"税抜")==="税抜"?M[k].net:M[k].gross)});
+  if(Object.keys(H).length)cfg.salesCol["本店"]="WCSA（売上実績・当年実績）";
+  if(Object.keys(M).length)cfg.salesCol["マルコ"]=`WCSA（日報一覧・総売上${cfg.tax||"税抜"}）`;
+  saveCfg();
+}
 function renderMasterStatus(){const el=document.getElementById("masterStatus");if(el)el.textContent=masterStatus}
 const norm=n=>n.replace(/【.*?】/g,"").replace(/[\s　]+/g," ").trim();
 const num=v=>{const x=parseFloat(v);return isFinite(x)?x:0};
@@ -300,7 +322,7 @@ function ingest(text){
     STORES.forEach(s=>{cfg.closed[pk][s]=dates.filter(dt=>dt<=today && !rows.some(r=>r.store===s&&r.date===dt))});
   }
   const rs=rawGet().sales||{};STORES.forEach(st=>{if(rs[st])importSales(rs[st],st,true)});
-  saveCfg(); renderAll(); loadFishHack();
+  applyFbSales(); saveCfg(); renderAll(); loadFishHack(); loadDailySalesFB();
 }
 function buildPeople(){
   const map=new Map();
@@ -425,7 +447,7 @@ function renderDaily(){
   if(prov) al.push({lv:"w",t:`時給 ${prov}名が仮の値（¥${PROV_HOURLY}）のままです。実際の時給に直してください`});
   STORES.forEach(s=>{const miss=shown.filter(d=>!closedSet(s).has(d)&&!(salesOf(d,s)>0));if(miss.length&&miss.length<shown.length)al.push({lv:"w",t:`${s}の売上が未入力の営業日：${miss.map(d=>d.slice(5)).join("、")}`})});
   STORES.forEach(st=>{const z=shown.filter(d=>!closedSet(st).has(d)&&salesOf(d,st)===0);if(z.length)al.push({lv:"w",t:`${st}：売上0円なのに営業日扱いの日：${z.map(d=>d.slice(5)).join("、")}（休業ならカレンダーで定休に）`})});
-  const sc=cfg.salesCol||{};document.getElementById("colNote").textContent="売上の列："+STORES.map(st=>`${st}＝${sc[st]||"未取込"}`).join("　");
+  const sc=cfg.salesCol||{};document.getElementById("colNote").textContent="売上："+STORES.map(st=>`${st}＝${sc[st]||"未取込"}`).join("　")+(fbSalesStatus?"　｜ "+fbSalesStatus:"");
   document.getElementById("alerts").innerHTML=al.concat(issues).map(a=>`<div class="al ${a.lv}">${a.t}</div>`).join("");
   document.getElementById("sumNote").textContent=`月給者は営業日ごとに一定額を計上（休みの日も含む）。人件費率は売上が入っている日だけで計算。`;
   let h=`<thead><tr><th class="l" rowspan="2">日付</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th class="grp gf">FishHack</th><th colspan="3" class="grp">全社</th><th rowspan="2">実働h</th></tr>
@@ -594,7 +616,7 @@ STORES.forEach(s=>{document.getElementById("sales-"+s).onchange=e=>{const f=e.ta
 document.getElementById("target").value=cfg.target||30;
 document.getElementById("tax").value=cfg.tax||"税抜";
 document.getElementById("tax").onchange=e=>{cfg.tax=e.target.value;saveCfg();
-  const rs=rawGet().sales||{};STORES.forEach(st=>{if(rs[st])importSales(rs[st],st,true)});if(rows.length)renderDaily();toast(`売上の基準を${cfg.tax}にしました（マルコの日報一覧に反映。本店の当年実績は列が1つのため変わりません）`,"w")};
+  const rs=rawGet().sales||{};STORES.forEach(st=>{if(rs[st])importSales(rs[st],st,true)});applyFbSales();if(rows.length)renderDaily();toast(`売上の基準を${cfg.tax}にしました（マルコの日報一覧に反映。本店の当年実績は列が1つのため変わりません）`,"w")};
 document.getElementById("target").oninput=e=>{cfg.target=num(e.target.value)||30;saveCfg();renderDaily()};
 document.getElementById("clearSales").onclick=()=>{const b=document.getElementById("clearSales");if(b.dataset.arm!=="1"){b.dataset.arm="1";b.textContent="もう一度押すと消去";setTimeout(()=>{b.dataset.arm="";b.textContent="売上を全消去"},3000);return}
   const ks=new Set(dates);Object.keys(cfg.sales||{}).forEach(k=>{if(ks.has(k))delete cfg.sales[k]});saveCfg();b.dataset.arm="";b.textContent="売上を全消去";renderDaily()};
