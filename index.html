@@ -3488,7 +3488,7 @@ function handleCsvImport(event) {
   var shopKey = getChShopKey();
   // 本店: salesFile(UTF-16 TSV) + itemFile(UTF-16 TSV)
   // マルコ: marcoSalesFile(CP932 CSV 年間売上) + marcoItemFile(Shift_JIS CSV aggregateMenu)
-  var results = { salesFile: null, itemFile: null, dailyFile: null, marcoSalesFile: null, marcoItemFiles: [] };
+  var results = { salesFile: null, itemFile: null, dailyFile: null, marcoSalesFile: null, marcoDailyFile: null, marcoItemFiles: [] };
   var pending = files.length;
 
   files.forEach(function(file) {
@@ -3530,6 +3530,12 @@ function handleCsvImport(event) {
         var identified = false;
         for (var k = 0; k < Math.min(rows2.length, 15); k++) {
           var cell0 = (rows2[k][0] || '').trim();
+          // マルコ日報一覧CSV（aggregateRegiPaymentList）：日別売上として保存（人件費ページ用）
+          if (cell0.indexOf('日報一覧') !== -1 || (rows2[k].indexOf('日付') !== -1 && rows2[k].indexOf('総売上(税抜)') !== -1)) {
+            results.marcoDailyFile = rows2;
+            identified = true;
+            break;
+          }
           // 年間売上CSV：「対象月」ヘッダーか「年間売上」タイトル行
           if (cell0 === '対象月' || cell0.indexOf('年間売上') !== -1) {
             results.marcoSalesFile = rows2;
@@ -3604,11 +3610,68 @@ function parseCSV(text, sep) { return parseCSVAuto(text, sep); }
 
 var DEFAULT_LIMITED_NAMES = ['恵比寿御膳', '吉祥膳'];
 
+// ===== 日別売上を Firebase sales_daily/{honten|marco}/{YYYYMMDD} に保存（日別人件費ページが読む） =====
+function saveDailySales(results) {
+  if (!db) return 0;
+  var now = new Date();
+  var todayK = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+  var toInt = function(v){ return parseInt(String(v || '0').replace(/[¥,\s]/g,'')) || 0; };
+  var upd = {}, n = 0, ts = Date.now();
+  // 本店：売上実績CSV（当年日付・当年実績・当年客数）
+  if (results.salesFile) {
+    var h = results.salesFile[0];
+    var iD = h.indexOf('当年日付'), iS = h.indexOf('当年実績'), iC = h.indexOf('当年客数');
+    if (iD !== -1 && iS !== -1) {
+      for (var i = 1; i < results.salesFile.length; i++) {
+        var r = results.salesFile[i], d = String(r[iD] || '').trim();
+        if (!/^\d{8}$/.test(d)) continue;           // TOTAL・MD週の行は除外
+        var v = toInt(r[iS]);
+        if (v === 0 && d >= todayK) continue;         // 今日以降の未締め0円は保存しない
+        upd['honten/' + d] = { sales: v, cust: iC !== -1 ? toInt(r[iC]) : 0, src: '売上実績', ts: ts };
+        n++;
+      }
+    }
+  }
+  // マルコ：日報一覧CSV（日付・総売上(税抜)・総売上(税込)・客計）
+  if (results.marcoDailyFile) {
+    var rows = results.marcoDailyFile, y0 = now.getFullYear(), m0 = now.getMonth() + 1, hi = -1;
+    for (var k = 0; k < Math.min(rows.length, 10); k++) {
+      var c0 = rows[k][0] || '';
+      if (c0.indexOf('抽出期間') !== -1) {
+        var pm = String(rows[k][1] || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (pm) { y0 = +pm[1]; m0 = +pm[2]; }
+      }
+      if (rows[k].indexOf('日付') !== -1 && rows[k].indexOf('総売上(税抜)') !== -1) { hi = k; break; }
+    }
+    if (hi !== -1) {
+      var H = rows[hi], jD = H.indexOf('日付'), jN = H.indexOf('総売上(税抜)'), jG = H.indexOf('総売上(税込)'), jC = H.indexOf('客計');
+      for (var j = hi + 1; j < rows.length; j++) {
+        var mm = String(rows[j][jD] || '').match(/(\d{1,2})月(\d{1,2})日/);
+        if (!mm) continue;                               // 合計行は除外
+        var yy = (+mm[1] < m0) ? y0 + 1 : y0;
+        var key = yy + mm[1].padStart(2,'0') + mm[2].padStart(2,'0');
+        var net = toInt(rows[j][jN]), gross = jG !== -1 ? toInt(rows[j][jG]) : 0;
+        if (net === 0 && gross === 0 && key >= todayK) continue;
+        upd['marco/' + key] = { net: net, gross: gross, cust: jC !== -1 ? toInt(rows[j][jC]) : 0, src: '日報一覧', ts: ts };
+        n++;
+      }
+    }
+  }
+  if (n) {
+    db.ref('sales_daily').update(upd).then(function(){
+      showToast('📅 日別売上を' + n + '日分保存しました（日別人件費に反映）');
+    }).catch(function(e){ alert('日別売上の保存エラー: ' + e.message); });
+  }
+  return n;
+}
+
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
+  var dailySaved = saveDailySales(results);
   var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoSnapshotFile || results.marcoItemFiles.length > 0;
+  if (!hasData && dailySaved) return; // 日報一覧だけのときは日別売上の保存のみ
   if (!hasData) {
-    alert('売上CSVが見つかりませんでした。\n\n【本店】売上実績CSV + Daily_Item_Sales CSV\n【マルコ】年間売上CSV + aggregateMenu CSV\n\n勤怠CSVは下の「💰インセンティブ試算」から読み込んでください。');
+    alert('売上CSVが見つかりませんでした。\n\n【本店】売上実績CSV + Daily_Item_Sales CSV\n【マルコ】年間売上CSV + aggregateMenu CSV + 日報一覧CSV\n\n勤怠CSVは下の「💰インセンティブ試算」から読み込んでください。');
     return;
   }
   // 数量限定リストなど既存データを先読みしてから本体を実行
