@@ -2209,7 +2209,7 @@ function switchMode(mode, shopIdx) {
     var mainHeaderLb = document.getElementById('main-header');
     if (mainHeaderLb) mainHeaderLb.style.display = 'none';
     var lf = document.getElementById('labor-frame');
-    if (lf && !lf.getAttribute('src')) lf.setAttribute('src', 'labor.html');
+    if (lf && !lf.getAttribute('src')) lf.setAttribute('src', 'labor.html?v=' + Date.now()); // 毎回最新版を読む（GitHub Pagesのキャッシュ対策）
     if (laborWrapper) {
       laborWrapper.style.top = '0';
       laborWrapper.style.height = window.innerHeight + 'px';
