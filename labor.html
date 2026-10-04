@@ -7,18 +7,18 @@
 :root{
   --bg:#f3f0e9; --panel:#fbfaf6; --ink:#1c2541; --sub:#5d6276; --line:#ddd7c9;
   --navy:#1b2747; --gold:#b8913a; --honten:#1b2747; --marco:#b5532f;
-  --warn:#a5660b; --warnbg:#fbefd6; --crit:#b23a2e; --critbg:#f8e2de; --ok:#2f6b47;
+  --fish:#1f7a8c; --warn:#a5660b; --warnbg:#fbefd6; --crit:#b23a2e; --critbg:#f8e2de; --ok:#2f6b47;
   --display:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;
   --body:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#12172a; --panel:#1a2038; --ink:#ebe7dc; --sub:#a3a7b8; --line:#2d3452;
   --navy:#0d1222; --gold:#d6b25e; --honten:#8fa6e0; --marco:#e48a62;
-  --warn:#e3b05a; --warnbg:#3a2f17; --crit:#ef8a7e; --critbg:#3d1f1c; --ok:#79c495; color-scheme:dark}}
+  --fish:#6cc3d5; --warn:#e3b05a; --warnbg:#3a2f17; --crit:#ef8a7e; --critbg:#3d1f1c; --ok:#79c495; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#12172a; --panel:#1a2038; --ink:#ebe7dc; --sub:#a3a7b8; --line:#2d3452;
   --navy:#0d1222; --gold:#d6b25e; --honten:#8fa6e0; --marco:#e48a62;
-  --warn:#e3b05a; --warnbg:#3a2f17; --crit:#ef8a7e; --critbg:#3d1f1c; --ok:#79c495; color-scheme:dark}
+  --fish:#6cc3d5; --warn:#e3b05a; --warnbg:#3a2f17; --crit:#ef8a7e; --critbg:#3d1f1c; --ok:#79c495; color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0}
 [hidden]{display:none!important}
@@ -91,6 +91,8 @@ td.rt{border-right:1px solid var(--line)} tr.subrow td{color:var(--sub);font-siz
 .btn.gold{background:var(--gold);color:#1b2747;border-color:var(--gold);width:100%}
 .emptyb{max-width:640px;margin:40px auto;padding-inline:16px}
 #homeBtn{background:transparent;color:#f3efe3;border-color:rgba(255,255,255,.3);padding:6px 10px}
+.tile.f .v{color:var(--fish)} th.gf{color:var(--fish)}
+.btn.sm{font-size:12px;padding:3px 10px;margin-top:6px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head><body>
@@ -251,7 +253,7 @@ function ingest(text){
     STORES.forEach(s=>{cfg.closed[pk][s]=dates.filter(dt=>dt<=today && !rows.some(r=>r.store===s&&r.date===dt))});
   }
   const rs=rawGet().sales||{};STORES.forEach(st=>{if(rs[st])importSales(rs[st],st,true)});
-  saveCfg(); renderAll();
+  saveCfg(); renderAll(); loadFishHack();
 }
 function buildPeople(){
   const map=new Map();
@@ -311,6 +313,30 @@ function compute(){
 
 function renderAll(){document.getElementById("empty").hidden=true;document.getElementById("app").hidden=false;renderStaff();renderRates();renderCals();renderDaily()}
 
+const FH_DB="https://fishhack-74de3-default-rtdb.asia-southeast1.firebasedatabase.app";
+let fh={by:{},status:"未取得",n:0};
+function fhSales(d){const v=fh.by[d];if(!v)return 0;return (cfg.tax||"税抜")==="税抜"?v.net:v.gross}
+async function loadFishHack(){
+  if(!dates.length)return;
+  fh.status="取得中…";renderFhStatus();
+  const a=dates[0].replace(/\//g,"-"), z=dates[dates.length-1].replace(/\//g,"-");
+  let data=null;
+  try{const r=await fetch(`${FH_DB}/fishhack/deliveries.json?orderBy=${encodeURIComponent('"date"')}&startAt=${encodeURIComponent('"'+a+'"')}&endAt=${encodeURIComponent('"'+z+'"')}`);if(r.ok)data=await r.json()}catch(e){}
+  if(!data){try{const r=await fetch(`${FH_DB}/fishhack/deliveries.json`);if(r.ok)data=await r.json()}catch(e){}}
+  if(!data){fh.status="取得できませんでした（通信を確認して再取得）";renderFhStatus();return}
+  const by={};let n=0;
+  Object.values(data).forEach(d=>{
+    if(!d||!d.date||d.source==="excel")return;
+    const dd=String(d.date).replace(/-/g,"/");if(dd<dates[0]||dd>dates[dates.length-1])return;
+    // FishHackアプリの dTotal と同じ計算（伝票ごとに税率別に端数切り捨て）
+    let net=0,t8=0,t10=0;(d.items||[]).forEach(it=>{const t=it.total!=null?Math.floor(num(it.total)):Math.floor(num(it.qty)*num(it.price)-num(it.disc));net+=t;if(+it.tax===8)t8+=t;else t10+=t});
+    const gross=net+Math.floor(t8*0.08)+Math.floor(t10*0.10);
+    by[dd]=by[dd]||{net:0,gross:0,n:0};by[dd].net+=net;by[dd].gross+=gross;by[dd].n++;n++;
+  });
+  const now=new Date();fh={by,n,status:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")} 取得・納品${n}件`};
+  renderFhStatus();renderDaily();
+}
+function renderFhStatus(){const el=document.getElementById("fhStatus");if(el)el.textContent="FishHack："+fh.status}
 function salesOf(d,s){const v=(cfg.sales||{})[d];return v&&v[s]!=null&&v[s]!==""?num(v[s]):null}
 function ratioCell(cost,sales){
   if(sales==null||sales<=0)return '<td class="rt">—</td>';
@@ -332,12 +358,15 @@ function renderDaily(){
   const rs={本店:{c:0,s:0,n:0},マルコ:{c:0,s:0,n:0}};
   shown.forEach(d=>STORES.forEach(s=>{const v=salesOf(d,s);if(v>0){rs[s].c+=res[d][s].cost;rs[s].s+=v;rs[s].n++}}));
   const both=shown.filter(d=>!(closedSet("本店").has(d)&&closedSet("マルコ").has(d))&&STORES.every(st=>closedSet(st).has(d)||salesOf(d,st)>0));
-  const allC=both.reduce((a,d)=>a+res[d].本店.cost+res[d].マルコ.cost,0), allS=both.reduce((a,d)=>a+(salesOf(d,"本店")||0)+(salesOf(d,"マルコ")||0),0);
+  const allC=both.reduce((a,d)=>a+res[d].本店.cost+res[d].マルコ.cost,0), allS=both.reduce((a,d)=>a+(salesOf(d,"本店")||0)+(salesOf(d,"マルコ")||0)+fhSales(d),0);
+  const fhTot=shown.reduce((a,d)=>a+fhSales(d),0), fhN=shown.reduce((a,d)=>a+((fh.by[d]||{}).n||0),0);
   const rl=(c,s,n)=>n?`<div class="d">人件費率 <b class="rtv">${ratioTxt(c,s)}</b>（売上 ${yen(s)}／${n}日分）</div>`:`<div class="d">売上未入力</div>`;
   document.getElementById("sum").innerHTML=`
-    <div class="tile"><div class="lb">合計（${shown[0].slice(5)}〜${lastPunch.slice(5)}）</div><div class="v">${yen(all)}</div><div class="d">実働 ${(hrs.本店+hrs.マルコ).toFixed(1)}h</div>${rl(allC,allS,both.length)}</div>
+    <div class="tile"><div class="lb">全社（${shown[0].slice(5)}〜${lastPunch.slice(5)}）</div><div class="v">${yen(all)}</div><div class="d">実働 ${(hrs.本店+hrs.マルコ).toFixed(1)}h</div>${rl(allC,allS,both.length)}</div>
     <div class="tile h"><div class="lb">本店</div><div class="v">${yen(tot.本店)}</div><div class="d">営業日平均 ${yen(tot.本店/Math.max(1,openN.本店))} ／ ${openN.本店}日</div>${rl(rs.本店.c,rs.本店.s,rs.本店.n)}</div>
-    <div class="tile m"><div class="lb">マルコ</div><div class="v">${yen(tot.マルコ)}</div><div class="d">営業日平均 ${yen(tot.マルコ/Math.max(1,openN.マルコ))} ／ ${openN.マルコ}日</div>${rl(rs.マルコ.c,rs.マルコ.s,rs.マルコ.n)}</div>`;
+    <div class="tile m"><div class="lb">マルコ</div><div class="v">${yen(tot.マルコ)}</div><div class="d">営業日平均 ${yen(tot.マルコ/Math.max(1,openN.マルコ))} ／ ${openN.マルコ}日</div>${rl(rs.マルコ.c,rs.マルコ.s,rs.マルコ.n)}</div>
+    <div class="tile f"><div class="lb">FishHack 売上（${cfg.tax||"税抜"}）</div><div class="v">${yen(fhTot)}</div><div class="d">納品 ${fhN}件 ／ 人件費は本店に含む</div><div class="d" id="fhStatus"></div><button class="btn sm" id="fhReload" type="button">再取得</button></div>`;
+  renderFhStatus(); document.getElementById("fhReload").onclick=loadFishHack;
   renderDayType(res,shown,issuesToday(issues));
   const missingM=people.filter(p=>cfg.staff[p.name].type==="月給"&&cfg.staff[p.name].include!==false&&!num(cfg.staff[p.name].rate)).map(p=>p.name);
   const notM=people.filter(p=>cfg.staff[p.name].notInMaster).map(p=>p.name);
@@ -351,27 +380,29 @@ function renderDaily(){
   const sc=cfg.salesCol||{};document.getElementById("colNote").textContent="売上の列："+STORES.map(st=>`${st}＝${sc[st]||"未取込"}`).join("　");
   document.getElementById("alerts").innerHTML=al.concat(issues).map(a=>`<div class="al ${a.lv}">${a.t}</div>`).join("");
   document.getElementById("sumNote").textContent=`月給者は営業日ごとに一定額を計上（休みの日も含む）。人件費率は売上が入っている日だけで計算。`;
-  let h=`<thead><tr><th class="l" rowspan="2">日付</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th colspan="3" class="grp">合計</th><th rowspan="2">実働h</th></tr>
-    <tr><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>売上</th><th>率</th></tr></thead><tbody>`;
+  let h=`<thead><tr><th class="l" rowspan="2">日付</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th class="grp gf">FishHack</th><th colspan="3" class="grp">全社</th><th rowspan="2">実働h</th></tr>
+    <tr><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>売上</th><th>率</th><th class="rt">売上</th><th>人件費</th><th>売上</th><th>率</th></tr></thead><tbody>`;
   const sumS={本店:0,マルコ:0};
   shown.forEach(d=>{
     const b=res[d].本店, m=res[d].マルコ, t=b.cost+m.cost, dw=DOW[new Date(d).getDay()];
-    const sb=salesOf(d,"本店"), sm=salesOf(d,"マルコ"), st=(sb||0)+(sm||0);
+    const sb=salesOf(d,"本店"), sm=salesOf(d,"マルコ"), sf=fhSales(d), st=(sb||0)+(sm||0)+sf;
     sumS.本店+=sb||0; sumS.マルコ+=sm||0;
     const cl=closedSet("本店").has(d)&&closedSet("マルコ").has(d);
     const hol=HOLIDAYS[d];
     h+=`<tr class="day${cl?" closed":""}" data-d="${d}"><td class="l">${d.slice(5)} <span class="dow-${hol?"日":dw}">${dw}</span>${hol?'<span class="chip s">'+hol+'</span>':""}${cl?'<span class="chip s">定休</span>':""}</td>
       <td>${b.cost?yen(b.cost):"—"}</td><td class="sl">${sb!=null?yen(sb):"—"}</td>${ratioCell(b.cost,sb)}
       <td>${m.cost?yen(m.cost):"—"}</td><td class="sl">${sm!=null?yen(sm):"—"}</td>${ratioCell(m.cost,sm)}
+      <td class="sl rt">${sf?yen(sf):"—"}</td>
       <td><b>${t?yen(t):"—"}</b></td><td class="sl">${st?yen(st):"—"}</td>${ratioCell(t,(sb>0&&(sm>0||closedSet("マルコ").has(d)))||(sm>0&&closedSet("本店").has(d))?st:null)}
       <td>${(b.h+m.h).toFixed(1)}</td></tr>`;
-    if(openOpen.has(d)) h+=`<tr class="det"><td colspan="11"><div class="det-in">
+    if(openOpen.has(d)) h+=`<tr class="det"><td colspan="12"><div class="det-in">
       <div class="sin"><label for="sb-${d}">本店 売上<input id="sb-${d}" data-d="${d}" data-s="本店" type="number" min="0" step="1" value="${sb??""}"></label>
       <label for="sm-${d}">マルコ 売上<input id="sm-${d}" data-d="${d}" data-s="マルコ" type="number" min="0" step="1" value="${sm??""}"></label></div>
       ${detail(res[d])}</div></td></tr>`;
   });
   h+=`<tr class="tot"><td class="l">計</td><td>${yen(tot.本店)}</td><td class="sl">${sumS.本店?yen(sumS.本店):"—"}</td><td class="rt">${ratioTxt(rs.本店.c,rs.本店.s)}</td>
     <td>${yen(tot.マルコ)}</td><td class="sl">${sumS.マルコ?yen(sumS.マルコ):"—"}</td><td class="rt">${ratioTxt(rs.マルコ.c,rs.マルコ.s)}</td>
+    <td class="sl rt">${fhTot?yen(fhTot):"—"}</td>
     <td>${yen(all)}</td><td class="sl">${allS?yen(allS):"—"}</td><td class="rt">${ratioTxt(allC,allS)}</td><td>${(hrs.本店+hrs.マルコ).toFixed(1)}</td></tr></tbody>`;
   const tb=document.getElementById("daily"); tb.innerHTML=h;
   tb.querySelectorAll("tr.day").forEach(tr=>tr.onclick=()=>{const d=tr.dataset.d;openOpen.has(d)?openOpen.delete(d):openOpen.add(d);renderDaily()});
@@ -384,20 +415,20 @@ function renderDayType(res,shown,todayOpen){
   const groups=[["平日",d=>dayKind(d)==="平"],["土日祝",d=>dayKind(d)!=="平"],["　土",d=>dayKind(d)==="土"],["　日・祝",d=>dayKind(d)==="日"||dayKind(d)==="祝"]];
   const use=shown.filter(d=>!(closedSet("本店").has(d)&&closedSet("マルコ").has(d))&&!(todayOpen&&d===today));
   const avg=(ds,f)=>ds.length?ds.reduce((a,d)=>a+f(d),0)/ds.length:null;
-  const rat=(ds,stores)=>{let c=0,s=0;ds.forEach(d=>{const ok=stores.every(st=>closedSet(st).has(d)||salesOf(d,st)>0);if(!ok)return;stores.forEach(st=>{c+=res[d][st].cost;s+=salesOf(d,st)||0})});return s>0?c/s*100:null};
+  const rat=(ds,stores,withFh)=>{let c=0,s=0;ds.forEach(d=>{const ok=stores.every(st=>closedSet(st).has(d)||salesOf(d,st)>0);if(!ok)return;stores.forEach(st=>{c+=res[d][st].cost;s+=salesOf(d,st)||0});if(withFh)s+=fhSales(d)});return s>0?c/s*100:null};
   const savg=(ds,st)=>{const x=ds.map(d=>salesOf(d,st)).filter(v=>v>0);return x.length?x.reduce((a,b)=>a+b,0)/x.length:null};
   const stats=groups.map(([lb,fn])=>{const ds=use.filter(fn);return {lb,n:ds.length,
     h:avg(ds,d=>res[d].本店.cost),m:avg(ds,d=>res[d].マルコ.cost),t:avg(ds,d=>res[d].本店.cost+res[d].マルコ.cost),hr:avg(ds,d=>res[d].本店.h+res[d].マルコ.h),
-    sh:savg(ds,"本店"),sm:savg(ds,"マルコ"),rh:rat(ds,["本店"]),rm:rat(ds,["マルコ"]),rt:rat(ds,["本店","マルコ"])}});
+    sh:savg(ds,"本店"),sm:savg(ds,"マルコ"),rh:rat(ds,["本店"]),rm:rat(ds,["マルコ"]),rt:rat(ds,["本店","マルコ"],true),sf:avg(ds,d=>fhSales(d))}});
   const f=v=>v==null?"—":yen(v), fh=v=>v==null?"—":v.toFixed(1), fr=v=>{if(v==null)return "—";const t=num(cfg.target||30);return `<span class="pill ${v<=t?"ok":v<=t+5?"w":"c"}">${v.toFixed(1)}%</span>`};
-  let h=`<thead><tr><th class="l" rowspan="2">区分</th><th rowspan="2">日数</th><th colspan="3" class="grp gh">本店（1日平均）</th><th colspan="3" class="grp gm">マルコ（1日平均）</th><th colspan="2" class="grp">合計</th><th rowspan="2">実働h</th></tr>
-    <tr><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>率</th></tr></thead><tbody>`;
-  stats.forEach((x,i)=>h+=`<tr${i<2?' style="font-weight:700"':' class="subrow"'}><td class="l">${x.lb}</td><td>${x.n}</td><td>${f(x.h)}</td><td class="sl">${f(x.sh)}</td><td class="rt">${fr(x.rh)}</td><td>${f(x.m)}</td><td class="sl">${f(x.sm)}</td><td class="rt">${fr(x.rm)}</td><td>${f(x.t)}</td><td class="rt">${fr(x.rt)}</td><td>${fh(x.hr)}</td></tr>`);
+  let h=`<thead><tr><th class="l" rowspan="2">区分</th><th rowspan="2">日数</th><th colspan="3" class="grp gh">本店（1日平均）</th><th colspan="3" class="grp gm">マルコ（1日平均）</th><th class="grp gf">FishHack</th><th colspan="2" class="grp">全社</th><th rowspan="2">実働h</th></tr>
+    <tr><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>売上</th><th>率</th><th class="rt">売上</th><th>人件費</th><th>率</th></tr></thead><tbody>`;
+  stats.forEach((x,i)=>h+=`<tr${i<2?' style="font-weight:700"':' class="subrow"'}><td class="l">${x.lb}</td><td>${x.n}</td><td>${f(x.h)}</td><td class="sl">${f(x.sh)}</td><td class="rt">${fr(x.rh)}</td><td>${f(x.m)}</td><td class="sl">${f(x.sm)}</td><td class="rt">${fr(x.rm)}</td><td class="sl rt">${f(x.sf)}</td><td>${f(x.t)}</td><td class="rt">${fr(x.rt)}</td><td>${fh(x.hr)}</td></tr>`);
   const a=stats[0],b=stats[1];
   const pt=(x,y)=>x==null||y==null?"—":((y-x>=0?"+":"−")+Math.abs(y-x).toFixed(1)+"pt");
-  if(a.t!=null&&b.t!=null)h+=`<tr class="tot"><td class="l">土日祝−平日</td><td></td><td>${sg(b.h-a.h)}</td><td class="sl">${a.sh!=null&&b.sh!=null?sg(b.sh-a.sh):"—"}</td><td class="rt">${pt(a.rh,b.rh)}</td><td>${sg(b.m-a.m)}</td><td class="sl">${a.sm!=null&&b.sm!=null?sg(b.sm-a.sm):"—"}</td><td class="rt">${pt(a.rm,b.rm)}</td><td>${sg(b.t-a.t)}</td><td class="rt">${pt(a.rt,b.rt)}</td><td>${(b.hr-a.hr>=0?"+":"")+(b.hr-a.hr).toFixed(1)}</td></tr>`;
+  if(a.t!=null&&b.t!=null)h+=`<tr class="tot"><td class="l">土日祝−平日</td><td></td><td>${sg(b.h-a.h)}</td><td class="sl">${a.sh!=null&&b.sh!=null?sg(b.sh-a.sh):"—"}</td><td class="rt">${pt(a.rh,b.rh)}</td><td>${sg(b.m-a.m)}</td><td class="sl">${a.sm!=null&&b.sm!=null?sg(b.sm-a.sm):"—"}</td><td class="rt">${pt(a.rm,b.rm)}</td><td class="sl rt">${a.sf!=null&&b.sf!=null?sg(b.sf-a.sf):"—"}</td><td>${sg(b.t-a.t)}</td><td class="rt">${pt(a.rt,b.rt)}</td><td>${(b.hr-a.hr>=0?"+":"")+(b.hr-a.hr).toFixed(1)}</td></tr>`;
   document.getElementById("dayType").innerHTML=h+"</tbody>";
-  document.getElementById("dtNote").textContent=`営業日のみで平均（定休日${todayOpen?"・勤務中の今日":""}は除外）。率＝その区分の人件費合計÷売上合計（売上がある日のみ）。祝日は国民の祝日・振替休日・国民の休日。`;
+  document.getElementById("dtNote").textContent=`営業日のみで平均（定休日${todayOpen?"・勤務中の今日":""}は除外）。率＝その区分の人件費合計÷売上合計（売上がある日のみ）。全社の率はFishHack売上を含む（FishHackの作業は本店の人件費に含まれる）。祝日は国民の祝日・振替休日・国民の休日。`;
 }
 function sg(v){return (v>=0?"+":"−")+yen(Math.abs(v))}
 function detail(day){
