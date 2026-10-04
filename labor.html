@@ -250,6 +250,7 @@ function ingest(text){
     cfg.closed[pk]={};
     STORES.forEach(s=>{cfg.closed[pk][s]=dates.filter(dt=>dt<=today && !rows.some(r=>r.store===s&&r.date===dt))});
   }
+  const rs=rawGet().sales||{};STORES.forEach(st=>{if(rs[st])importSales(rs[st],st,true)});
   saveCfg(); renderAll();
 }
 function buildPeople(){
@@ -470,7 +471,10 @@ function toDate(cell){
   m=cell.match(/(\d{4})[\/\-年.](\d{1,2})[\/\-月.](\d{1,2})/);
   if(m)return `${m[1]}/${m[2].padStart(2,"0")}/${m[3].padStart(2,"0")}`;
   m=cell.match(/(\d{1,2})[\/月](\d{1,2})/);
-  if(m&&dates.length){const md=`${m[1].padStart(2,"0")}/${m[2].padStart(2,"0")}`;const hit=dates.find(d=>d.slice(5)===md);if(hit)return hit}
+  if(m){const md=`${m[1].padStart(2,"0")}/${m[2].padStart(2,"0")}`;
+    if(dates.length){const hit=dates.find(d=>d.slice(5)===md);if(hit)return hit}
+    // 年が書かれていない日付：今日から見て未来になりすぎない年を採用
+    const now=new Date();let y=now.getFullYear();if(+m[1]>now.getMonth()+2)y--;return `${y}/${md}`}
   return null;
 }
 // 売上CSV: 日付列と金額列を自動判定。品目行なら日付ごとに合算
