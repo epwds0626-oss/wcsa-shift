@@ -119,7 +119,7 @@ td.rt{border-right:1px solid var(--line)} tr.subrow td{color:var(--sub);font-siz
 <div id="toast" class="al" hidden role="status" style="max-width:1060px;margin:12px auto 0;position:sticky;top:0;z-index:20"></div>
 <div id="empty" class="emptyb" hidden><h2>まだデータがありません</h2>
   <p>右上のボタンから次のCSVを読み込んでください。読み込んだデータはこの端末の中だけに保存され、WCSAのサーバーやGitHubには送られません。</p>
-  <ol><li>打刻管理CSV（給与システムの打刻管理 → CSV出力）</li><li>スタッフマスタCSV</li><li>本店 売上実績CSV（当年日付・当年実績）</li><li>マルコ 日報一覧CSV（aggregateRegiPaymentList）</li></ol></div>
+  <ol><li>打刻管理CSV（給与システムの打刻管理 → CSV出力）</li><li>（単価は給与システムの従業員マスタから自動取得）</li><li>本店 売上実績CSV（当年日付・当年実績）</li><li>マルコ 日報一覧CSV（aggregateRegiPaymentList）</li></ol></div>
 <main id="app" hidden>
   <section>
     <div class="sum" id="sum"></div>
@@ -146,7 +146,8 @@ td.rt{border-right:1px solid var(--line)} tr.subrow td{color:var(--sub);font-siz
   <section class="grid2">
     <div class="panel" style="grid-column:1/-1">
       <h2>人別の単価</h2>
-      <p class="note">時給者は「時給×実働＋残業・深夜割増25%＋交通費/日」。月給者は「目標総支給額÷その店の営業日数」を営業日に均等配分。単価はスタッフマスタから自動入力（打刻CSV・マスタCSVどちらも上のボタンで読み込めます）。派遣・外注は「単価×実働」で社保なし。入力値はこのブラウザに保存されます。</p>
+      <p class="note"><span id="masterStatus"></span> <button class="btn sm" id="masterReload" type="button">再取得</button></p>
+      <p class="note">時給者は「時給×実働＋残業・深夜割増25%＋交通費/日」。月給者は「目標総支給額÷その店の営業日数」を営業日に均等配分。単価は給与システムの従業員マスタから自動で取得（取れないときはスタッフマスタCSVで代用）。ここで変えた値は次に取得し直すまでの一時的な変更です。派遣・外注は「単価×実働」で社保なし。入力値はこのブラウザに保存されます。</p>
       <div class="wrap" style="border:none"><table class="form" id="staff"></table></div>
     </div>
     <div style="display:contents">
@@ -223,6 +224,52 @@ function applyMaster(text){
   Object.entries(master).forEach(([n,v])=>{cfg.staff[n]=v});
   saveCfg();
 }
+// ===== 給与システムの従業員マスタ（Firebase: payroll/employees）から単価を取得 =====
+const PAYROLL_DB="https://wcsa-shift-default-rtdb.firebaseio.com";
+let masterStatus="未取得";
+function ageOf(bd){if(!bd)return null;const b=new Date(bd),t=new Date();if(isNaN(b))return null;return t.getFullYear()-b.getFullYear()-((t.getMonth()<b.getMonth()||(t.getMonth()===b.getMonth()&&t.getDate()<b.getDate()))?1:0)}
+function applyEmployees(list){
+  let n=0;
+  list.forEach(e=>{
+    if(!e||!e.name)return;
+    if(e.status==="inactive"||e.status==="leave")return;
+    const name=norm(e.name);
+    let type="時給";
+    if(e.payType==="月給")type="月給";
+    else if(e.type==="業務委託")type=/フルキャスト/.test(name)?"派遣":"外注";
+    const ins=!/派遣|外注/.test(type), age=ageOf(e.birthDate);
+    // 通勤手当（給与システムと同じルール）: 距離=片道km×2×10円/日（大洗町在住は0）、日額=commutePerDay、固定=月額commute
+    let perDay=0,monthly=0;
+    if(e.commuteType==="distance")perDay=String(e.address||"").includes("大洗町")?0:Math.round((+e.commuteKm||0)*2*10);
+    else if(e.commuteType==="daily")perDay=+e.commutePerDay||0;
+    else monthly=+e.commute||0;
+    const prev=cfg.staff[name]||{};
+    const fixedOT=type==="月給"&&(+e.fixedOTHours||0)>0?Math.round((+e.fixedOTHours)*(+e.hourlyWage||0)*1.25):0;
+    cfg.staff[name]={type,
+      rate:type==="月給"?((+e.targetGross||0)||((+e.baseSalary||0)+(+e.positionAllowance||0)+fixedOT+monthly)):(+e.hourlyWage||0),
+      commute:type==="時給"?perDay:0, cmMonthly:type==="時給"?monthly:0,
+      shaho:ins&&e.shakai==="加入", koyo:ins&&e.koyo==="加入",
+      kaigo:ins&&e.shakai==="加入"&&age!==null&&age>=40&&age<65,
+      age, home:e.store==="マルコ"?"マルコ":"本店",
+      include:prev.fromPayroll&&prev.include!==undefined?prev.include:!(e.dept==="管理"),
+      prov:false, fromMaster:true, fromPayroll:true};
+    n++;
+  });
+  saveCfg();return n;
+}
+async function loadPayrollMaster(){
+  masterStatus="給与システムから取得中…";renderMasterStatus();
+  try{
+    const r=await fetch(`${PAYROLL_DB}/payroll/employees.json`);
+    if(!r.ok)throw new Error(r.status);
+    const d=await r.json(); const list=Array.isArray(d)?d:Object.values(d||{});
+    const n=applyEmployees(list);
+    if(!n)throw new Error("empty");
+    const t=new Date();masterStatus=`給与システムの従業員マスタから取得（${n}名・${t.getHours()}:${String(t.getMinutes()).padStart(2,"0")}）`;
+    renderMasterStatus();return true;
+  }catch(e){masterStatus="給与システムから取得できませんでした（スタッフマスタCSVで代用できます）";renderMasterStatus();return false}
+}
+function renderMasterStatus(){const el=document.getElementById("masterStatus");if(el)el.textContent=masterStatus}
 const norm=n=>n.replace(/【.*?】/g,"").replace(/[\s　]+/g," ").trim();
 const num=v=>{const x=parseFloat(v);return isFinite(x)?x:0};
 const yen=v=>"¥"+Math.round(v).toLocaleString("ja-JP");
@@ -288,7 +335,8 @@ function compute(){
     if(st.type==="月給"){ res[r.date][r.store].h+=r.work; return; }
     const rate=num(st.rate); let gross=0, er=0;
     if(r.work>0){
-      gross = st.type==="時給" ? rate*r.work + rate*0.25*(r.ot+r.night) + num(st.commute) : rate*r.work;
+      const cmDay=num(st.cmMonthly)?num(st.cmMonthly)/Math.max(1,rows.filter(x=>x.name===r.name&&x.work>0).length):0;
+      gross = st.type==="時給" ? rate*r.work + rate*0.25*(r.ot+r.night) + num(st.commute) + cmDay : rate*r.work;
       if(st.type==="時給"){ er = gross*((st.shaho?sr:0) + (st.koyo?R.koyo/100:0) + R.rousai/100); }
     }
     const c=res[r.date][r.store]; c.cost+=gross+er; c.h+=r.work;
@@ -552,10 +600,11 @@ document.getElementById("clearSales").onclick=()=>{const b=document.getElementBy
   const ks=new Set(dates);Object.keys(cfg.sales||{}).forEach(k=>{if(ks.has(k))delete cfg.sales[k]});saveCfg();b.dataset.arm="";b.textContent="売上を全消去";renderDaily()};
 
 async function sha(t){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
-function boot(){
+async function boot(){
   document.getElementById("lock").hidden=true;
   const r=rawGet();
-  if(r.master)applyMaster(r.master);
+  const ok=await loadPayrollMaster();
+  if(!ok&&r.master)applyMaster(r.master);
   if(r.tc){ingest(r.tc)}else{document.getElementById("empty").hidden=false;document.getElementById("app").hidden=true}
 }
 async function tryUnlock(){
@@ -564,6 +613,7 @@ async function tryUnlock(){
   else{document.getElementById("pwErr").hidden=false}
 }
 document.getElementById("pwBtn").onclick=tryUnlock;
+document.getElementById("masterReload").onclick=async()=>{if(await loadPayrollMaster()&&rows.length){buildPeople();renderAll()}};
 document.getElementById("pw").onkeydown=e=>{if(e.key==="Enter")tryUnlock()};
 document.getElementById("lockNow").onclick=()=>{try{sessionStorage.removeItem("jinkenhi-ok")}catch(e){}location.reload()};
 document.getElementById("homeBtn").onclick=()=>{try{sessionStorage.removeItem("jinkenhi-ok")}catch(e){}
