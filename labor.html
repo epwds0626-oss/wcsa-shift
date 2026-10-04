@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow">
+<title>日別人件費</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+/* Layout: 上に期間サマリー → 日別テーブル(行クリックで内訳) → 設定(人別単価・料率・営業日) */
+:root{
+  --bg:#f3f0e9; --panel:#fbfaf6; --ink:#1c2541; --sub:#5d6276; --line:#ddd7c9;
+  --navy:#1b2747; --gold:#b8913a; --honten:#1b2747; --marco:#b5532f;
+  --warn:#a5660b; --warnbg:#fbefd6; --crit:#b23a2e; --critbg:#f8e2de; --ok:#2f6b47;
+  --display:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;
+  --body:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12172a; --panel:#1a2038; --ink:#ebe7dc; --sub:#a3a7b8; --line:#2d3452;
+  --navy:#0d1222; --gold:#d6b25e; --honten:#8fa6e0; --marco:#e48a62;
+  --warn:#e3b05a; --warnbg:#3a2f17; --crit:#ef8a7e; --critbg:#3d1f1c; --ok:#79c495; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12172a; --panel:#1a2038; --ink:#ebe7dc; --sub:#a3a7b8; --line:#2d3452;
+  --navy:#0d1222; --gold:#d6b25e; --honten:#8fa6e0; --marco:#e48a62;
+  --warn:#e3b05a; --warnbg:#3a2f17; --crit:#ef8a7e; --critbg:#3d1f1c; --ok:#79c495; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.6}
+header{background:var(--navy);color:#f3efe3;border-bottom:3px solid var(--gold);padding:14px 16px}
+header .in{max-width:1060px;margin:0 auto;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+header h1{font-family:var(--display);font-weight:900;font-size:20px;margin:0;color:var(--gold);letter-spacing:.04em}
+header .sub{font-size:12px;opacity:.8}
+.btn{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 12px;cursor:pointer}
+header .btn{background:var(--gold);color:#1b2747;border-color:var(--gold)}
+.btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+main{max-width:1060px;margin:0 auto;padding-inline:16px;padding-block:20px 60px;display:grid;gap:22px}
+h2{font-family:var(--display);font-size:16px;font-weight:900;margin:0 0 10px;letter-spacing:.03em;text-wrap:balance}
+.note{color:var(--sub);font-size:12px}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.tile .lb{font-size:12px;color:var(--sub);letter-spacing:.06em}
+.tile .v{font-family:var(--display);font-weight:900;font-size:26px;font-variant-numeric:tabular-nums}
+.tile .d{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+.tile.h .v{color:var(--honten)} .tile.m .v{color:var(--marco)}
+.alerts{display:grid;gap:6px}
+.al{border-radius:8px;padding:8px 12px;font-size:13px}
+.al.w{background:var(--warnbg);color:var(--warn)} .al.c{background:var(--critbg);color:var(--crit)}
+.wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-size:12px;color:var(--sub);font-weight:700;background:var(--panel);position:sticky;top:0}
+td.l,th.l{text-align:left}
+tr.day{cursor:pointer} tr.day:hover td{background:color-mix(in srgb,var(--gold) 9%,transparent)}
+tr.closed td{color:var(--sub)}
+tr.tot td{font-weight:700;border-top:2px solid var(--ink)}
+.bar{display:flex;height:10px;width:150px;border-radius:3px;overflow:hidden;background:color-mix(in srgb,var(--line) 60%,transparent)}
+.bar i{display:block;height:100%} .bar .bh{background:var(--honten)} .bar .bm{background:var(--marco)}
+.dow-土{color:#3a6fb0} .dow-日{color:var(--crit)}
+.chip{display:inline-block;font-size:11px;border-radius:99px;padding:0 7px;margin-left:4px;border:1px solid currentColor}
+.chip.w{color:var(--warn)} .chip.s{color:var(--sub)}
+tr.det td{background:var(--bg);padding:0}
+.det-in{padding:10px 14px}
+.det-in table th,.det-in table td{padding:4px 8px;font-size:12.5px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+.form td,.form th{padding:5px 6px}
+input[type=number],select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 6px;width:100%}
+input[type=number]{text-align:right;font-variant-numeric:tabular-nums}
+input.empty{border-color:var(--crit);background:var(--critbg)}
+td.c{text-align:center}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal button{font:inherit;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:4px 0;cursor:pointer;background:var(--panel);color:var(--ink);font-variant-numeric:tabular-nums}
+.cal button.off{background:var(--bg);color:var(--sub);text-decoration:line-through}
+.cal .hd{font-size:11px;text-align:center;color:var(--sub)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.rates{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.rates label{font-size:12px;color:var(--sub);display:grid;gap:3px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+details summary{cursor:pointer;font-weight:700}
+.toolbar{display:flex;gap:12px 18px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.pill{display:inline-block;min-width:52px;text-align:center;border-radius:99px;padding:1px 8px;font-weight:700;font-size:12.5px}
+.pill.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.pill.w{background:var(--warnbg);color:var(--warn)} .pill.c{background:var(--critbg);color:var(--crit)}
+td.sl{color:var(--sub)} th.grp{text-align:center;border-bottom:2px solid var(--line)} th.gh{color:var(--honten)} th.gm{color:var(--marco)}
+td.rt{border-right:1px solid var(--line)} tr.subrow td{color:var(--sub);font-size:13px}
+.rtv{font-family:var(--display);font-size:15px;color:var(--ink)}
+.al.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.sin{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px}.sin label{display:grid;gap:2px;font-size:12px;color:var(--sub)}.sin input{width:150px}
+.lock{position:fixed;inset:0;z-index:1000;background:var(--navy);display:grid;place-items:center;padding:16px}
+.lock-in{display:grid;gap:12px;justify-items:center;width:min(320px,100%);color:#f3efe3}
+.lock-in .note{color:#c9cbd6}
+.lock-t{font-family:var(--display);font-weight:900;font-size:24px;color:var(--gold);letter-spacing:.06em}
+.lock-in input{font:inherit;font-size:18px;width:100%;text-align:center;padding:10px;border-radius:8px;border:1px solid var(--gold);background:#0f1730;color:#f3efe3;letter-spacing:.2em}
+.btn.gold{background:var(--gold);color:#1b2747;border-color:var(--gold);width:100%}
+.emptyb{max-width:640px;margin:40px auto;padding-inline:16px}
+#homeBtn{background:transparent;color:#f3efe3;border-color:rgba(255,255,255,.3);padding:6px 10px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head><body>
+
+<div id="lock" class="lock"><div class="lock-in">
+  <div class="lock-t">日別人件費</div><div class="note">管理者専用。パスワードを入力してください</div>
+  <input id="pw" type="password" autocomplete="current-password" inputmode="text" aria-label="パスワード">
+  <button class="btn gold" id="pwBtn" type="button">開く</button>
+  <div id="pwErr" class="al c" hidden>パスワードが違います</div>
+  <button class="btn" type="button" onclick="(function(){try{if(parent&&parent!==window&&parent.switchMode){parent.switchMode('shift');return}}catch(e){}location.href='./'})()">WCSAに戻る</button>
+</div></div>
+<header><div class="in">
+  <div style="display:flex;gap:10px;align-items:center"><button class="btn" id="homeBtn" type="button" aria-label="WCSAに戻る">🏠</button><div><h1>日別人件費</h1><div class="sub" id="period">CSVを読み込んでください</div></div></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <label class="btn" for="csvIn" style="display:inline-block">打刻・マスタCSV</label>
+    <input id="csvIn" type="file" accept=".csv,.txt,.tsv" multiple hidden>
+    <label class="btn" for="sales-本店" style="display:inline-block">本店 売上CSV</label>
+    <input id="sales-本店" type="file" accept=".csv,.txt,.tsv" hidden>
+    <label class="btn" for="sales-マルコ" style="display:inline-block">マルコ 売上CSV</label>
+    <input id="sales-マルコ" type="file" accept=".csv,.txt,.tsv" hidden>
+  </div>
+</div></header>
+
+<div id="toast" class="al" hidden role="status" style="max-width:1060px;margin:12px auto 0;position:sticky;top:0;z-index:20"></div>
+<div id="empty" class="emptyb" hidden><h2>まだデータがありません</h2>
+  <p>右上のボタンから次のCSVを読み込んでください。読み込んだデータはこの端末の中だけに保存され、WCSAのサーバーやGitHubには送られません。</p>
+  <ol><li>打刻管理CSV（給与システムの打刻管理 → CSV出力）</li><li>スタッフマスタCSV</li><li>本店 売上実績CSV（当年日付・当年実績）</li><li>マルコ 日報一覧CSV（aggregateRegiPaymentList）</li></ol></div>
+<main id="app" hidden>
+  <section>
+    <div class="sum" id="sum"></div>
+    <p class="note" id="sumNote"></p>
+  </section>
+  <section>
+    <h2>曜日区分の平均</h2>
+    <div class="wrap"><table id="dayType"></table></div>
+    <p class="note" id="dtNote"></p>
+  </section>
+  <section class="alerts" id="alerts"></section>
+
+  <section>
+    <h2>日別</h2>
+    <div class="toolbar"><span class="note">行をタップ → 人別の内訳と売上の手入力</span>
+      <label for="target" class="note">目標人件費率 <input id="target" type="number" min="1" max="100" step="0.5" style="width:70px"> %</label>
+      <span class="legend"><span style="--c:var(--ok)">目標以内</span><span style="--c:var(--warn)">+5pt以内</span><span style="--c:var(--crit)">超過</span></span>
+      <label for="tax" class="note">売上の基準 <select id="tax" style="width:auto"><option>税抜</option><option>税込</option></select></label>
+      <button class="btn" id="clearSales" type="button">売上を全消去</button></div>
+    <p class="note" id="colNote"></p>
+    <div class="wrap"><table id="daily"></table></div>
+  </section>
+
+  <section class="grid2">
+    <div class="panel" style="grid-column:1/-1">
+      <h2>人別の単価</h2>
+      <p class="note">時給者は「時給×実働＋残業・深夜割増25%＋交通費/日」。月給者は「目標総支給額÷その店の営業日数」を営業日に均等配分。単価はスタッフマスタから自動入力（打刻CSV・マスタCSVどちらも上のボタンで読み込めます）。派遣・外注は「単価×実働」で社保なし。入力値はこのブラウザに保存されます。</p>
+      <div class="wrap" style="border:none"><table class="form" id="staff"></table></div>
+    </div>
+    <div style="display:contents">
+      <div class="panel">
+        <h2>会社負担の料率</h2>
+        <div class="rates" id="rates"></div>
+        <p class="note">初期値は概算です。給与システム（data.js）の料率と合わせてください。社保は標準報酬ではなく当日の総支給額に掛けて近似しています。介護保険は生年月日から40〜64歳の社保加入者に自動で掛けています。</p>
+      </div>
+      <div class="panel">
+        <h2>営業日</h2>
+        <p class="note">タップで営業／定休を切替。月給の日割りの分母になります。過去日で打刻ゼロの日は定休として初期設定。</p>
+        <div id="cals" style="display:grid;gap:14px"></div>
+      </div>
+      <div class="panel">
+        <h2>この端末のデータ</h2>
+        <p class="note">CSVの内容と単価の設定は、この端末のブラウザにだけ保存されます。共用の端末で使ったあとは消去してください。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="lockNow" type="button">ロックする</button><button class="btn" id="wipe" type="button">この端末のデータを消去</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const RAW_KEY="jinkenhi-raw-v1";
+const PASS_SALT="0d64feb306b44f27", PASS_HASH="69bc09eb65d58a4923ed967ae5518379535ad45523f50653b2d01f3d2cdb1be1";
+const STORES = ["本店","マルコ"];
+const HOLIDAYS = {"2026/01/01":"元日","2026/01/12":"成人の日","2026/02/11":"建国記念の日","2026/02/23":"天皇誕生日","2026/03/20":"春分の日","2026/04/29":"昭和の日","2026/05/03":"憲法記念日","2026/05/04":"みどりの日","2026/05/05":"こどもの日","2026/05/06":"振替休日","2026/07/20":"海の日","2026/08/11":"山の日","2026/09/21":"敬老の日","2026/09/22":"国民の休日","2026/09/23":"秋分の日","2026/10/12":"スポーツの日","2026/11/03":"文化の日","2026/11/23":"勤労感謝の日",
+"2027/01/01":"元日","2027/01/11":"成人の日","2027/02/11":"建国記念の日","2027/02/23":"天皇誕生日","2027/03/21":"春分の日","2027/03/22":"振替休日","2027/04/29":"昭和の日","2027/05/03":"憲法記念日","2027/05/04":"みどりの日","2027/05/05":"こどもの日","2027/07/19":"海の日","2027/08/11":"山の日","2027/09/20":"敬老の日","2027/09/23":"秋分の日","2027/10/11":"スポーツの日","2027/11/03":"文化の日","2027/11/23":"勤労感謝の日"};
+function dayKind(d){if(HOLIDAYS[d])return "祝";const w=new Date(d).getDay();return w===6?"土":w===0?"日":"平"}
+const LS_KEY = "jinkenhi-v2";
+
+const DEFAULT_RATES = {kenpo:4.95, kaigo:0.81, kounen:9.15, kosodate:0.115, koyo:0.85, rousai:0.30};
+const RATE_LABEL = {kenpo:"健康保険(会社半分)%", kaigo:"介護保険(40〜64歳・会社半分)%", kounen:"厚生年金(会社半分)%", kosodate:"子育て支援金(会社)%", koyo:"雇用保険(会社)%", rousai:"労災保険%"};
+const MONTHLY_GUESS = []; // 区分はスタッフマスタCSVから判定（公開リポジトリのため氏名は書かない）
+const PROV_HOURLY = 1074; // 仮：茨城県最低賃金(2025年10月〜)
+
+let rows=[], people=[], dates=[], cfg=loadCfg(), openOpen=new Set();
+
+function loadCfg(){try{const s=JSON.parse(localStorage.getItem(LS_KEY)||"null");if(s)return s}catch(e){}return {staff:{},rates:{...DEFAULT_RATES},closed:{}}}
+function rawGet(){try{return JSON.parse(localStorage.getItem(RAW_KEY)||"{}")}catch(e){return {}}}
+function rawSet(k,v){try{const r=rawGet();if(k.includes(".")){const [a,b]=k.split(".");r[a]=r[a]||{};r[a][b]=v}else r[k]=v;localStorage.setItem(RAW_KEY,JSON.stringify(r))}catch(e){}}
+function saveCfg(){try{localStorage.setItem(LS_KEY,JSON.stringify(cfg))}catch(e){}}
+
+function splitLine(l){const out=[];let cur="",q=false;for(let i=0;i<l.length;i++){const ch=l[i];
+  if(q){if(ch=='"'){if(l[i+1]=='"'){cur+='"';i++}else q=false}else cur+=ch}
+  else if(ch=='"')q=true;else if(ch==','){out.push(cur);cur=""}else cur+=ch}out.push(cur);return out}
+function parseCSV(t){
+  t=t.replace(/^\uFEFF/,"").trim();
+  const lines=t.split(/\r?\n/), head=splitLine(lines[0]).map(h=>h.trim());
+  return lines.slice(1).filter(l=>l.trim()).map(l=>{const c=splitLine(l);const o={};head.forEach((h,i)=>o[h]=(c[i]||"").trim());return o});
+}
+let master={};
+function applyMaster(text){
+  if(!text||!text.trim())return;
+  rawSet("master",text);
+  master={};
+  const today=new Date();
+  parseCSV(text).forEach(m=>{
+    if(m["状態"]&&m["状態"]!=="active")return;
+    const name=norm(m["氏名"]);
+    let type="時給";
+    if(m["給与形態"]==="月給")type="月給";
+    else if(m["雇用区分"]==="業務委託")type=/フルキャスト/.test(name)?"派遣":"外注";
+    let age=null;if(m["生年月日"]){const b=new Date(m["生年月日"]);age=today.getFullYear()-b.getFullYear()-((today.getMonth()<b.getMonth()||(today.getMonth()===b.getMonth()&&today.getDate()<b.getDate()))?1:0)}
+    const ins=!/派遣|外注/.test(type);
+    master[name]={type,
+      rate:type==="月給"?(num(m["目標総支給額"])||num(m["基本給"])):num(m["時給"]),
+      commute:type==="時給"?num(m["交通費日額"]):0,
+      shaho:ins&&m["社保"]==="加入", koyo:ins&&m["雇保"]==="加入",
+      kaigo:ins&&m["社保"]==="加入"&&age!==null&&age>=40&&age<65,
+      age, home:m["店舗"]==="マルコ"?"マルコ":"本店",
+      include:!(m["部門"]==="管理"), prov:false, fromMaster:true};
+  });
+  Object.entries(master).forEach(([n,v])=>{cfg.staff[n]=v});
+  saveCfg();
+}
+const norm=n=>n.replace(/【.*?】/g,"").replace(/[\s　]+/g," ").trim();
+const num=v=>{const x=parseFloat(v);return isFinite(x)?x:0};
+const yen=v=>"¥"+Math.round(v).toLocaleString("ja-JP");
+const dstr=d=>`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;
+const DOW="日月火水木金土";
+
+function ingest(text){
+  const raw=parseCSV(text);
+  if(raw.length&&("給与形態" in raw[0])){applyMaster(text);if(rows.length){buildPeople();renderAll()}return}
+  if(!raw.length||!("氏名" in raw[0])||!("実働(h)" in raw[0])){toast("打刻CSV・スタッフマスタCSVのどちらでもありません","c");return}
+  rawSet("tc",text);
+  rows=raw.map(r=>({name:norm(r["氏名"]),store:r["店舗"],date:r["日付"],dow:r["曜日"],in:r["出勤"],out:r["退勤"],
+    brk:[r["休憩1戻"],r["休憩2戻"],r["休憩3戻"]].filter(Boolean),
+    work:num(r["実働(h)"]),ot:num(r["残業(h)"]),night:num(r["深夜(h)"]),miss:!!r["打刻漏れ"]}));
+  // 期間: 最初の日付の21日〜翌20日
+  const ds=rows.map(r=>r.date).sort();
+  const [y,m,d]=ds[0].split("/").map(Number);
+  let start=new Date(y,m-1,21); if(d<21) start=new Date(y,m-2,21);
+  const end=new Date(start.getFullYear(),start.getMonth()+1,20);
+  dates=[]; for(let x=new Date(start);x<=end;x.setDate(x.getDate()+1)) dates.push(dstr(x));
+  document.getElementById("period").textContent=`${dates[0]} 〜 ${dates[dates.length-1]}（${dates.length}日）`;
+  buildPeople();
+  // 定休日の初期値: 過去日で打刻0件
+  const today=dstr(new Date());
+  const pk=dates[0];
+  if(!cfg.closed[pk]){
+    cfg.closed[pk]={};
+    STORES.forEach(s=>{cfg.closed[pk][s]=dates.filter(dt=>dt<=today && !rows.some(r=>r.store===s&&r.date===dt))});
+  }
+  saveCfg(); renderAll();
+}
+function buildPeople(){
+  const map=new Map();
+  rows.forEach(r=>{if(!map.has(r.name))map.set(r.name,new Set());map.get(r.name).add(r.store)});
+  Object.entries(cfg.staff).forEach(([n,v])=>{if(v.fromMaster&&v.type==="月給"&&!map.has(n))map.set(n,new Set([v.home]))});
+  people=[...map.entries()].map(([n,s])=>({name:n,stores:[...s],nopunch:!rows.some(r=>r.name===n)}));
+  people.forEach(p=>{
+    if(!cfg.staff[p.name]){
+      const t=MONTHLY_GUESS.includes(p.name)?"月給":/フルキャスト/.test(p.name)?"派遣":"時給";
+      cfg.staff[p.name]={type:t,rate:t==="時給"?PROV_HOURLY:"",commute:0,shaho:t==="月給",koyo:t==="月給",prov:t==="時給",include:true,notInMaster:true};
+    }
+    if(cfg.staff[p.name].include===undefined)cfg.staff[p.name].include=true;
+  });
+}
+
+function closedSet(s){return new Set((cfg.closed[dates[0]]||{})[s]||[])}
+function openDays(s){const c=closedSet(s);return dates.filter(d=>!c.has(d))}
+
+function compute(){
+  const R=cfg.rates, shahoRate=(+R.kenpo + +R.kounen + +R.kosodate)/100;
+  const res={}; dates.forEach(d=>res[d]={本店:{cost:0,h:0,items:[]},マルコ:{cost:0,h:0,items:[]}});
+  const issues=[]; let inprog=0;
+  // 時給・派遣・外注
+  rows.forEach(r=>{
+    const st=cfg.staff[r.name]; if(!res[r.date]||!res[r.date][r.store])return;
+    const sr=shahoRate+(st.kaigo?R.kaigo/100:0);
+    const suspicious=r.out && r.brk.includes(r.out);
+    if(r.miss&&r.date===dstr(new Date())){inprog++;}
+    else if(r.miss){issues.push({lv:"c",t:`${r.date.slice(5)} ${r.name}（${r.store}）退勤打刻なし → 0円で計上`});}
+    else if(suspicious){issues.push({lv:"w",t:`${r.date.slice(5)} ${r.name}（${r.store}）退勤＝休憩戻 ${r.out}。打刻ミスの可能性`});}
+    if(st.include===false){ return; }
+    if(st.type==="月給"){ res[r.date][r.store].h+=r.work; return; }
+    const rate=num(st.rate); let gross=0, er=0;
+    if(r.work>0){
+      gross = st.type==="時給" ? rate*r.work + rate*0.25*(r.ot+r.night) + num(st.commute) : rate*r.work;
+      if(st.type==="時給"){ er = gross*((st.shaho?sr:0) + (st.koyo?R.koyo/100:0) + R.rousai/100); }
+    }
+    const c=res[r.date][r.store]; c.cost+=gross+er; c.h+=r.work;
+    c.items.push({name:r.name,type:st.type,work:r.work,ot:r.ot,night:r.night,gross,er});
+  });
+  // 月給
+  people.forEach(p=>{
+    const st=cfg.staff[p.name]; if(st.type!=="月給"||st.include===false)return;
+    const amt=num(st.rate);
+    const cnt={}; rows.filter(r=>r.name===p.name).forEach(r=>cnt[r.store]=(cnt[r.store]||0)+1);
+    const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
+    const s=top?top[0]:(st.home||"本店");
+    const sr=shahoRate+(st.kaigo?R.kaigo/100:0);
+    const od=openDays(s); if(!od.length)return;
+    const g=amt/od.length, er=g*((st.shaho?sr:0)+(st.koyo?R.koyo/100:0)+R.rousai/100);
+    od.forEach(d=>{const r=rows.find(x=>x.name===p.name&&x.date===d&&x.store===s);
+      res[d][s].cost+=g+er; res[d][s].items.push({name:p.name,type:"月給",work:r?r.work:0,ot:r?r.ot:0,night:r?r.night:0,gross:g,er,off:!r&&!p.nopunch});});
+  });
+  if(inprog) issues.unshift({lv:"w",t:`今日は ${inprog}名が勤務中（退勤前）のため、今日の時給分は未計上。退勤後にCSVを再読込すると確定します`});
+  return {res,issues};
+}
+
+function renderAll(){document.getElementById("empty").hidden=true;document.getElementById("app").hidden=false;renderStaff();renderRates();renderCals();renderDaily()}
+
+function salesOf(d,s){const v=(cfg.sales||{})[d];return v&&v[s]!=null&&v[s]!==""?num(v[s]):null}
+function ratioCell(cost,sales){
+  if(sales==null||sales<=0)return '<td class="rt">—</td>';
+  const r=cost/sales*100, t=num(cfg.target||30);
+  const cls=r<=t?"ok":r<=t+5?"w":"c";
+  return `<td class="rt"><span class="pill ${cls}">${r.toFixed(1)}%</span></td>`;
+}
+function ratioTxt(cost,sales){return sales>0?(cost/sales*100).toFixed(1)+"%":"—"}
+function renderDaily(){
+  if(!rows.length)return;
+  const {res,issues}=compute();
+  const lastPunch=rows.map(r=>r.date).sort().pop();
+  const shown=dates.filter(d=>d<=lastPunch);
+  const tot={本店:0,マルコ:0}, hrs={本店:0,マルコ:0};
+  shown.forEach(d=>STORES.forEach(s=>{tot[s]+=res[d][s].cost;hrs[s]+=res[d][s].h}));
+  const openN={本店:shown.filter(d=>!closedSet("本店").has(d)).length, マルコ:shown.filter(d=>!closedSet("マルコ").has(d)).length};
+  const all=tot.本店+tot.マルコ;
+  // 売上がある日だけで比率
+  const rs={本店:{c:0,s:0,n:0},マルコ:{c:0,s:0,n:0}};
+  shown.forEach(d=>STORES.forEach(s=>{const v=salesOf(d,s);if(v>0){rs[s].c+=res[d][s].cost;rs[s].s+=v;rs[s].n++}}));
+  const both=shown.filter(d=>!(closedSet("本店").has(d)&&closedSet("マルコ").has(d))&&STORES.every(st=>closedSet(st).has(d)||salesOf(d,st)>0));
+  const allC=both.reduce((a,d)=>a+res[d].本店.cost+res[d].マルコ.cost,0), allS=both.reduce((a,d)=>a+(salesOf(d,"本店")||0)+(salesOf(d,"マルコ")||0),0);
+  const rl=(c,s,n)=>n?`<div class="d">人件費率 <b class="rtv">${ratioTxt(c,s)}</b>（売上 ${yen(s)}／${n}日分）</div>`:`<div class="d">売上未入力</div>`;
+  document.getElementById("sum").innerHTML=`
+    <div class="tile"><div class="lb">合計（${shown[0].slice(5)}〜${lastPunch.slice(5)}）</div><div class="v">${yen(all)}</div><div class="d">実働 ${(hrs.本店+hrs.マルコ).toFixed(1)}h</div>${rl(allC,allS,both.length)}</div>
+    <div class="tile h"><div class="lb">本店</div><div class="v">${yen(tot.本店)}</div><div class="d">営業日平均 ${yen(tot.本店/Math.max(1,openN.本店))} ／ ${openN.本店}日</div>${rl(rs.本店.c,rs.本店.s,rs.本店.n)}</div>
+    <div class="tile m"><div class="lb">マルコ</div><div class="v">${yen(tot.マルコ)}</div><div class="d">営業日平均 ${yen(tot.マルコ/Math.max(1,openN.マルコ))} ／ ${openN.マルコ}日</div>${rl(rs.マルコ.c,rs.マルコ.s,rs.マルコ.n)}</div>`;
+  renderDayType(res,shown,issuesToday(issues));
+  const missingM=people.filter(p=>cfg.staff[p.name].type==="月給"&&cfg.staff[p.name].include!==false&&!num(cfg.staff[p.name].rate)).map(p=>p.name);
+  const notM=people.filter(p=>cfg.staff[p.name].notInMaster).map(p=>p.name);
+  const prov=people.filter(p=>cfg.staff[p.name].prov).length;
+  const al=[];
+  if(missingM.length) al.push({lv:"c",t:`月給額が未入力：${missingM.join("、")}（下の「人別の単価」で入力すると反映）`});
+  if(notM.length) al.push({lv:"w",t:`スタッフマスタにない人：${notM.join("、")}（仮の単価で計算中）`});
+  if(prov) al.push({lv:"w",t:`時給 ${prov}名が仮の値（¥${PROV_HOURLY}）のままです。実際の時給に直してください`});
+  STORES.forEach(s=>{const miss=shown.filter(d=>!closedSet(s).has(d)&&!(salesOf(d,s)>0));if(miss.length&&miss.length<shown.length)al.push({lv:"w",t:`${s}の売上が未入力の営業日：${miss.map(d=>d.slice(5)).join("、")}`})});
+  STORES.forEach(st=>{const z=shown.filter(d=>!closedSet(st).has(d)&&salesOf(d,st)===0);if(z.length)al.push({lv:"w",t:`${st}：売上0円なのに営業日扱いの日：${z.map(d=>d.slice(5)).join("、")}（休業ならカレンダーで定休に）`})});
+  const sc=cfg.salesCol||{};document.getElementById("colNote").textContent="売上の列："+STORES.map(st=>`${st}＝${sc[st]||"未取込"}`).join("　");
+  document.getElementById("alerts").innerHTML=al.concat(issues).map(a=>`<div class="al ${a.lv}">${a.t}</div>`).join("");
+  document.getElementById("sumNote").textContent=`月給者は営業日ごとに一定額を計上（休みの日も含む）。人件費率は売上が入っている日だけで計算。`;
+  let h=`<thead><tr><th class="l" rowspan="2">日付</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th colspan="3" class="grp">合計</th><th rowspan="2">実働h</th></tr>
+    <tr><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>売上</th><th>率</th></tr></thead><tbody>`;
+  const sumS={本店:0,マルコ:0};
+  shown.forEach(d=>{
+    const b=res[d].本店, m=res[d].マルコ, t=b.cost+m.cost, dw=DOW[new Date(d).getDay()];
+    const sb=salesOf(d,"本店"), sm=salesOf(d,"マルコ"), st=(sb||0)+(sm||0);
+    sumS.本店+=sb||0; sumS.マルコ+=sm||0;
+    const cl=closedSet("本店").has(d)&&closedSet("マルコ").has(d);
+    const hol=HOLIDAYS[d];
+    h+=`<tr class="day${cl?" closed":""}" data-d="${d}"><td class="l">${d.slice(5)} <span class="dow-${hol?"日":dw}">${dw}</span>${hol?'<span class="chip s">'+hol+'</span>':""}${cl?'<span class="chip s">定休</span>':""}</td>
+      <td>${b.cost?yen(b.cost):"—"}</td><td class="sl">${sb!=null?yen(sb):"—"}</td>${ratioCell(b.cost,sb)}
+      <td>${m.cost?yen(m.cost):"—"}</td><td class="sl">${sm!=null?yen(sm):"—"}</td>${ratioCell(m.cost,sm)}
+      <td><b>${t?yen(t):"—"}</b></td><td class="sl">${st?yen(st):"—"}</td>${ratioCell(t,(sb>0&&(sm>0||closedSet("マルコ").has(d)))||(sm>0&&closedSet("本店").has(d))?st:null)}
+      <td>${(b.h+m.h).toFixed(1)}</td></tr>`;
+    if(openOpen.has(d)) h+=`<tr class="det"><td colspan="11"><div class="det-in">
+      <div class="sin"><label for="sb-${d}">本店 売上<input id="sb-${d}" data-d="${d}" data-s="本店" type="number" min="0" step="1" value="${sb??""}"></label>
+      <label for="sm-${d}">マルコ 売上<input id="sm-${d}" data-d="${d}" data-s="マルコ" type="number" min="0" step="1" value="${sm??""}"></label></div>
+      ${detail(res[d])}</div></td></tr>`;
+  });
+  h+=`<tr class="tot"><td class="l">計</td><td>${yen(tot.本店)}</td><td class="sl">${sumS.本店?yen(sumS.本店):"—"}</td><td class="rt">${ratioTxt(rs.本店.c,rs.本店.s)}</td>
+    <td>${yen(tot.マルコ)}</td><td class="sl">${sumS.マルコ?yen(sumS.マルコ):"—"}</td><td class="rt">${ratioTxt(rs.マルコ.c,rs.マルコ.s)}</td>
+    <td>${yen(all)}</td><td class="sl">${allS?yen(allS):"—"}</td><td class="rt">${ratioTxt(allC,allS)}</td><td>${(hrs.本店+hrs.マルコ).toFixed(1)}</td></tr></tbody>`;
+  const tb=document.getElementById("daily"); tb.innerHTML=h;
+  tb.querySelectorAll("tr.day").forEach(tr=>tr.onclick=()=>{const d=tr.dataset.d;openOpen.has(d)?openOpen.delete(d):openOpen.add(d);renderDaily()});
+  tb.querySelectorAll(".sin input").forEach(inp=>{inp.onclick=e=>e.stopPropagation();inp.onchange=e=>{
+    const d=inp.dataset.d,s=inp.dataset.s;cfg.sales=cfg.sales||{};cfg.sales[d]=cfg.sales[d]||{};cfg.sales[d][s]=inp.value===""?null:num(inp.value);saveCfg();renderDaily()}});
+}
+function issuesToday(issues){return issues.some(i=>/勤務中/.test(i.t))}
+function renderDayType(res,shown,todayOpen){
+  const today=dstr(new Date());
+  const groups=[["平日",d=>dayKind(d)==="平"],["土日祝",d=>dayKind(d)!=="平"],["　土",d=>dayKind(d)==="土"],["　日・祝",d=>dayKind(d)==="日"||dayKind(d)==="祝"]];
+  const use=shown.filter(d=>!(closedSet("本店").has(d)&&closedSet("マルコ").has(d))&&!(todayOpen&&d===today));
+  const avg=(ds,f)=>ds.length?ds.reduce((a,d)=>a+f(d),0)/ds.length:null;
+  const rat=(ds,stores)=>{let c=0,s=0;ds.forEach(d=>{const ok=stores.every(st=>closedSet(st).has(d)||salesOf(d,st)>0);if(!ok)return;stores.forEach(st=>{c+=res[d][st].cost;s+=salesOf(d,st)||0})});return s>0?c/s*100:null};
+  const savg=(ds,st)=>{const x=ds.map(d=>salesOf(d,st)).filter(v=>v>0);return x.length?x.reduce((a,b)=>a+b,0)/x.length:null};
+  const stats=groups.map(([lb,fn])=>{const ds=use.filter(fn);return {lb,n:ds.length,
+    h:avg(ds,d=>res[d].本店.cost),m:avg(ds,d=>res[d].マルコ.cost),t:avg(ds,d=>res[d].本店.cost+res[d].マルコ.cost),hr:avg(ds,d=>res[d].本店.h+res[d].マルコ.h),
+    sh:savg(ds,"本店"),sm:savg(ds,"マルコ"),rh:rat(ds,["本店"]),rm:rat(ds,["マルコ"]),rt:rat(ds,["本店","マルコ"])}});
+  const f=v=>v==null?"—":yen(v), fh=v=>v==null?"—":v.toFixed(1), fr=v=>{if(v==null)return "—";const t=num(cfg.target||30);return `<span class="pill ${v<=t?"ok":v<=t+5?"w":"c"}">${v.toFixed(1)}%</span>`};
+  let h=`<thead><tr><th class="l" rowspan="2">区分</th><th rowspan="2">日数</th><th colspan="3" class="grp gh">本店（1日平均）</th><th colspan="3" class="grp gm">マルコ（1日平均）</th><th colspan="2" class="grp">合計</th><th rowspan="2">実働h</th></tr>
+    <tr><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>率</th></tr></thead><tbody>`;
+  stats.forEach((x,i)=>h+=`<tr${i<2?' style="font-weight:700"':' class="subrow"'}><td class="l">${x.lb}</td><td>${x.n}</td><td>${f(x.h)}</td><td class="sl">${f(x.sh)}</td><td class="rt">${fr(x.rh)}</td><td>${f(x.m)}</td><td class="sl">${f(x.sm)}</td><td class="rt">${fr(x.rm)}</td><td>${f(x.t)}</td><td class="rt">${fr(x.rt)}</td><td>${fh(x.hr)}</td></tr>`);
+  const a=stats[0],b=stats[1];
+  const pt=(x,y)=>x==null||y==null?"—":((y-x>=0?"+":"−")+Math.abs(y-x).toFixed(1)+"pt");
+  if(a.t!=null&&b.t!=null)h+=`<tr class="tot"><td class="l">土日祝−平日</td><td></td><td>${sg(b.h-a.h)}</td><td class="sl">${a.sh!=null&&b.sh!=null?sg(b.sh-a.sh):"—"}</td><td class="rt">${pt(a.rh,b.rh)}</td><td>${sg(b.m-a.m)}</td><td class="sl">${a.sm!=null&&b.sm!=null?sg(b.sm-a.sm):"—"}</td><td class="rt">${pt(a.rm,b.rm)}</td><td>${sg(b.t-a.t)}</td><td class="rt">${pt(a.rt,b.rt)}</td><td>${(b.hr-a.hr>=0?"+":"")+(b.hr-a.hr).toFixed(1)}</td></tr>`;
+  document.getElementById("dayType").innerHTML=h+"</tbody>";
+  document.getElementById("dtNote").textContent=`営業日のみで平均（定休日${todayOpen?"・勤務中の今日":""}は除外）。率＝その区分の人件費合計÷売上合計（売上がある日のみ）。祝日は国民の祝日・振替休日・国民の休日。`;
+}
+function sg(v){return (v>=0?"+":"−")+yen(Math.abs(v))}
+function detail(day){
+  let h=`<table><thead><tr><th class="l">店</th><th class="l">氏名</th><th class="l">区分</th><th>実働</th><th>残業</th><th>深夜</th><th>支給</th><th>会社負担</th><th>計</th></tr></thead><tbody>`;
+  STORES.forEach(s=>day[s].items.sort((a,b)=>(b.gross+b.er)-(a.gross+a.er)).forEach(i=>{
+    h+=`<tr><td class="l">${s}</td><td class="l">${i.name}${i.off?'<span class="chip s">休み</span>':""}</td><td class="l">${i.type}</td><td>${i.work.toFixed(2)}</td><td>${i.ot.toFixed(2)}</td><td>${i.night.toFixed(2)}</td><td>${yen(i.gross)}</td><td>${yen(i.er)}</td><td><b>${yen(i.gross+i.er)}</b></td></tr>`}));
+  return h+"</tbody></table>";
+}
+
+function renderStaff(){
+  let h=`<thead><tr><th class="l">氏名</th><th class="l">区分</th><th>時給／月額／単価</th><th>交通費/日</th><th>社保</th><th>介護</th><th>雇保</th><th>含める</th></tr></thead><tbody>`;
+  people.forEach((p,i)=>{const s=cfg.staff[p.name];
+    const empty=s.type==="月給"&&!num(s.rate);
+    h+=`<tr><td class="l">${p.name}<div class="note">${p.stores.join("・")}${p.nopunch?"・打刻なし":""}</div></td>
+      <td><select id="t${i}">${["時給","月給","派遣","外注"].map(t=>`<option${t===s.type?" selected":""}>${t}</option>`).join("")}</select></td>
+      <td><input id="r${i}" type="number" min="0" step="1" value="${s.rate}" class="${empty?"empty":""}" placeholder="${s.type==="月給"?"月額総支給":"円"}">${s.prov?'<span class="chip w">仮</span>':""}</td>
+      <td><input id="c${i}" type="number" min="0" step="10" value="${s.commute||0}" ${s.type!=="時給"?"disabled":""}></td>
+      <td class="c"><input id="s${i}" type="checkbox" ${s.shaho?"checked":""} ${/派遣|外注/.test(s.type)?"disabled":""}></td>
+      <td class="c"><input id="g${i}" type="checkbox" ${s.kaigo?"checked":""} ${/派遣|外注/.test(s.type)?"disabled":""}></td>
+      <td class="c"><input id="k${i}" type="checkbox" ${s.koyo?"checked":""} ${/派遣|外注/.test(s.type)?"disabled":""}></td>
+      <td class="c"><input id="i${i}" type="checkbox" ${s.include!==false?"checked":""}></td></tr>`});
+  const tb=document.getElementById("staff"); tb.innerHTML=h+"</tbody>";
+  people.forEach((p,i)=>{const s=cfg.staff[p.name];
+    const up=(full)=>{saveCfg(); full?renderStaff():null; renderDaily()};
+    tb.querySelector("#t"+i).onchange=e=>{s.type=e.target.value;if(/派遣|外注/.test(s.type)){s.shaho=false;s.koyo=false;s.kaigo=false}up(true)};
+    tb.querySelector("#r"+i).oninput=e=>{s.rate=e.target.value;s.prov=false;e.target.classList.toggle("empty",s.type==="月給"&&!num(s.rate));up(false)};
+    tb.querySelector("#r"+i).onchange=()=>up(true);
+    tb.querySelector("#c"+i).oninput=e=>{s.commute=e.target.value;up(false)};
+    tb.querySelector("#s"+i).onchange=e=>{s.shaho=e.target.checked;up(false)};
+    tb.querySelector("#k"+i).onchange=e=>{s.koyo=e.target.checked;up(false)};
+    tb.querySelector("#g"+i).onchange=e=>{s.kaigo=e.target.checked;up(false)};
+    tb.querySelector("#i"+i).onchange=e=>{s.include=e.target.checked;up(false)};
+  });
+}
+function renderRates(){
+  const el=document.getElementById("rates");
+  el.innerHTML=Object.keys(DEFAULT_RATES).map(k=>`<label for="rt-${k}">${RATE_LABEL[k]}<input id="rt-${k}" type="number" step="0.001" min="0" value="${cfg.rates[k]}"></label>`).join("");
+  Object.keys(DEFAULT_RATES).forEach(k=>el.querySelector("#rt-"+k).oninput=e=>{cfg.rates[k]=num(e.target.value);saveCfg();renderDaily()});
+}
+function renderCals(){
+  const el=document.getElementById("cals");
+  el.innerHTML=STORES.map(s=>{
+    const c=closedSet(s), first=new Date(dates[0]).getDay();
+    let g=`<div><div style="font-weight:700;margin-bottom:4px">${s} <span class="note">営業 ${openDays(s).length}日</span></div><div class="cal">`+[..."日月火水木金土"].map(x=>`<div class="hd">${x}</div>`).join("")+"<div></div>".repeat(first);
+    dates.forEach(d=>g+=`<button data-s="${s}" data-d="${d}" class="${c.has(d)?"off":""}" aria-pressed="${!c.has(d)}">${+d.slice(8)}</button>`);
+    return g+"</div></div>"}).join("");
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    const arr=cfg.closed[dates[0]][b.dataset.s], i=arr.indexOf(b.dataset.d);
+    i>=0?arr.splice(i,1):arr.push(b.dataset.d); saveCfg(); renderCals(); renderDaily()});
+}
+
+function decodeBuf(buf){
+  const a=new Uint8Array(buf);
+  if(a[0]===0xFF&&a[1]===0xFE)return new TextDecoder("utf-16le").decode(buf);
+  if(a[0]===0xFE&&a[1]===0xFF)return new TextDecoder("utf-16be").decode(buf);
+  const u=new TextDecoder("utf-8",{fatal:false}).decode(buf);
+  if(!u.includes("\uFFFD"))return u;
+  try{return new TextDecoder("shift_jis").decode(buf)}catch(e){return u}
+}
+function parseTable(text){
+  text=text.replace(/^\uFEFF/,"");
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  const sep=(lines[0]||"").split("\t").length>(lines[0]||"").split(",").length?"\t":",";
+  return lines.map(l=>{const out=[];let cur="",q=false;for(let i=0;i<l.length;i++){const ch=l[i];
+    if(q){if(ch=='"'){if(l[i+1]=='"'){cur+='"';i++}else q=false}else cur+=ch}
+    else if(ch=='"')q=true;else if(ch===sep){out.push(cur.trim());cur=""}else cur+=ch}out.push(cur.trim());return out});
+}
+function toDate(cell){
+  cell=String(cell||"");let m=cell.match(/^(20\d{2})(\d{2})(\d{2})$/);
+  if(m)return `${m[1]}/${m[2]}/${m[3]}`;
+  m=cell.match(/(\d{4})[\/\-年.](\d{1,2})[\/\-月.](\d{1,2})/);
+  if(m)return `${m[1]}/${m[2].padStart(2,"0")}/${m[3].padStart(2,"0")}`;
+  m=cell.match(/(\d{1,2})[\/月](\d{1,2})/);
+  if(m&&dates.length){const md=`${m[1].padStart(2,"0")}/${m[2].padStart(2,"0")}`;const hit=dates.find(d=>d.slice(5)===md);if(hit)return hit}
+  return null;
+}
+// 売上CSV: 日付列と金額列を自動判定。品目行なら日付ごとに合算
+function importSales(text,store,noSave){
+  if(!noSave)rawSet("sales."+store,text);
+  const t=parseTable(text);
+  let hi=-1,di=-1,ai=-1;
+  const tax=cfg.tax||"税抜";
+  const AMT=tax==="税抜"?["当年実績","総売上(税抜)","純売上(税抜)","売上金額(税抜)","売上(税抜)","総売上(税込)","純売上(税込)","純売上（税込）","売上金額","総売上","売上合計","純売上","売上"]
+                       :["当年実績","総売上(税込)","純売上(税込)","純売上（税込）","売上金額(税込)","売上金額","総売上","売上合計","純売上","売上"];
+  for(let i=0;i<Math.min(t.length,20);i++){
+    const r=t[i];const d=r.findIndex(c=>/^(営業日|日付|売上日|営業日付|日|当年日付)$/.test(c));
+    let a=-1;for(const k of AMT){a=r.indexOf(k);if(a>=0)break}
+    if(d>=0&&a>=0){hi=i;di=d;ai=a;break}
+  }
+  if(hi<0)return {ok:false,msg:`${store}：日付列（営業日／日付）と売上列（売上金額／純売上など）が見つかりませんでした`};
+  const isItem=t[hi].includes("商品名");
+  const acc={};let n=0;
+  for(let i=hi+1;i<t.length;i++){
+    const d=toDate(t[i][di]);if(!d)continue;
+    const v=parseFloat(String(t[i][ai]||"").replace(/[¥,\s円]/g,""));if(!isFinite(v))continue;
+    if(v===0&&d>=dstr(new Date()))continue; // 今日以降の0円は未締めとして取り込まない
+    acc[d]=(acc[d]||0)+v;n++;
+  }
+  cfg.sales=cfg.sales||{};
+  const ds=Object.keys(acc);
+  ds.forEach(d=>{cfg.sales[d]=cfg.sales[d]||{};cfg.sales[d][store]=Math.round(acc[d])});
+  saveCfg();
+  cfg.salesCol=cfg.salesCol||{};cfg.salesCol[store]=t[hi][ai];saveCfg();
+  return {ok:ds.length>0,msg:ds.length?`${store}の売上を${ds.length}日分取り込みました（列「${t[hi][ai]}」${isItem?"を品目ごとに合算":""}）`:`${store}：日付つきの売上行がありませんでした`};
+}
+function toast(msg,lv){const el=document.getElementById("toast");el.textContent=msg;el.className="al "+(lv||"w");el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,6000)}
+function readFile(f,cb){const r=new FileReader();r.onload=()=>cb(decodeBuf(r.result));r.readAsArrayBuffer(f)}
+document.getElementById("csvIn").onchange=e=>{[...e.target.files].forEach(f=>readFile(f,t=>{
+  if((/営業日/.test(t)&&/売上金額/.test(t)&&/商品名/.test(t))||(/当年日付/.test(t)&&/当年実績/.test(t))){const r=importSales(t,"本店");toast(r.msg,r.ok?"ok":"c");renderDaily();return}
+  openOpen.clear();ingest(t)}));e.target.value=""};
+STORES.forEach(s=>{document.getElementById("sales-"+s).onchange=e=>{const f=e.target.files[0];if(!f)return;readFile(f,t=>{const r=importSales(t,s);toast(r.msg,r.ok?"ok":"c");renderDaily()});e.target.value=""}});
+document.getElementById("target").value=cfg.target||30;
+document.getElementById("tax").value=cfg.tax||"税抜";
+document.getElementById("tax").onchange=e=>{cfg.tax=e.target.value;saveCfg();
+  const rs=rawGet().sales||{};STORES.forEach(st=>{if(rs[st])importSales(rs[st],st,true)});if(rows.length)renderDaily();toast(`売上の基準を${cfg.tax}にしました（マルコの日報一覧に反映。本店の当年実績は列が1つのため変わりません）`,"w")};
+document.getElementById("target").oninput=e=>{cfg.target=num(e.target.value)||30;saveCfg();renderDaily()};
+document.getElementById("clearSales").onclick=()=>{const b=document.getElementById("clearSales");if(b.dataset.arm!=="1"){b.dataset.arm="1";b.textContent="もう一度押すと消去";setTimeout(()=>{b.dataset.arm="";b.textContent="売上を全消去"},3000);return}
+  const ks=new Set(dates);Object.keys(cfg.sales||{}).forEach(k=>{if(ks.has(k))delete cfg.sales[k]});saveCfg();b.dataset.arm="";b.textContent="売上を全消去";renderDaily()};
+
+async function sha(t){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+function boot(){
+  document.getElementById("lock").hidden=true;
+  const r=rawGet();
+  if(r.master)applyMaster(r.master);
+  if(r.tc){ingest(r.tc)}else{document.getElementById("empty").hidden=false;document.getElementById("app").hidden=true}
+}
+async function tryUnlock(){
+  const v=document.getElementById("pw").value.trim();
+  if(await sha(PASS_SALT+v)===PASS_HASH){try{sessionStorage.setItem("jinkenhi-ok","1")}catch(e){}document.getElementById("pw").value="";boot()}
+  else{document.getElementById("pwErr").hidden=false}
+}
+document.getElementById("pwBtn").onclick=tryUnlock;
+document.getElementById("pw").onkeydown=e=>{if(e.key==="Enter")tryUnlock()};
+document.getElementById("lockNow").onclick=()=>{try{sessionStorage.removeItem("jinkenhi-ok")}catch(e){}location.reload()};
+document.getElementById("homeBtn").onclick=()=>{try{sessionStorage.removeItem("jinkenhi-ok")}catch(e){}
+  try{if(window.parent&&window.parent!==window&&typeof window.parent.switchMode==="function"){window.parent.switchMode("shift");location.reload();return}}catch(e){}
+  location.href="./"};
+document.getElementById("wipe").onclick=()=>{const b=document.getElementById("wipe");if(b.dataset.arm!=="1"){b.dataset.arm="1";b.textContent="もう一度押すとこの端末のデータを全消去";setTimeout(()=>{b.dataset.arm="";b.textContent="この端末のデータを消去"},4000);return}
+  try{localStorage.removeItem(RAW_KEY);localStorage.removeItem(LS_KEY)}catch(e){}location.reload()};
+let ok=false;try{ok=sessionStorage.getItem("jinkenhi-ok")==="1"}catch(e){}
+if(ok)boot();else setTimeout(()=>document.getElementById("pw").focus(),50);
+</script>
+</body></html>
