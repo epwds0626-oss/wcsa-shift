@@ -3488,7 +3488,7 @@ function handleCsvImport(event) {
   var shopKey = getChShopKey();
   // 本店: salesFile(UTF-16 TSV) + itemFile(UTF-16 TSV)
   // マルコ: marcoSalesFile(CP932 CSV 年間売上) + marcoItemFile(Shift_JIS CSV aggregateMenu)
-  var results = { salesFile: null, itemFile: null, dailyFile: null, marcoSalesFile: null, marcoDailyFile: null, marcoItemFiles: [] };
+  var results = { salesFile: null, itemFile: null, dailyFile: null, marcoSalesFile: null, marcoDailyFile: null, marcoPeriodFile: null, marcoItemFiles: [] };
   var pending = files.length;
 
   files.forEach(function(file) {
@@ -3530,6 +3530,12 @@ function handleCsvImport(event) {
         var identified = false;
         for (var k = 0; k < Math.min(rows2.length, 15); k++) {
           var cell0 = (rows2[k][0] || '').trim();
+          // マルコ月間売上CSV（日別行＋男女）：チャレンジの今月実績と日別売上の両方に使う
+          if (cell0.indexOf('月間売上') !== -1 || (rows2[k].indexOf('日付') !== -1 && rows2[k].indexOf('純売上(税込)') !== -1 && rows2[k].indexOf('男') !== -1)) {
+            results.marcoPeriodFile = rows2;
+            identified = true;
+            break;
+          }
           // マルコ日報一覧CSV（aggregateRegiPaymentList）：日別売上として保存（人件費ページ用）
           if (cell0.indexOf('日報一覧') !== -1 || (rows2[k].indexOf('日付') !== -1 && rows2[k].indexOf('総売上(税抜)') !== -1)) {
             results.marcoDailyFile = rows2;
@@ -3657,6 +3663,25 @@ function saveDailySales(results) {
       }
     }
   }
+  // マルコ：月間売上CSV（日付・純売上(税込)・内税・外税・男・女・客計）
+  if (results.marcoPeriodFile) {
+    var P = results.marcoPeriodFile, ph = -1;
+    for (var q = 0; q < Math.min(P.length, 10); q++) { if (P[q].indexOf('日付') !== -1 && P[q].indexOf('純売上(税込)') !== -1) { ph = q; break; } }
+    if (ph !== -1) {
+      var PH = P[ph], pD = PH.indexOf('日付'), pG = PH.indexOf('純売上(税込)'), pIn = PH.indexOf('内税'), pOut = PH.indexOf('外税'),
+          pM = PH.indexOf('男'), pF = PH.indexOf('女'), pC = PH.indexOf('客計');
+      for (var w = ph + 1; w < P.length; w++) {
+        var dm = String(P[w][pD] || '').match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+        if (!dm) continue;                               // 合計行は除外
+        var pk = dm[1] + dm[2].padStart(2,'0') + dm[3].padStart(2,'0');
+        var g = toInt(P[w][pG]), nt = g - (pIn !== -1 ? toInt(P[w][pIn]) : 0) - (pOut !== -1 ? toInt(P[w][pOut]) : 0);
+        if (g === 0 && pk >= todayK) continue;
+        upd['marco/' + pk] = { net: nt, gross: g, cust: pC !== -1 ? toInt(P[w][pC]) : 0,
+          male: pM !== -1 ? toInt(P[w][pM]) : 0, female: pF !== -1 ? toInt(P[w][pF]) : 0, src: '月間売上', ts: ts };
+        n++;
+      }
+    }
+  }
   if (n) {
     db.ref('sales_daily').update(upd).then(function(){
       showToast('📅 日別売上を' + n + '日分保存しました（日別人件費に反映）');
@@ -3690,14 +3715,25 @@ function saveDailySales(results) {
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
   var dailySaved = saveDailySales(results);
-  var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoSnapshotFile || results.marcoItemFiles.length > 0;
+  var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoPeriodFile || results.marcoSnapshotFile || results.marcoItemFiles.length > 0;
   if (!hasData && dailySaved) return; // 日報一覧だけのときは日別売上の保存のみ
   if (!hasData) {
-    alert('売上CSVが見つかりませんでした。\n\n【本店】売上実績CSV + Daily_Item_Sales CSV\n【マルコ】年間売上CSV + aggregateMenu CSV + 日報一覧CSV\n\n勤怠CSVは下の「💰インセンティブ試算」から読み込んでください。');
+    alert('売上CSVが見つかりませんでした。\n\n【本店】売上実績CSV + Daily_Item_Sales CSV\n【マルコ】月間売上CSV（または年間売上CSV）+ aggregateMenu CSV\n\n勤怠CSVは下の「💰インセンティブ試算」から読み込んでください。');
     return;
   }
+  // マルコ月間売上CSVのみのとき、前月基準用に sales_daily の前月分を先読み
+  var prefetch = Promise.resolve();
+  if (results.marcoPeriodFile && !results.marcoSalesFile && db) {
+    var nd = new Date(); var pm = new Date(nd.getFullYear(), nd.getMonth() - 1, 1);
+    var pPre = pm.getFullYear() + String(pm.getMonth()+1).padStart(2,'0');
+    prefetch = db.ref('sales_daily/marco').once('value').then(function(sn){
+      var v = sn.val() || {}, sSum = 0, cSum = 0;
+      Object.keys(v).forEach(function(k){ if (k.indexOf(pPre) === 0) { sSum += +v[k].gross || 0; cSum += (+v[k].male || 0) + (+v[k].female || 0); } });
+      results._prevMonthMarco = { sales: sSum, cust: cSum };
+    }).catch(function(){});
+  }
   // 数量限定リストなど既存データを先読みしてから本体を実行
-  getChRef(shopKey).once('value').then(function(snap) {
+  prefetch.then(function(){ return getChRef(shopKey).once('value'); }).then(function(snap) {
     var existingCh = snap.val() || {};
     processCsvResultsCore(results, shopKey, existingCh);
   }).catch(function() {
@@ -3937,6 +3973,28 @@ function processCsvResultsCore(results, shopKey, existingCh) {
   }
 
   // ===== マルコ: 年間売上CSV =====
+  // マルコ：月間売上CSV（年間売上CSVの代わり）→ 今月実績（売上・客数=男+女・客単価）
+  // 前月基準（big_base/spot_base）は既存値を維持。無い月は sales_daily の前月分（男+女）から計算（processCsvResultsで先読み）
+  if (results.marcoPeriodFile && isMarco && !results.marcoSalesFile) {
+    var PR = results.marcoPeriodFile, prh = -1;
+    for (var pq = 0; pq < Math.min(PR.length, 10); pq++) { if (PR[pq].indexOf('日付') !== -1 && PR[pq].indexOf('純売上(税込)') !== -1) { prh = pq; break; } }
+    if (prh !== -1) {
+      var PRH = PR[prh], cS = PRH.indexOf('純売上(税込)'), cMa = PRH.indexOf('男'), cFe = PRH.indexOf('女');
+      var tR = null;
+      for (var pr = prh + 1; pr < PR.length; pr++) { if (PR[pr][0] === '合計') { tR = PR[pr]; break; } }
+      var ti = function(v){ return parseInt(String(v || '0').replace(/,/g,'')) || 0; };
+      if (tR) {
+        var pSales = ti(tR[cS]), pCust = (cMa !== -1 ? ti(tR[cMa]) : 0) + (cFe !== -1 ? ti(tR[cFe]) : 0);
+        upd.big_current = pSales; upd.mission_total = pCust; upd.spot_current = pCust > 0 ? Math.round(pSales / pCust) : 0;
+        upd.big_updated = ts; upd.spot_updated = ts;
+        if (!existingCh.big_base && results._prevMonthMarco && results._prevMonthMarco.sales > 0) {
+          upd.big_base = results._prevMonthMarco.sales;
+          upd.spot_base = results._prevMonthMarco.cust > 0 ? Math.round(results._prevMonthMarco.sales / results._prevMonthMarco.cust) : 0;
+        }
+      }
+    }
+  }
+
   if (results.marcoSalesFile && isMarco) {
     var mRows = results.marcoSalesFile;
     // 「対象月」ヘッダー行を探す
