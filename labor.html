@@ -94,6 +94,10 @@ tr.sep td{background:var(--bg);color:var(--sub);font-size:12px;font-weight:700;p
 #homeBtn{background:transparent;color:#f3efe3;border-color:rgba(255,255,255,.3);padding:6px 10px}
 .tile.f .v{color:var(--fish)} th.gf{color:var(--fish)}
 .btn.sm{font-size:12px;padding:3px 10px;margin-top:6px}
+.pnav{display:inline-flex;align-items:center;gap:6px;margin-right:8px}
+.pnav button{font:inherit;background:transparent;color:#f3efe3;border:1px solid rgba(255,255,255,.35);border-radius:6px;width:28px;height:26px;cursor:pointer}
+.pnav button:disabled{opacity:.3;cursor:default}
+.pnav b{color:var(--gold);font-weight:700}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head><body>
@@ -106,7 +110,7 @@ tr.sep td{background:var(--bg);color:var(--sub);font-size:12px;font-weight:700;p
   <button class="btn" type="button" onclick="(function(){try{if(parent&&parent!==window&&parent.switchMode){parent.switchMode('shift');return}}catch(e){}location.href='./'})()">WCSAに戻る</button>
 </div></div>
 <header><div class="in">
-  <div style="display:flex;gap:10px;align-items:center"><button class="btn" id="homeBtn" type="button" aria-label="WCSAに戻る">🏠</button><div><h1>日別人件費</h1><div class="sub" id="period">CSVを読み込んでください</div></div></div>
+  <div style="display:flex;gap:10px;align-items:center"><button class="btn" id="homeBtn" type="button" aria-label="WCSAに戻る">🏠</button><div><h1>日別人件費</h1><div class="sub"><span class="pnav"><button type="button" id="pPrev" aria-label="前の期間">‹</button><b id="pLabel"></b><button type="button" id="pNext" aria-label="次の期間">›</button></span> <span id="period">CSVを読み込んでください</span></div></div></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <label class="btn" for="csvIn" style="display:inline-block">打刻・マスタCSV</label>
     <input id="csvIn" type="file" accept=".csv,.txt,.tsv" multiple hidden>
@@ -234,7 +238,7 @@ function applyEmployees(list){
   let n=0;
   list.forEach(e=>{
     if(!e||!e.name)return;
-    if(e.status==="inactive"||e.status==="leave")return;
+    // 退職・休業者も過去期間の計算のため取り込む（打刻がなければ表に出ない）
     const name=norm(e.name);
     let type="時給";
     if(e.payType==="月給")type="月給";
@@ -307,9 +311,13 @@ function applyFbSales(){
 const PAYROLL_JS="/epwds0626-oss-payroll-system/js/data.js";
 let tcStatus="";
 function curPayYM(){const t=new Date();let y=t.getFullYear(),m=t.getMonth()+1;if(t.getDate()>=21){m++;if(m>12){m=1;y++}}return [y,m]}
+let selYM=null; // 表示中の給与期間 [年,月]（月＝締め月。例：10月度＝9/21〜10/20）。nullは今期
+let periodTG={}; // 表示期間の月別目標総支給（給与システム targetGrossHistory）
+function viewYM(){return selYM||curPayYM()}
+function isCurrentPeriod(){const a=viewYM(),b=curPayYM();return a[0]===b[0]&&a[1]===b[1]}
 function loadPunchesLive(){
   return new Promise(resolve=>{
-    const [y,m]=curPayYM();
+    const [y,m]=viewYM();
     const f=document.createElement("iframe");f.hidden=true;f.title="打刻データ取得";
     let to;
     const done=v=>{clearTimeout(to);window.removeEventListener("message",onMsg);f.remove();resolve(v)};
@@ -323,12 +331,15 @@ function loadPunchesLive(){
 <${S} src="${PAYROLL_JS}?t=${Date.now()}"></${S}>
 <${S}>
 (async()=>{try{
-  const [e,a,t]=await Promise.all([FB.employees().once("value"),FB.attendance().once("value"),FB.timecard().once("value")]);
+  const [e,a,t,g]=await Promise.all([FB.employees().once("value"),FB.attendance().once("value"),FB.timecard().once("value"),FB.targetGrossHistory().once("value")]);
   const ev=e.val()||{};employees=(Array.isArray(ev)?ev.filter(Boolean):Object.values(ev));
-  attendance=a.val()||{};timecardLive=t.val()||{};
+  attendance=a.val()||{};timecardLive=t.val()||{};targetGrossHistory=g.val()||{};
   const Y=${y},M=${m};const p=getPayPeriod(Y,M);
   const out=[];
-  for(const emp of activeEmployeesExpanded()){
+  // 過去の期間は退職者も含める（activeEmployeesExpandedと同じ展開を全員に）
+  const allExp=[];for(const e2 of employees){if(e2.store==="両店"){allExp.push({...e2,id:e2.id+"_enya",name:e2.name+"【本店】"});allExp.push({...e2,id:e2.id+"_marco",name:e2.name+"【マルコ】"})}else allExp.push(e2)}
+  const tg={};for(const e2 of employees){if(e2.payType==="月給"){const v=getMonthlyTargetGross(e2.id,Y,M);if(v)tg[e2.name]=v}}
+  for(const emp of allExp){
     const id=String(emp.id);const store=id.includes("_enya")?"本店":id.includes("_marco")?"マルコ":(emp.store||"");
     for(const d of getExtendedDailyList(emp.id,Y,M,true)){
       if(d.date<p.startDate||d.date>p.endDate)continue;
@@ -339,7 +350,7 @@ function loadPunchesLive(){
         miss:(!!d.punchIn)!==(!!d.punchOut)});
     }
   }
-  parent.postMessage({kind:"punches",ok:true,rows:out,start:p.startDate,end:p.endDate},"*");
+  parent.postMessage({kind:"punches",ok:true,rows:out,tg,start:p.startDate,end:p.endDate},"*");
 }catch(err){parent.postMessage({kind:"punches",ok:false,err:String(err&&err.message||err)},"*")}})();
 </${S}>`;
     document.body.appendChild(f);
@@ -353,14 +364,22 @@ function punchesToCSV(rs){
   return [head,...lines].join("\n");
 }
 async function loadPunchesAndRender(){
-  tcStatus="打刻：給与システムから取得中…";renderTcStatus();
+  tcStatus="打刻：給与システムから取得中…";renderTcStatus();renderPeriodNav();
   const r=await loadPunchesLive();
   if(r.ok&&r.rows&&r.rows.length){
+    periodTG={};Object.entries(r.tg||{}).forEach(([n,v])=>periodTG[norm(n)]=num(v));
     const t=new Date();tcStatus=`打刻：給与システムから取得（${r.rows.length}件・${t.getHours()}:${String(t.getMinutes()).padStart(2,"0")}）`;
-    openOpen.clear();ingest(punchesToCSV(r.rows));renderTcStatus();return true;
+    openOpen.clear();ingest(punchesToCSV(r.rows),!isCurrentPeriod());renderTcStatus();return true;
   }
+  if(r.ok){const [y,m]=viewYM();tcStatus=`打刻：${y}年${m}月度の打刻はありません`;
+    rows=[];people=[];document.getElementById("period").textContent="";
+    const em=document.getElementById("empty");em.querySelector("h2").textContent=`${y}年${m}月度は給与システムに打刻がありません`;
+    em.hidden=false;document.getElementById("app").hidden=true;renderTcStatus();toast(tcStatus,"w");return false}
   tcStatus=`打刻：給与システムから取得できませんでした（${r.err||"データなし"}）。打刻管理CSVで代用できます`;renderTcStatus();return false;
 }
+function renderPeriodNav(){const [y,m]=viewYM();const el=document.getElementById("pLabel");if(el)el.textContent=`${y}年${m}月度`;
+  const nx=document.getElementById("pNext");if(nx)nx.disabled=isCurrentPeriod()}
+function shiftPeriod(d){let [y,m]=viewYM();m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}selYM=[y,m];if(isCurrentPeriod())selYM=null;loadPunchesAndRender()}
 function renderTcStatus(){const el=document.getElementById("tcStatus");if(el)el.textContent=tcStatus}
 
 function renderMasterStatus(){const el=document.getElementById("masterStatus");if(el)el.textContent=masterStatus}
@@ -370,11 +389,11 @@ const yen=v=>"¥"+Math.round(v).toLocaleString("ja-JP");
 const dstr=d=>`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;
 const DOW="日月火水木金土";
 
-function ingest(text){
+function ingest(text,noCache){
   const raw=parseCSV(text);
   if(raw.length&&("給与形態" in raw[0])){applyMaster(text);if(rows.length){buildPeople();renderAll()}return}
   if(!raw.length||!("氏名" in raw[0])||!("実働(h)" in raw[0])){toast("打刻CSV・スタッフマスタCSVのどちらでもありません","c");return}
-  rawSet("tc",text);
+  if(!noCache)rawSet("tc",text);
   rows=raw.map(r=>({name:norm(r["氏名"]),store:r["店舗"],date:r["日付"],dow:r["曜日"],in:r["出勤"],out:r["退勤"],
     brk:[r["休憩1戻"],r["休憩2戻"],r["休憩3戻"]].filter(Boolean),
     work:num(r["実働(h)"]),ot:num(r["残業(h)"]),night:num(r["深夜(h)"]),miss:!!r["打刻漏れ"]}));
@@ -439,7 +458,7 @@ function compute(){
   // 月給
   people.forEach(p=>{
     const st=cfg.staff[p.name]; if(st.type!=="月給"||st.include===false)return;
-    const amt=num(st.rate);
+    const amt=periodTG[p.name]!=null?periodTG[p.name]:num(st.rate); // その月の目標総支給（履歴）を優先
     const cnt={}; rows.filter(r=>r.name===p.name).forEach(r=>cnt[r.store]=(cnt[r.store]||0)+1);
     const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
     const s=top?top[0]:(st.home||"本店");
@@ -453,7 +472,7 @@ function compute(){
   return {res,issues};
 }
 
-function renderAll(){document.getElementById("empty").hidden=true;document.getElementById("app").hidden=false;renderStaff();renderRates();renderCals();renderDaily()}
+function renderAll(){const em=document.getElementById("empty");em.hidden=true;em.querySelector("h2").textContent="まだデータがありません";document.getElementById("app").hidden=false;renderStaff();renderRates();renderCals();renderDaily()}
 
 const FH_DB="https://fishhack-74de3-default-rtdb.asia-southeast1.firebasedatabase.app";
 let fh={by:{},status:"未取得",n:0};
@@ -696,11 +715,47 @@ function importSales(text,store,noSave){
   return {ok:ds.length>0,msg:ds.length?`${store}の売上を${ds.length}日分取り込みました（列「${t[hi][ai]}」${isItem?"を品目ごとに合算":""}）`:`${store}：日付つきの売上行がありませんでした`};
 }
 function toast(msg,lv){const el=document.getElementById("toast");el.textContent=msg;el.className="al "+(lv||"w");el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,6000)}
+// 売上CSVを WCSA の Firebase（sales_daily）にも保存：過去の月の売上をさかのぼって入れるため
+// （チャレンジの数字は変えない。チャレンジ側と同じ形式で保存）
+async function persistSalesFB(text,store){
+  const t=parseTable(text);const toI=v=>parseInt(String(v||"0").replace(/[¥,\s円]/g,""))||0;
+  const todayS=dstr(new Date()).replace(/\//g,"");const body={};let n=0;
+  let hi=-1;for(let i=0;i<Math.min(t.length,15);i++){if(t[i].includes("当年日付")||t[i].includes("日付")){hi=i;break}}
+  if(hi<0)return 0;
+  const H=t[hi],ix=k=>H.indexOf(k);
+  for(let i=hi+1;i<t.length;i++){
+    const r=t[i];
+    if(store==="本店"){
+      if(ix("当年日付")<0||ix("当年実績")<0)return 0;
+      const d=String(r[ix("当年日付")]||"");if(!/^\d{8}$/.test(d))continue;
+      const v=toI(r[ix("当年実績")]);if(v===0&&d>=todayS)continue;
+      body["honten/"+d]={sales:v,cust:ix("当年客数")>=0?toI(r[ix("当年客数")]):0,src:"売上実績",ts:Date.now()};n++;
+    }else{
+      const dd=toDate(r[ix("日付")]);if(!dd)continue;const d=dd.replace(/\//g,"");
+      let net,gross,src;
+      if(ix("総売上(税抜)")>=0){net=toI(r[ix("総売上(税抜)")]);gross=ix("総売上(税込)")>=0?toI(r[ix("総売上(税込)")]):0;src="日報一覧"}
+      else if(ix("純売上(税込)")>=0){gross=toI(r[ix("純売上(税込)")]);net=gross-(ix("内税")>=0?toI(r[ix("内税")]):0)-(ix("外税")>=0?toI(r[ix("外税")]):0);src="月間売上"}
+      else return 0;
+      if(net===0&&gross===0&&d>=todayS)continue;
+      const cI=ix("客計")>=0?ix("客計"):ix("客数");const o={net,gross,cust:cI>=0?toI(r[cI]):0,src,ts:Date.now()};
+      if(ix("男")>=0){o.male=toI(r[ix("男")]);o.female=toI(r[ix("女")])}
+      body["marco/"+d]=o;n++;
+    }
+  }
+  if(!n)return 0;
+  try{const res=await fetch(`${PAYROLL_DB}/sales_daily.json`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!res.ok)throw 0}
+  catch(e){toast("売上はこの端末に保存しました（WCSAへの保存は失敗）","w");return 0}
+  await loadDailySalesFB();return n;
+}
+async function salesUpload(t,store){
+  const r=importSales(t,store);toast(r.msg,r.ok?"ok":"c");renderDaily();
+  if(r.ok){const n=await persistSalesFB(t,store);if(n)toast(`${store}の売上${n}日分をWCSAにも保存しました（過去の月も見られます）`,"ok")}
+}
 function readFile(f,cb){const r=new FileReader();r.onload=()=>cb(decodeBuf(r.result));r.readAsArrayBuffer(f)}
 document.getElementById("csvIn").onchange=e=>{[...e.target.files].forEach(f=>readFile(f,t=>{
-  if((/営業日/.test(t)&&/売上金額/.test(t)&&/商品名/.test(t))||(/当年日付/.test(t)&&/当年実績/.test(t))){const r=importSales(t,"本店");toast(r.msg,r.ok?"ok":"c");renderDaily();return}
+  if((/営業日/.test(t)&&/売上金額/.test(t)&&/商品名/.test(t))||(/当年日付/.test(t)&&/当年実績/.test(t))){salesUpload(t,"本店");return}
   openOpen.clear();ingest(t)}));e.target.value=""};
-STORES.forEach(s=>{document.getElementById("sales-"+s).onchange=e=>{const f=e.target.files[0];if(!f)return;readFile(f,t=>{const r=importSales(t,s);toast(r.msg,r.ok?"ok":"c");renderDaily()});e.target.value=""}});
+STORES.forEach(s=>{document.getElementById("sales-"+s).onchange=e=>{const f=e.target.files[0];if(!f)return;readFile(f,t=>salesUpload(t,s));e.target.value=""}});
 document.getElementById("target").value=cfg.target||30;
 document.getElementById("tax").value=cfg.tax||"税抜";
 document.getElementById("tax").onchange=e=>{cfg.tax=e.target.value;saveCfg();
@@ -725,6 +780,8 @@ async function tryUnlock(){
   else{document.getElementById("pwErr").hidden=false}
 }
 document.getElementById("pwBtn").onclick=tryUnlock;
+document.getElementById("pPrev").onclick=()=>shiftPeriod(-1);
+document.getElementById("pNext").onclick=()=>shiftPeriod(1);
 document.getElementById("tcReload").onclick=()=>loadPunchesAndRender();
 document.getElementById("masterReload").onclick=async()=>{if(await loadPayrollMaster()&&rows.length){buildPeople();renderAll()}};
 document.getElementById("pw").onkeydown=e=>{if(e.key==="Enter")tryUnlock()};
