@@ -3662,6 +3662,34 @@ function saveDailySales(results) {
       showToast('📅 日別売上を' + n + '日分保存しました（日別人件費に反映）');
     }).catch(function(e){ alert('日別売上の保存エラー: ' + e.message); });
   }
+  // マルコ：年間売上CSV（当月の累計）から「今日の売上＝当月累計−保存済みの他の日」を推定して保存
+  // 日報一覧CSVで確定値が入っている日は上書きしない（後から日報一覧を取り込めば確定値で置き換わる）
+  if (results.marcoSalesFile) {
+    var ym = now.getFullYear() + '年' + String(now.getMonth()+1).padStart(2,'0') + '月';
+    var R = results.marcoSalesFile, mh = -1;
+    for (var a = 0; a < R.length; a++) { if (R[a][0] === '対象月') { mh = a; break; } }
+    if (mh !== -1) {
+      var MH = R[mh], cG = MH.indexOf('純売上(税込)'), cIn = MH.indexOf('内税'), cOut = MH.indexOf('外税');
+      var cur = null;
+      for (var b = mh + 1; b < R.length; b++) { if (R[b][0] === ym) { cur = R[b]; break; } }
+      if (cur && cG !== -1) {
+        var mtdG = toInt(cur[cG]), mtdN = mtdG - (cIn !== -1 ? toInt(cur[cIn]) : 0) - (cOut !== -1 ? toInt(cur[cOut]) : 0);
+        var pre = todayK.slice(0, 6);
+        db.ref('sales_daily/marco').once('value').then(function(snap){
+          var ex = snap.val() || {};
+          // 同じ取込で日報一覧も入れた場合はその値を優先
+          Object.keys(upd).forEach(function(k){ if (k.indexOf('marco/') === 0) ex[k.slice(6)] = upd[k]; });
+          if (ex[todayK] && ex[todayK].src === '日報一覧' && (ex[todayK].net || ex[todayK].gross)) return null;
+          var sN = 0, sG = 0;
+          Object.keys(ex).forEach(function(k){ if (k.indexOf(pre) === 0 && k !== todayK) { sN += +ex[k].net || 0; sG += +ex[k].gross || 0; } });
+          var eN = mtdN - sN, eG = mtdG - sG;
+          if (eN <= 0) return null;
+          return db.ref('sales_daily/marco/' + todayK).set({ net: eN, gross: eG, cust: 0, src: '年間売上から推定', est: true, ts: Date.now() })
+            .then(function(){ showToast('📅 マルコ今日の売上（推定）¥' + eN.toLocaleString() + '（税抜）を保存しました'); });
+        }).catch(function(e){ console.error(e); });
+      }
+    }
+  }
   return n;
 }
 
