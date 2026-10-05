@@ -288,8 +288,17 @@ function applyFbSales(){
   const k2d=k=>`${k.slice(0,4)}/${k.slice(4,6)}/${k.slice(6,8)}`;
   const H=fbSales.honten||{},M=fbSales.marco||{};
   Object.keys(H).forEach(k=>{const d=k2d(k);cfg.sales[d]=cfg.sales[d]||{};cfg.sales[d]["本店"]=num(H[k].sales)});
-  fbEst=new Set(Object.keys(M).filter(k=>M[k].est).map(k2d));
-  Object.keys(M).forEach(k=>{const d=k2d(k);cfg.sales[d]=cfg.sales[d]||{};cfg.sales[d]["マルコ"]=num((cfg.tax||"税抜")==="税抜"?M[k].net:M[k].gross)});
+  fbEst=new Set();
+  Object.keys(M).filter(k=>!M[k].est).forEach(k=>{const d=k2d(k);cfg.sales[d]=cfg.sales[d]||{};cfg.sales[d]["マルコ"]=num((cfg.tax||"税抜")==="税抜"?M[k].net:M[k].gross)});
+  // マルコ今日の売上の推定：当月累計（年間売上CSV）−同じ月のほかの日の売上（このページにある全日分）
+  const mt=fbSales.marco_mtd;
+  if(mt&&mt.asOf&&!(M[mt.asOf]&&!M[mt.asOf].est)){
+    const d0=k2d(mt.asOf), pre=d0.slice(0,8);
+    let other=0;Object.keys(cfg.sales).forEach(d=>{if(d.startsWith(pre)&&d!==d0){const v=cfg.sales[d]["マルコ"];if(v!=null)other+=num(v)}});
+    const tot=num((cfg.tax||"税抜")==="税抜"?mt.net:mt.gross), est=tot-other;
+    cfg.sales[d0]=cfg.sales[d0]||{};
+    if(est>0){cfg.sales[d0]["マルコ"]=est;fbEst.add(d0)}else{delete cfg.sales[d0]["マルコ"]}
+  }
   if(Object.keys(H).length)cfg.salesCol["本店"]="WCSA（売上実績・当年実績）";
   if(Object.keys(M).length)cfg.salesCol["マルコ"]=`WCSA（日報一覧・総売上${cfg.tax||"税抜"}）`;
   saveCfg();
@@ -527,7 +536,7 @@ function renderDaily(){
     const hol=HOLIDAYS[d];
     h+=`<tr class="day${cl?" closed":""}" data-d="${d}"><td class="l">${d.slice(5)} <span class="dow-${hol?"日":dw}">${dw}</span>${hol?'<span class="chip s">'+hol+'</span>':""}${cl?'<span class="chip s">定休</span>':""}</td>
       <td>${b.cost?yen(b.cost):"—"}</td><td class="sl">${sb!=null?yen(sb):"—"}</td>${ratioCell(b.cost,sb)}
-      <td>${m.cost?yen(m.cost):"—"}</td><td class="sl">${sm!=null?yen(sm):"—"}${fbEst.has(d)?'<span class="chip s" title="年間売上CSVの当月累計から推定。日報一覧CSVを取り込むと確定値になります">推定</span>':""}</td>${ratioCell(m.cost,sm)}
+      <td>${m.cost?yen(m.cost):"—"}</td><td class="sl">${sm!=null?yen(sm):"—"}${fbEst.has(d)?'<span class="chip s" title="年間売上CSVの当月累計−同じ月のほかの日の売上。日報一覧CSVを取り込むと確定値になります">推定</span>':""}</td>${ratioCell(m.cost,sm)}
       <td class="sl rt">${sf?yen(sf):"—"}</td>
       <td><b>${t?yen(t):"—"}</b></td><td class="sl">${st?yen(st):"—"}</td>${ratioCell(t,st>0?st:null)}
       <td>${(b.h+m.h).toFixed(1)}</td></tr>`;
