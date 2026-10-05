@@ -3669,7 +3669,7 @@ function saveDailySales(results) {
     for (var q = 0; q < Math.min(P.length, 10); q++) { if (P[q].indexOf('日付') !== -1 && P[q].indexOf('純売上(税込)') !== -1) { ph = q; break; } }
     if (ph !== -1) {
       var PH = P[ph], pD = PH.indexOf('日付'), pG = PH.indexOf('純売上(税込)'), pIn = PH.indexOf('内税'), pOut = PH.indexOf('外税'),
-          pM = PH.indexOf('男'), pF = PH.indexOf('女'), pC = PH.indexOf('客計');
+          pM = PH.indexOf('男'), pF = PH.indexOf('女'), pC = PH.indexOf('客計') !== -1 ? PH.indexOf('客計') : PH.indexOf('客数');
       for (var w = ph + 1; w < P.length; w++) {
         var dm = String(P[w][pD] || '').match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
         if (!dm) continue;                               // 合計行は除外
@@ -3715,6 +3715,12 @@ function saveDailySales(results) {
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
   var dailySaved = saveDailySales(results);
+  // 過去の月のCSVは日別売上の保存だけ行い、今月のチャレンジ数値は更新しない
+  var nowYm = (function(){ var d = new Date(); return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0'); })();
+  // ファイル内でいちばん新しい日付の年月（本店の売上実績は9/21〜10/31のように月をまたぐため最新日で判定）
+  var firstYm = function(rows, re){ var best = null; for (var i = 0; i < rows.length; i++) { var m = String(rows[i][0] || '').match(re); if (m) { var k = m[1] + m[2].padStart(2,'0'); if (!best || k > best) best = k; } } return best; };
+  if (results.salesFile) { var ym1 = firstYm(results.salesFile, /^(\d{4})(\d{2})\d{2}$/); if (ym1 && ym1 < nowYm) { results.salesFile = null; showToast('過去の月の売上実績CSVです。日別売上だけ保存し、チャレンジは更新しません'); } }
+  if (results.marcoPeriodFile) { var ym2 = firstYm(results.marcoPeriodFile, /^(\d{4})年(\d{1,2})月/); if (ym2 && ym2 < nowYm) { results.marcoPeriodFile = null; showToast('過去の月の月間売上CSVです。日別売上だけ保存し、チャレンジは更新しません'); } }
   var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoPeriodFile || results.marcoSnapshotFile || results.marcoItemFiles.length > 0;
   if (!hasData && dailySaved) return; // 日報一覧だけのときは日別売上の保存のみ
   if (!hasData) {
