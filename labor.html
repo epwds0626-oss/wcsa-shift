@@ -79,7 +79,8 @@ details summary{cursor:pointer;font-weight:700}
 .pill.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
 .pill.w{background:var(--warnbg);color:var(--warn)} .pill.c{background:var(--critbg);color:var(--crit)}
 td.sl{color:var(--sub)} th.grp{text-align:center;border-bottom:2px solid var(--line)} th.gh{color:var(--honten)} th.gm{color:var(--marco)}
-td.rt{border-right:1px solid var(--line)} tr.subrow td{color:var(--sub);font-size:13px}
+td.rt{border-right:1px solid var(--line)}
+tr.sep td{background:var(--bg);color:var(--sub);font-size:12px;font-weight:700;padding-top:14px} tr.subrow td{color:var(--sub);font-size:13px}
 .rtv{font-family:var(--display);font-size:15px;color:var(--ink)}
 .al.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
 .sin{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px}.sin label{display:grid;gap:2px;font-size:12px;color:var(--sub)}.sin input{width:150px}
@@ -420,6 +421,9 @@ function renderDaily(){
   const {res,issues}=compute();
   const lastPunch=rows.map(r=>r.date).sort().pop();
   const shown=dates.filter(d=>d<=lastPunch);
+  // 打刻CSVより後でも、今日までに売上・納品がある日は「売上のみ」として下に表示（率の計算には入れない）
+  const todayS=dstr(new Date());
+  const after=dates.filter(d=>d>lastPunch&&d<=todayS&&(fhSales(d)>0||salesOf(d,"本店")!=null||salesOf(d,"マルコ")!=null));
   const tot={本店:0,マルコ:0}, hrs={本店:0,マルコ:0};
   shown.forEach(d=>STORES.forEach(s=>{tot[s]+=res[d][s].cost;hrs[s]+=res[d][s].h}));
   const openN={本店:shown.filter(d=>!closedSet("本店").has(d)).length, マルコ:shown.filter(d=>!closedSet("マルコ").has(d)).length};
@@ -435,7 +439,7 @@ function renderDaily(){
     <div class="tile"><div class="lb">全社（${shown[0].slice(5)}〜${lastPunch.slice(5)}）</div><div class="v">${yen(all)}</div><div class="d">実働 ${(hrs.本店+hrs.マルコ).toFixed(1)}h</div>${rl(allC,allS,both.length)}</div>
     <div class="tile h"><div class="lb">本店</div><div class="v">${yen(tot.本店)}</div><div class="d">営業日平均 ${yen(tot.本店/Math.max(1,openN.本店))} ／ ${openN.本店}日</div>${rl(rs.本店.c,rs.本店.s,rs.本店.n)}</div>
     <div class="tile m"><div class="lb">マルコ</div><div class="v">${yen(tot.マルコ)}</div><div class="d">営業日平均 ${yen(tot.マルコ/Math.max(1,openN.マルコ))} ／ ${openN.マルコ}日</div>${rl(rs.マルコ.c,rs.マルコ.s,rs.マルコ.n)}</div>
-    <div class="tile f"><div class="lb">FishHack 売上（${cfg.tax||"税抜"}）</div><div class="v">${yen(fhTot)}</div><div class="d">納品 ${fhN}件 ／ 人件費は本店に含む</div><div class="d" id="fhStatus"></div><button class="btn sm" id="fhReload" type="button">再取得</button></div>`;
+    <div class="tile f"><div class="lb">FishHack 売上（${cfg.tax||"税抜"}）</div><div class="v">${yen(fhTot)}</div><div class="d">納品 ${fhN}件 ／ 人件費は本店に含む</div>${after.length&&after.some(d=>fhSales(d)>0)?`<div class="d">${after[0].slice(5)}〜の納品 ${yen(after.reduce((a,d)=>a+fhSales(d),0))}は打刻取込後に集計へ反映</div>`:""}<div class="d" id="fhStatus"></div><button class="btn sm" id="fhReload" type="button">再取得</button></div>`;
   renderFhStatus(); document.getElementById("fhReload").onclick=loadFishHack;
   renderDayType(res,shown,issuesToday(issues));
   const missingM=people.filter(p=>cfg.staff[p.name].type==="月給"&&cfg.staff[p.name].include!==false&&!num(cfg.staff[p.name].rate)).map(p=>p.name);
@@ -473,7 +477,20 @@ function renderDaily(){
   h+=`<tr class="tot"><td class="l">計</td><td>${yen(tot.本店)}</td><td class="sl">${sumS.本店?yen(sumS.本店):"—"}</td><td class="rt">${ratioTxt(rs.本店.c,rs.本店.s)}</td>
     <td>${yen(tot.マルコ)}</td><td class="sl">${sumS.マルコ?yen(sumS.マルコ):"—"}</td><td class="rt">${ratioTxt(rs.マルコ.c,rs.マルコ.s)}</td>
     <td class="sl rt">${fhTot?yen(fhTot):"—"}</td>
-    <td>${yen(all)}</td><td class="sl">${allS?yen(allS):"—"}</td><td class="rt">${ratioTxt(allC,allS)}</td><td>${(hrs.本店+hrs.マルコ).toFixed(1)}</td></tr></tbody>`;
+    <td>${yen(all)}</td><td class="sl">${allS?yen(allS):"—"}</td><td class="rt">${ratioTxt(allC,allS)}</td><td>${(hrs.本店+hrs.マルコ).toFixed(1)}</td></tr>`;
+  if(after.length){
+    h+=`<tr class="sep"><td class="l" colspan="12">打刻CSV未取込の日（売上のみ・人件費率は計算しません）</td></tr>`;
+    after.forEach(d=>{
+      const dw=DOW[new Date(d).getDay()], hol=HOLIDAYS[d];
+      const sb=salesOf(d,"本店"), sm=salesOf(d,"マルコ"), sf=fhSales(d), st=(sb||0)+(sm||0)+sf;
+      h+=`<tr class="closed"><td class="l">${d.slice(5)} <span class="dow-${hol?"日":dw}">${dw}</span><span class="chip w">打刻未取込</span></td>
+        <td>—</td><td class="sl">${sb!=null?yen(sb):"—"}</td><td class="rt">—</td>
+        <td>—</td><td class="sl">${sm!=null?yen(sm):"—"}</td><td class="rt">—</td>
+        <td class="sl rt">${sf?yen(sf):"—"}</td>
+        <td>—</td><td class="sl">${st?yen(st):"—"}</td><td class="rt">—</td><td>—</td></tr>`;
+    });
+  }
+  h+=`</tbody>`;
   const tb=document.getElementById("daily"); tb.innerHTML=h;
   tb.querySelectorAll("tr.day").forEach(tr=>tr.onclick=()=>{const d=tr.dataset.d;openOpen.has(d)?openOpen.delete(d):openOpen.add(d);renderDaily()});
   tb.querySelectorAll(".sin input").forEach(inp=>{inp.onclick=e=>e.stopPropagation();inp.onchange=e=>{
