@@ -120,11 +120,12 @@ tr.sep td{background:var(--bg);color:var(--sub);font-size:12px;font-weight:700;p
 <div id="toast" class="al" hidden role="status" style="max-width:1060px;margin:12px auto 0;position:sticky;top:0;z-index:20"></div>
 <div id="empty" class="emptyb" hidden><h2>まだデータがありません</h2>
   <p>右上のボタンから次のCSVを読み込んでください。読み込んだデータはこの端末の中だけに保存され、WCSAのサーバーやGitHubには送られません。</p>
-  <ol><li>打刻管理CSV（給与システムの打刻管理 → CSV出力）</li><li>（単価は給与システムの従業員マスタから自動取得）</li><li>売上はWCSAのチャレンジ「売上CSVから更新」で取り込めば自動で反映（本店：売上実績CSV、マルコ：日報一覧CSV）</li></ol></div>
+  <ol><li>打刻は給与システムから自動取得（取れないときは打刻管理CSVを読み込み）</li><li>（単価は給与システムの従業員マスタから自動取得）</li><li>売上はWCSAのチャレンジ「売上CSVから更新」で取り込めば自動で反映（本店：売上実績CSV、マルコ：日報一覧CSV）</li></ol></div>
 <main id="app" hidden>
   <section>
     <div class="sum" id="sum"></div>
     <p class="note" id="sumNote"></p>
+    <p class="note"><span id="tcStatus"></span> <button class="btn sm" id="tcReload" type="button">打刻を再取得</button></p>
   </section>
   <section>
     <h2>曜日区分の平均</h2>
@@ -292,6 +293,66 @@ function applyFbSales(){
   if(Object.keys(M).length)cfg.salesCol["マルコ"]=`WCSA（日報一覧・総売上${cfg.tax||"税抜"}）`;
   saveCfg();
 }
+// ===== 打刻を給与システムから直接取得（打刻管理CSVと同じ計算 getExtendedDailyList を給与システムのdata.jsで実行） =====
+const PAYROLL_JS="/epwds0626-oss-payroll-system/js/data.js";
+let tcStatus="";
+function curPayYM(){const t=new Date();let y=t.getFullYear(),m=t.getMonth()+1;if(t.getDate()>=21){m++;if(m>12){m=1;y++}}return [y,m]}
+function loadPunchesLive(){
+  return new Promise(resolve=>{
+    const [y,m]=curPayYM();
+    const f=document.createElement("iframe");f.hidden=true;f.title="打刻データ取得";
+    let to;
+    const done=v=>{clearTimeout(to);window.removeEventListener("message",onMsg);f.remove();resolve(v)};
+    const onMsg=e=>{if(e.source!==f.contentWindow||!e.data||e.data.kind!=="punches")return;done(e.data)};
+    window.addEventListener("message",onMsg);
+    to=setTimeout(()=>done({ok:false,err:"時間切れ"}),25000);
+    const S="script";
+    f.srcdoc=`<!doctype html><meta charset="utf-8">
+<${S} src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></${S}>
+<${S} src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></${S}>
+<${S} src="${PAYROLL_JS}?t=${Date.now()}"></${S}>
+<${S}>
+(async()=>{try{
+  const [e,a,t]=await Promise.all([FB.employees().once("value"),FB.attendance().once("value"),FB.timecard().once("value")]);
+  const ev=e.val()||{};employees=(Array.isArray(ev)?ev.filter(Boolean):Object.values(ev));
+  attendance=a.val()||{};timecardLive=t.val()||{};
+  const Y=${y},M=${m};const p=getPayPeriod(Y,M);
+  const out=[];
+  for(const emp of activeEmployeesExpanded()){
+    const id=String(emp.id);const store=id.includes("_enya")?"本店":id.includes("_marco")?"マルコ":(emp.store||"");
+    for(const d of getExtendedDailyList(emp.id,Y,M,true)){
+      if(d.date<p.startDate||d.date>p.endDate)continue;
+      const br=(d.breaks||[]).filter(b=>b.start||b.end);
+      out.push({name:emp.name,store,date:d.date,in:d.punchIn||"",out:d.punchOut||"",br:br.map(b=>[b.start||"",b.end||""]),
+        brMins:d.breakMins||(d.breaks||[]).reduce((s,b)=>s+(b.minutes||0),0),
+        actual:d.actual||0,ot:d.dailyOT||0,night:d.midnight||0,pl:d.paidLeave?1:0,ab:d.absent?1:0,
+        miss:(!!d.punchIn)!==(!!d.punchOut)});
+    }
+  }
+  parent.postMessage({kind:"punches",ok:true,rows:out,start:p.startDate,end:p.endDate},"*");
+}catch(err){parent.postMessage({kind:"punches",ok:false,err:String(err&&err.message||err)},"*")}})();
+</${S}>`;
+    document.body.appendChild(f);
+  });
+}
+function punchesToCSV(rs){
+  const W="日月火水木金土",r2=v=>Math.round((v||0)*100)/100;
+  const head="氏名,店舗,日付,曜日,出勤,休憩1入,休憩1戻,休憩2入,休憩2戻,休憩3入,休憩3戻,退勤,休憩計(分),実働(h),残業(h),深夜(h),有給,欠勤,打刻漏れ";
+  const lines=rs.map(x=>{const b=x.br.slice(0,3);while(b.length<3)b.push(["",""]);
+    return [String(x.name).replace(/,/g," "),x.store,x.date.replace(/-/g,"/"),W[new Date(x.date).getDay()],x.in,b[0][0],b[0][1],b[1][0],b[1][1],b[2][0],b[2][1],x.out,Math.round(x.brMins)||0,r2(x.actual),r2(x.ot),r2(x.night),x.pl,x.ab,x.miss?"⚠":""].join(",")});
+  return [head,...lines].join("\n");
+}
+async function loadPunchesAndRender(){
+  tcStatus="打刻：給与システムから取得中…";renderTcStatus();
+  const r=await loadPunchesLive();
+  if(r.ok&&r.rows&&r.rows.length){
+    const t=new Date();tcStatus=`打刻：給与システムから取得（${r.rows.length}件・${t.getHours()}:${String(t.getMinutes()).padStart(2,"0")}）`;
+    openOpen.clear();ingest(punchesToCSV(r.rows));renderTcStatus();return true;
+  }
+  tcStatus=`打刻：給与システムから取得できませんでした（${r.err||"データなし"}）。打刻管理CSVで代用できます`;renderTcStatus();return false;
+}
+function renderTcStatus(){const el=document.getElementById("tcStatus");if(el)el.textContent=tcStatus}
+
 function renderMasterStatus(){const el=document.getElementById("masterStatus");if(el)el.textContent=masterStatus}
 const norm=n=>n.replace(/【.*?】/g,"").replace(/[\s　]+/g," ").trim();
 const num=v=>{const x=parseFloat(v);return isFinite(x)?x:0};
@@ -323,7 +384,7 @@ function ingest(text){
     STORES.forEach(s=>{cfg.closed[pk][s]=dates.filter(dt=>dt<=today && !rows.some(r=>r.store===s&&r.date===dt))});
   }
   const rs=rawGet().sales||{};STORES.forEach(st=>{if(rs[st])importSales(rs[st],st,true)});
-  applyFbSales(); saveCfg(); renderAll(); loadFishHack(); loadDailySalesFB();
+  applyFbSales(); saveCfg(); renderAll(); renderTcStatus(); loadFishHack(); loadDailySalesFB();
 }
 function buildPeople(){
   const map=new Map();
@@ -644,7 +705,9 @@ async function boot(){
   const r=rawGet();
   const ok=await loadPayrollMaster();
   if(!ok&&r.master)applyMaster(r.master);
-  if(r.tc){ingest(r.tc)}else{document.getElementById("empty").hidden=false;document.getElementById("app").hidden=true}
+  if(r.tc)ingest(r.tc);   // 前回分をすぐ表示
+  const live=await loadPunchesAndRender();   // 給与システムの最新打刻で置き換え
+  if(!live&&!r.tc){document.getElementById("empty").hidden=false;document.getElementById("app").hidden=true}
 }
 async function tryUnlock(){
   const v=document.getElementById("pw").value.trim();
@@ -652,6 +715,7 @@ async function tryUnlock(){
   else{document.getElementById("pwErr").hidden=false}
 }
 document.getElementById("pwBtn").onclick=tryUnlock;
+document.getElementById("tcReload").onclick=()=>loadPunchesAndRender();
 document.getElementById("masterReload").onclick=async()=>{if(await loadPayrollMaster()&&rows.length){buildPeople();renderAll()}};
 document.getElementById("pw").onkeydown=e=>{if(e.key==="Enter")tryUnlock()};
 document.getElementById("lockNow").onclick=()=>{try{sessionStorage.removeItem("jinkenhi-ok")}catch(e){}location.reload()};
