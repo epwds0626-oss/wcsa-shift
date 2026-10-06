@@ -634,6 +634,9 @@ async function loadFishHack(){
   renderFhStatus();renderDaily();
 }
 function renderFhStatus(){const el=document.getElementById("fhStatus");if(el)el.textContent="FishHack："+fh.status}
+// 前年同曜日（364日前）＝POSの「前年実績」と同じ合わせ方
+function prevDay(d){const x=new Date(d);x.setDate(x.getDate()-364);return dstr(x)}
+function yoyTag(c,p){return p>0&&c>0?`<div class="yoy ${c>=p?"up":"down"}">昨対 ${(c/p*100).toFixed(1)}%</div>`:""}
 function salesOf(d,s){const v=(cfg.sales||{})[d];return v&&v[s]!=null&&v[s]!==""?num(v[s]):null}
 function ratioCell(cost,sales){
   if(sales==null||sales<=0)return '<td class="rt">—</td>';
@@ -660,11 +663,15 @@ function renderDaily(){
   const fhTot=shown.reduce((a,d)=>a+fhSales(d),0), fhN=shown.reduce((a,d)=>a+((fh.by[d]||{}).n||0),0);
   const allC=rs.本店.c+rs.マルコ.c, allS=rs.本店.s+rs.マルコ.s+fhTot;
   const both={length:shown.filter(d=>salesOf(d,"本店")!=null||salesOf(d,"マルコ")!=null||fhSales(d)).length};
+  const yy={本店:{c:0,p:0},マルコ:{c:0,p:0}};
+  shown.forEach(d=>STORES.forEach(st=>{const c=salesOf(d,st),p=salesOf(prevDay(d),st);if(c>0&&p>0){yy[st].c+=c;yy[st].p+=p}}));
+  const yl=st=>yy[st].p>0?`<div class="d">売上昨対 <b class="rtv">${(yy[st].c/yy[st].p*100).toFixed(1)}%</b>（前年同曜日と比較）</div>`:"";
+  const yAll=yy.本店.p+yy.マルコ.p>0?`<div class="d">売上昨対 <b class="rtv">${((yy.本店.c+yy.マルコ.c)/(yy.本店.p+yy.マルコ.p)*100).toFixed(1)}%</b>（前年のある店のみ）</div>`:"";
   const rl=(c,s,n)=>n?`<div class="d">人件費率 <b class="rtv">${ratioTxt(c,s)}</b>（売上 ${yen(s)}）</div>`:`<div class="d">売上未入力</div>`;
   document.getElementById("sum").innerHTML=`
-    <div class="tile"><div class="lb">全社（${shown[0].slice(5)}〜${lastPunch.slice(5)}）</div><div class="v">${yen(all)}</div><div class="d">実働 ${(hrs.本店+hrs.マルコ).toFixed(1)}h</div>${rl(allC,allS,both.length)}</div>
-    <div class="tile h"><div class="lb">本店</div><div class="v">${yen(tot.本店)}</div><div class="d">営業日平均 ${yen(tot.本店/Math.max(1,openN.本店))} ／ ${openN.本店}日</div>${rl(rs.本店.c,rs.本店.s,rs.本店.n)}</div>
-    <div class="tile m"><div class="lb">マルコ</div><div class="v">${yen(tot.マルコ)}</div><div class="d">営業日平均 ${yen(tot.マルコ/Math.max(1,openN.マルコ))} ／ ${openN.マルコ}日</div>${rl(rs.マルコ.c,rs.マルコ.s,rs.マルコ.n)}</div>
+    <div class="tile"><div class="lb">全社（${shown[0].slice(5)}〜${lastPunch.slice(5)}）</div><div class="v">${yen(all)}</div><div class="d">実働 ${(hrs.本店+hrs.マルコ).toFixed(1)}h</div>${rl(allC,allS,both.length)}${yAll}</div>
+    <div class="tile h"><div class="lb">本店</div><div class="v">${yen(tot.本店)}</div><div class="d">営業日平均 ${yen(tot.本店/Math.max(1,openN.本店))} ／ ${openN.本店}日</div>${rl(rs.本店.c,rs.本店.s,rs.本店.n)}${yl("本店")}</div>
+    <div class="tile m"><div class="lb">マルコ</div><div class="v">${yen(tot.マルコ)}</div><div class="d">営業日平均 ${yen(tot.マルコ/Math.max(1,openN.マルコ))} ／ ${openN.マルコ}日</div>${rl(rs.マルコ.c,rs.マルコ.s,rs.マルコ.n)}${yl("マルコ")}</div>
     <div class="tile f"><div class="lb">FishHack 売上（${cfg.tax||"税抜"}）</div><div class="v">${yen(fhTot)}</div><div class="d">納品 ${fhN}件 ／ 人件費は本店に含む</div>${after.length&&after.some(d=>fhSales(d)>0)?`<div class="d">${after[0].slice(5)}〜の納品 ${yen(after.reduce((a,d)=>a+fhSales(d),0))}は打刻取込後に集計へ反映</div>`:""}<div class="d" id="fhStatus"></div><button class="btn sm" id="fhReload" type="button">再取得</button></div>`;
   renderFhStatus(); document.getElementById("fhReload").onclick=loadFishHack;
   renderDayType(res,shown,issuesToday(issues));
@@ -686,14 +693,16 @@ function renderDaily(){
   shown.forEach(d=>{
     const b=res[d].本店, m=res[d].マルコ, t=b.cost+m.cost, dw=DOW[new Date(d).getDay()];
     const sb=salesOf(d,"本店"), sm=salesOf(d,"マルコ"), sf=fhSales(d), st=(sb||0)+(sm||0)+sf;
+    const pdy=prevDay(d), pb=salesOf(pdy,"本店"), pm=salesOf(pdy,"マルコ");
+    const rc=(pb>0&&sb>0?sb:0)+(pm>0&&sm>0?sm:0), rp=(pb>0&&sb>0?pb:0)+(pm>0&&sm>0?pm:0);
     sumS.本店+=sb||0; sumS.マルコ+=sm||0;
     const cl=closedSet("本店").has(d)&&closedSet("マルコ").has(d);
     const hol=HOLIDAYS[d];
     h+=`<tr class="day${cl?" closed":""}" data-d="${d}"><td class="l">${d.slice(5)} <span class="dow-${hol?"日":dw}">${dw}</span>${hol?'<span class="chip s">'+hol+'</span>':""}${cl?'<span class="chip s">定休</span>':""}</td>
-      <td>${b.cost?yen(b.cost):"—"}</td><td class="sl">${sb!=null?yen(sb):"—"}</td>${ratioCell(b.cost,sb)}
-      <td>${m.cost?yen(m.cost):"—"}</td><td class="sl">${sm!=null?yen(sm):"—"}${fbEst.has(d)?'<span class="chip s" title="年間売上CSVの当月累計−同じ月のほかの日の売上。日報一覧CSVを取り込むと確定値になります">推定</span>':""}</td>${ratioCell(m.cost,sm)}
+      <td>${b.cost?yen(b.cost):"—"}</td><td class="sl">${sb!=null?yen(sb):"—"}${yoyTag(sb,pb)}</td>${ratioCell(b.cost,sb)}
+      <td>${m.cost?yen(m.cost):"—"}</td><td class="sl">${sm!=null?yen(sm):"—"}${yoyTag(sm,pm)}${fbEst.has(d)?'<span class="chip s" title="年間売上CSVの当月累計−同じ月のほかの日の売上。日報一覧CSVを取り込むと確定値になります">推定</span>':""}</td>${ratioCell(m.cost,sm)}
       <td class="sl rt">${sf?yen(sf):"—"}</td>
-      <td><b>${t?yen(t):"—"}</b></td><td class="sl">${st?yen(st):"—"}</td>${ratioCell(t,st>0?st:null)}
+      <td><b>${t?yen(t):"—"}</b></td><td class="sl">${st?yen(st):"—"}${yoyTag(rc,rp)}</td>${ratioCell(t,st>0?st:null)}
       <td>${(b.h+m.h).toFixed(1)}</td></tr>`;
     if(openOpen.has(d)) h+=`<tr class="det"><td colspan="12"><div class="det-in">
       <div class="sin"><label for="sb-${d}">本店 売上<input id="sb-${d}" data-d="${d}" data-s="本店" type="number" min="0" step="1" value="${sb??""}"></label>
