@@ -107,6 +107,8 @@ body.annual-mode #app,body.annual-mode #empty{display:none!important}
 .bar .bf{background:var(--fish)}
 #anTable .bar{width:80px}
 #anTable th,#anTable td{padding:8px 7px}
+.yoy{font-size:11px;font-weight:700;line-height:1.2}
+.yoy.up{color:var(--ok)} .yoy.down{color:var(--crit)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head><body>
@@ -455,6 +457,11 @@ async function openAnnual(fy){
   // 3) FishHack（Excel取込の月まとめ分も月の合計には含める）
   const fhm=await fetchFishHackMonthly(fy);
   if(fhm)months.forEach(k=>{const v=fhm[k];if(!v)return;M[k].fh=(cfg.tax||"税抜")==="税抜"?v.net:v.gross;Object.entries(v.byDay).forEach(([d,a])=>{if(M[k].lab.has(d)&&(cfg.sales[d]||{})["本店"]!=null)M[k].fhl+=a})});
+  // 4) 前年同月の売上（昨対比）：本店・マルコは保存済みの前年の日別売上、FishHackは納品データ
+  months.forEach(k=>{const pk=(+k.slice(0,4)-1)+k.slice(4);const pv={本店:null,マルコ:null,fh:null};
+    Object.keys(cfg.sales||{}).forEach(d=>{if(!d.startsWith(pk))return;STORES.forEach(s=>{const v=cfg.sales[d][s];if(v!=null)pv[s]=(pv[s]||0)+num(v)})});
+    if(fhm&&fhm[pk])pv.fh=(cfg.tax||"税抜")==="税抜"?fhm[pk].net:fhm[pk].gross;
+    M[k].prev=pv});
   renderAnnual(fy,months,M,!!fhm,labNote);annualBusy=false;
 }
 function renderAnnual(fy,months,M,fhOk,labNote){
@@ -462,6 +469,8 @@ function renderAnnual(fy,months,M,fhOk,labNote){
   const pct=(c,s)=>s>0&&c>0?(c/s*100):null;
   const fr=v=>{if(v==null)return "—";const t=num(cfg.target||30);return `<span class="pill ${v<=t?"ok":v<=t+5?"w":"c"}">${v.toFixed(1)}%</span>`};
   const y=v=>v?yen(v):"—";
+  const yoy=(c,p)=>p>0&&c>0?`<div class="yoy ${c>=p?"up":"down"}">昨対 ${(c/p*100).toFixed(1)}%</div>`:"";
+  const P={本店:0,マルコ:0,fh:0,cmpCur:0,cmpPrev:0,hc:0,mc:0,fc:0};
   const maxS=Math.max(1,...months.map(k=>M[k].本店.s+M[k].マルコ.s+M[k].fh));
   let h=`<thead><tr><th class="l" rowspan="2">月</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th class="grp gf">FishHack</th><th colspan="3" class="grp">全社</th><th class="l" rowspan="2"></th><th rowspan="2">人件費<br>の日数</th></tr>
   <tr><th>売上</th><th>人件費</th><th>率</th><th>売上</th><th>人件費</th><th>率</th><th class="rt">売上</th><th>売上</th><th>人件費</th><th>率</th></tr></thead><tbody>`;
@@ -469,27 +478,33 @@ function renderAnnual(fy,months,M,fhOk,labNote){
     const m=M[k],hs=m.本店,ms=m.マルコ,allS=hs.s+ms.s+m.fh,allC=hs.c+ms.c,allSL=hs.sl+ms.sl+m.fhl,allCM=hs.cm+ms.cm,n=m.lab.size;
     const dim=new Date(+k.slice(0,4),+k.slice(5,7),0).getDate();
     ["本店","マルコ"].forEach(s=>{T[s].c+=m[s].c;T[s].s+=m[s].s;T[s].sl+=m[s].sl;T[s].cm+=m[s].cm});T.fh+=m.fh;T.fhl+=m.fhl;T.lab+=n;T.h+=m.h;
+    // 全社の昨対：前年も数字がある事業だけで比べる（マルコ開店前の月は本店＋FishHack）
+    const pv=m.prev||{};let cc=0,cp=0;
+    if(pv.本店>0&&hs.s>0){cc+=hs.s;cp+=pv.本店;P.本店+=pv.本店;P.hc+=hs.s}
+    if(pv.マルコ>0&&ms.s>0){cc+=ms.s;cp+=pv.マルコ;P.マルコ+=pv.マルコ;P.mc+=ms.s}
+    if(pv.fh>0&&m.fh>0){cc+=m.fh;cp+=pv.fh;P.fh+=pv.fh;P.fc+=m.fh}
+    P.cmpCur+=cc;P.cmpPrev+=cp;
     h+=`<tr${!allS&&!allC?' class="closed"':""}><td class="l">${+k.slice(5)}月 <span class="note">${k.slice(0,4)}</span></td>
-      <td class="sl">${y(hs.s)}</td><td>${y(hs.c)}</td><td class="rt">${fr(pct(hs.cm,hs.sl))}</td>
-      <td class="sl">${y(ms.s)}</td><td>${y(ms.c)}</td><td class="rt">${fr(pct(ms.cm,ms.sl))}</td>
-      <td class="sl rt">${y(m.fh)}</td>
-      <td class="sl">${y(allS)}</td><td><b>${y(allC)}</b></td><td class="rt">${fr(pct(allCM,allSL))}</td>
+      <td class="sl">${y(hs.s)}${yoy(hs.s,pv.本店)}</td><td>${y(hs.c)}</td><td class="rt">${fr(pct(hs.cm,hs.sl))}</td>
+      <td class="sl">${y(ms.s)}${yoy(ms.s,pv.マルコ)}</td><td>${y(ms.c)}</td><td class="rt">${fr(pct(ms.cm,ms.sl))}</td>
+      <td class="sl rt">${y(m.fh)}${yoy(m.fh,pv.fh)}</td>
+      <td class="sl">${y(allS)}${yoy(cc,cp)}</td><td><b>${y(allC)}</b></td><td class="rt">${fr(pct(allCM,allSL))}</td>
       <td class="l"><div class="bar"><i class="bh" style="width:${hs.s/maxS*100}%"></i><i class="bm" style="width:${ms.s/maxS*100}%"></i><i class="bf" style="width:${m.fh/maxS*100}%"></i></div></td>
       <td>${n?(n<dim?`<span class="chip w">${n}/${dim}日</span>`:`${n}日`):'<span class="note">打刻なし</span>'}</td></tr>`;
   });
   const tS=T.本店.s+T.マルコ.s+T.fh,tC=T.本店.c+T.マルコ.c,tSL=T.本店.sl+T.マルコ.sl+T.fhl,tCM=T.本店.cm+T.マルコ.cm;
-  h+=`<tr class="tot"><td class="l">年間計</td><td class="sl">${y(T.本店.s)}</td><td>${y(T.本店.c)}</td><td class="rt">${fr(pct(T.本店.cm,T.本店.sl))}</td>
-    <td class="sl">${y(T.マルコ.s)}</td><td>${y(T.マルコ.c)}</td><td class="rt">${fr(pct(T.マルコ.cm,T.マルコ.sl))}</td>
-    <td class="sl rt">${y(T.fh)}</td><td class="sl">${y(tS)}</td><td><b>${y(tC)}</b></td><td class="rt">${fr(pct(tCM,tSL))}</td><td></td><td>${T.lab}日</td></tr></tbody>`;
+  h+=`<tr class="tot"><td class="l">年間計</td><td class="sl">${y(T.本店.s)}${yoy(P.hc,P.本店)}</td><td>${y(T.本店.c)}</td><td class="rt">${fr(pct(T.本店.cm,T.本店.sl))}</td>
+    <td class="sl">${y(T.マルコ.s)}${yoy(P.mc,P.マルコ)}</td><td>${y(T.マルコ.c)}</td><td class="rt">${fr(pct(T.マルコ.cm,T.マルコ.sl))}</td>
+    <td class="sl rt">${y(T.fh)}${yoy(P.fc,P.fh)}</td><td class="sl">${y(tS)}${yoy(P.cmpCur,P.cmpPrev)}</td><td><b>${y(tC)}</b></td><td class="rt">${fr(pct(tCM,tSL))}</td><td></td><td>${T.lab}日</td></tr></tbody>`;
   document.getElementById("anTable").innerHTML=h;
   const labMonths=months.filter(k=>M[k].lab.size).map(k=>+k.slice(5)+"月");
   document.getElementById("anTiles").innerHTML=`
-    <div class="tile"><div class="lb">全社 売上（${cfg.tax||"税抜"}）</div><div class="v">${yen(tS)}</div><div class="d">本店 ${yen(T.本店.s)} ／ マルコ ${yen(T.マルコ.s)} ／ FishHack ${yen(T.fh)}</div></div>
+    <div class="tile"><div class="lb">全社 売上（${cfg.tax||"税抜"}）</div><div class="v">${yen(tS)}</div><div class="d">本店 ${yen(T.本店.s)} ／ マルコ ${yen(T.マルコ.s)} ／ FishHack ${yen(T.fh)}</div>${P.cmpPrev>0?`<div class="d">昨対 <b class="rtv">${(P.cmpCur/P.cmpPrev*100).toFixed(1)}%</b>（前年と比べられる月・事業で計算）</div>`:`<div class="d">昨対：前年の売上データなし</div>`}</div>
     <div class="tile"><div class="lb">人件費（打刻のある日）</div><div class="v">${yen(tC)}</div><div class="d">本店 ${yen(T.本店.c)} ／ マルコ ${yen(T.マルコ.c)} ／ 実働 ${T.h.toFixed(0)}h</div></div>
     <div class="tile"><div class="lb">人件費率（同じ日の売上で計算）</div><div class="v">${pct(tCM,tSL)!=null?pct(tCM,tSL).toFixed(1)+"%":"—"}</div><div class="d">人件費 ${yen(tCM)} ÷ 売上 ${yen(tSL)}（両方そろった日）</div></div>`;
   document.getElementById("anStatus").textContent=
     `人件費は給与システムに打刻がある日だけ計算しています（${labMonths.length?labMonths.join("・"):"該当なし"}）${labNote}。率は人件費と売上が両方そろった日だけで計算（全社はFishHack売上を含む）。`+
-    (fhOk?"":" FishHackの売上を取得できませんでした。")+" 売上が「—」の月は、その月のPOSの売上CSVを読み込むと入ります。";
+    (fhOk?"":" FishHackの売上を取得できませんでした。")+" 売上が「—」の月は、その月のPOSの売上CSVを読み込むと入ります。昨対は前年同月の売上と比べています（本店の前年分は売上実績CSVの「前年実績」から保存。全社はマルコ開店前の月は本店＋FishHackで比較）。";
 }
 function closeAnnual(){document.body.classList.remove("annual-mode")}
 
@@ -862,6 +877,13 @@ async function persistSalesFB(text,store){
       if(ix("男")>=0){o.male=toI(r[ix("男")]);o.female=toI(r[ix("女")])}
       body["marco/"+d]=o;n++;
     }
+  }
+  // 本店：前年日付・前年実績を前年の日別売上として保存（昨対比用。既にある日は上書きしない）
+  if(store==="本店"&&ix("前年日付")>=0&&ix("前年実績")>=0){
+    const ex=(fbSales&&fbSales.honten)||{};
+    for(let i=hi+1;i<t.length;i++){const r=t[i],pd=String(r[ix("前年日付")]||"");if(!/^\d{8}$/.test(pd))continue;
+      if(ex[pd]||body["honten/"+pd])continue;
+      body["honten/"+pd]={sales:toI(r[ix("前年実績")]),cust:ix("前年客数")>=0?toI(r[ix("前年客数")]):0,src:"前年実績",ts:Date.now()}}
   }
   if(!n)return 0;
   try{const res=await fetch(`${PAYROLL_DB}/sales_daily.json`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!res.ok)throw 0}
