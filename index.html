@@ -3627,6 +3627,8 @@ function saveDailySales(results) {
   if (results.salesFile) {
     var h = results.salesFile[0];
     var iD = h.indexOf('当年日付'), iS = h.indexOf('当年実績'), iC = h.indexOf('当年客数');
+    var iPD = h.indexOf('前年日付'), iPS = h.indexOf('前年実績'), iPC = h.indexOf('前年客数');
+    var prevUpd = {};
     if (iD !== -1 && iS !== -1) {
       for (var i = 1; i < results.salesFile.length; i++) {
         var r = results.salesFile[i], d = String(r[iD] || '').trim();
@@ -3635,6 +3637,21 @@ function saveDailySales(results) {
         if (v === 0 && d >= todayK) continue;         // 今日以降の未締め0円は保存しない
         upd['honten/' + d] = { sales: v, cust: iC !== -1 ? toInt(r[iC]) : 0, src: '売上実績', ts: ts };
         n++;
+      }
+      // 前年実績（前年日付つき）を前年の日別売上として保存（昨対比用）。既にある日は上書きしない
+      if (iPD !== -1 && iPS !== -1) {
+        for (var pi = 1; pi < results.salesFile.length; pi++) {
+          var pr = results.salesFile[pi], pd = String(pr[iPD] || '').trim();
+          if (!/^\d{8}$/.test(pd)) continue;
+          prevUpd[pd] = { sales: toInt(pr[iPS]), cust: iPC !== -1 ? toInt(pr[iPC]) : 0, src: '前年実績', ts: ts };
+        }
+        if (Object.keys(prevUpd).length) {
+          db.ref('sales_daily/honten').once('value').then(function(sn){
+            var ex = sn.val() || {}, add = {};
+            Object.keys(prevUpd).forEach(function(k){ if (!ex[k] && !upd['honten/' + k]) add['honten/' + k] = prevUpd[k]; });
+            if (Object.keys(add).length) return db.ref('sales_daily').update(add);
+          }).catch(function(e){ console.error(e); });
+        }
       }
     }
   }
