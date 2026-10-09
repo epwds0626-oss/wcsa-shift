@@ -3154,7 +3154,8 @@ function updateChallengUI(d, shopKey) {
   var sGoalLabel = isMarco ? '前月比アップ' : '前年比アップ';
 
   setText('ch-spot-current', fmtYen(sCurrent));
-  setText('ch-spot-target', isMarco ? '前月超え' : fmtYen(sTarget));
+  // マルコの目標＝前月の客単価（これを超えれば達成）。「¥」はHTML側にあるので数字だけ入れる
+  setText('ch-spot-target', isMarco ? (sBase > 0 ? fmtYen(sBase) + ' 超え' : '—') : fmtYen(sTarget));
   setText('ch-spot-pct', (sUpRate >= 0 ? '+' : '') + sUpRate + '%');
   var sLabelEl = document.getElementById('ch-spot-pct');
   if (sLabelEl && sLabelEl.nextElementSibling) sLabelEl.nextElementSibling.textContent = sGoalLabel;
@@ -3729,6 +3730,14 @@ function saveDailySales(results) {
   return n;
 }
 
+// マルコPOSの客数：「客数」（または「客計」）列を使う。列が無いCSVだけ 男+女+子供+不明 を足す
+function marcoCustOf(header, row) {
+  var n = function(i){ return i !== -1 ? (parseInt(String(row[i] || '0').replace(/,/g,'')) || 0) : 0; };
+  var c = header.indexOf('客数') !== -1 ? header.indexOf('客数') : header.indexOf('客計');
+  if (c !== -1) return n(c);
+  return n(header.indexOf('男')) + n(header.indexOf('女')) + n(header.indexOf('子供')) + n(header.indexOf('不明'));
+}
+
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
   var dailySaved = saveDailySales(results);
@@ -3751,7 +3760,8 @@ function processCsvResults(results, shopKey) {
     var pPre = pm.getFullYear() + String(pm.getMonth()+1).padStart(2,'0');
     prefetch = db.ref('sales_daily/marco').once('value').then(function(sn){
       var v = sn.val() || {}, sSum = 0, cSum = 0;
-      Object.keys(v).forEach(function(k){ if (k.indexOf(pPre) === 0) { sSum += +v[k].gross || 0; cSum += (+v[k].male || 0) + (+v[k].female || 0); } });
+      // 客数は保存済みの cust（POS客数列）を優先。無い日だけ男+女で補う
+      Object.keys(v).forEach(function(k){ if (k.indexOf(pPre) === 0) { sSum += +v[k].gross || 0; cSum += (+v[k].cust || 0) > 0 ? +v[k].cust : (+v[k].male || 0) + (+v[k].female || 0); } });
       results._prevMonthMarco = { sales: sSum, cust: cSum };
     }).catch(function(){});
   }
@@ -4002,17 +4012,21 @@ function processCsvResultsCore(results, shopKey, existingCh) {
     var PR = results.marcoPeriodFile, prh = -1;
     for (var pq = 0; pq < Math.min(PR.length, 10); pq++) { if (PR[pq].indexOf('日付') !== -1 && PR[pq].indexOf('純売上(税込)') !== -1) { prh = pq; break; } }
     if (prh !== -1) {
-      var PRH = PR[prh], cS = PRH.indexOf('純売上(税込)'), cMa = PRH.indexOf('男'), cFe = PRH.indexOf('女');
+      var PRH = PR[prh], cS = PRH.indexOf('純売上(税込)');
       var tR = null;
       for (var pr = prh + 1; pr < PR.length; pr++) { if (PR[pr][0] === '合計') { tR = PR[pr]; break; } }
       var ti = function(v){ return parseInt(String(v || '0').replace(/,/g,'')) || 0; };
       if (tR) {
-        var pSales = ti(tR[cS]), pCust = (cMa !== -1 ? ti(tR[cMa]) : 0) + (cFe !== -1 ? ti(tR[cFe]) : 0);
+        // 客数はPOSの「客数」列（男+女+子供+不明）。男+女だけだと子供・性別不明の客が抜けて客単価が膨らむ
+        var pSales = ti(tR[cS]), pCust = marcoCustOf(PRH, tR);
         upd.big_current = pSales; upd.mission_total = pCust; upd.spot_current = pCust > 0 ? Math.round(pSales / pCust) : 0;
         upd.big_updated = ts; upd.spot_updated = ts;
         if (!existingCh.big_base && results._prevMonthMarco && results._prevMonthMarco.sales > 0) {
           upd.big_base = results._prevMonthMarco.sales;
-          upd.spot_base = results._prevMonthMarco.cust > 0 ? Math.round(results._prevMonthMarco.sales / results._prevMonthMarco.cust) : 0;
+        }
+        // 前月の客単価は毎回、同じ数え方（客数列）で計算し直す（旧版が男+女で保存した値を上書きするため）
+        if (results._prevMonthMarco && results._prevMonthMarco.sales > 0 && results._prevMonthMarco.cust > 0) {
+          upd.spot_base = Math.round(results._prevMonthMarco.sales / results._prevMonthMarco.cust);
         }
       }
     }
@@ -4042,9 +4056,7 @@ function processCsvResultsCore(results, shopKey, existingCh) {
         var prevRow = dataRows.length >= 2 ? dataRows[dataRows.length - 2] : null;
 
         var curSales = idxPureSales !== -1 ? parseInt(curRow[idxPureSales].replace(/,/g,''))  || 0 : 0;
-        var curMale  = idxMale   !== -1 ? parseInt(curRow[idxMale].replace(/,/g,''))   || 0 : 0;
-        var curFemale= idxFemale !== -1 ? parseInt(curRow[idxFemale].replace(/,/g,'')) || 0 : 0;
-        var curCust  = curMale + curFemale;
+        var curCust  = marcoCustOf(mHeader, curRow);
         var curAvg   = curCust > 0 ? Math.round(curSales / curCust) : 0;
 
         upd.big_current   = curSales;
@@ -4055,9 +4067,7 @@ function processCsvResultsCore(results, shopKey, existingCh) {
 
         if (prevRow) {
           var prevSales  = idxPureSales !== -1 ? parseInt(prevRow[idxPureSales].replace(/,/g,''))  || 0 : 0;
-          var prevMale   = idxMale   !== -1 ? parseInt(prevRow[idxMale].replace(/,/g,''))   || 0 : 0;
-          var prevFemale = idxFemale !== -1 ? parseInt(prevRow[idxFemale].replace(/,/g,'')) || 0 : 0;
-          var prevCust   = prevMale + prevFemale;
+          var prevCust   = marcoCustOf(mHeader, prevRow);
           var prevAvg    = prevCust > 0 ? Math.round(prevSales / prevCust) : 0;
           upd.big_base  = prevSales;
           upd.spot_base = prevAvg;
