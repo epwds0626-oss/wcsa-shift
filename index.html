@@ -2938,10 +2938,13 @@ function updateChallengUI(d, shopKey) {
   var fdWrap = document.getElementById('ch-fooddaily-wrap');
   if (fdWrap) {
     var fdData = d.food_daily;
-    if (!isMarco && fdData && fdData.names && fdData.days && fdData.days.length) {
+    if (!isMarco) {
+      // 今月分（food_daily）が無くても、蓄積済みの直近8週データがあれば表示する
       fdWrap.style.display = 'block';
-      _fdMonthData = fdData;
-      if (_fdState.mode === '8w') {
+      var hasMonth = !!(fdData && fdData.names && fdData.days && fdData.days.length);
+      _fdMonthData = hasMonth ? fdData : null;
+      if (_fdState.mode === '8w' || !hasMonth) {
+        _fdState.mode = '8w';
         fdSetMode('8w');      // 直近8週表示中なら最新の保存データで読み直す
       } else {
         window._chFoodDaily = fdData;
@@ -3589,6 +3592,11 @@ function fdSetMode(mode) {
   _fdState.date = -1;
   if (mode === 'month') {
     window._chFoodDaily = _fdMonthData;
+    if (!_fdMonthData) {
+      var el0 = document.getElementById('ch-fooddaily');
+      if (el0) el0.innerHTML = fdModeBar() + '<div style="padding:8px 10px;background:#fef3c7;border-radius:6px;font-size:11.5px;color:#92400e">今月の日別CSV（Daily_Item_Sales）がまだ取り込まれていません。今月分を取り込むと表示されます。</div>';
+      return;
+    }
     renderFoodDaily();
     return;
   }
@@ -3779,6 +3787,7 @@ function handleCsvImport(event) {
           // 「営業日」列があれば日別CSV（Daily_Item_Sales）、無ければ月間ABC品目CSV
           if (header.indexOf('営業日') !== -1 && header.indexOf('商品名') !== -1 && header.indexOf('売上数量') !== -1) {
             results.dailyFile = rows;
+            (results.dailyFiles = results.dailyFiles || []).push(rows);   // 複数月まとめて選んだとき用
           } else if (header.indexOf('商品名') !== -1 && header.indexOf('売上数量') !== -1) {
             results.itemFile = rows;
           }
@@ -4017,16 +4026,23 @@ function processCsvResults(results, shopKey) {
   // 【追加 R8.10.16】本店の日別CSVは、料理別の日別出数を月をまたいで蓄積（直近8週平均用）。
   // 過去の月の日別CSVは蓄積だけ行い、今月のチャレンジ（デザート・TOP5等）は上書きしない。
   var fdHistSaved = false;
-  if (results.dailyFile && !isMarco) {
-    var fdAll = buildFoodDaily(results.dailyFile);
-    if (fdAll && fdAll.days.length) {
+  if (results.dailyFiles && results.dailyFiles.length && !isMarco) {
+    // 【修正 R8.10.16】日別CSVを複数（8月・9月・10月など）まとめて選んでも全部蓄積する。
+    // チャレンジ（今月の数値）には、最新日が今月の日別CSVだけを使う。無ければ更新しない。
+    var curDaily = null, curLastK = 0, histDays = 0, histMonths = [];
+    results.dailyFiles.forEach(function(rows){
+      var fdAll = buildFoodDaily(rows);
+      if (!fdAll || !fdAll.days.length) return;
       fdHistSaved = true;
+      histDays += fdAll.days.length;
+      var lastK = fdAll.days[fdAll.days.length - 1].k;
+      histMonths.push(String(lastK).slice(4, 6).replace(/^0/, '') + '月');
       saveFoodDailyHist(shopKey, fdAll).catch(function(e){ console.warn('food_daily_hist', e); });
-      var fdLastYm = String(fdAll.days[fdAll.days.length - 1].k).slice(0, 6);
-      if (fdLastYm < nowYm) {
-        results.dailyFile = null;
-        showToast('過去の月の日別CSVです。料理別出数（8週平均用）だけ保存し、チャレンジは更新しません');
-      }
+      if (String(lastK).slice(0, 6) >= nowYm && lastK > curLastK) { curDaily = rows; curLastK = lastK; }
+    });
+    results.dailyFile = curDaily;
+    if (fdHistSaved) {
+      showToast('料理別出数を保存しました（' + histMonths.join('・') + '／' + histDays + '日分）' + (curDaily ? '' : '。今月分が無いのでチャレンジは更新しません'));
     }
   }
   var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoPeriodFile || results.marcoSnapshotFile || results.marcoItemFiles.length > 0;
