@@ -454,6 +454,10 @@ nav{display:flex;gap:2px}
           <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 曜日別 人気メニュー TOP5（デザート以外）</summary>
           <div id="ch-big-weekday" style="margin-top:6px;overflow-x:auto"></div>
         </details>
+        <details id="ch-fooddaily-wrap" open style="display:none;margin-top:8px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--accent2);user-select:none;font-weight:700">📅 料理別 出数（日別・曜日平均）</summary>
+          <div id="ch-fooddaily" style="margin-top:6px;overflow-x:auto"></div>
+        </details>
         <details id="ch-limited-wrap" open style="display:none;margin-top:8px">
           <summary style="cursor:pointer;font-size:11px;color:var(--accent3);user-select:none;font-weight:700">🍱 数量限定 出数の推移（曜日別）</summary>
           <div id="ch-limited-weekday" style="margin-top:6px;overflow-x:auto"></div>
@@ -2930,6 +2934,20 @@ function updateChallengUI(d, shopKey) {
     }
   }
 
+  // 料理別 出数（日別・曜日平均）— 本店のみ（日別CSVの food_daily）
+  var fdWrap = document.getElementById('ch-fooddaily-wrap');
+  if (fdWrap) {
+    var fdData = d.food_daily;
+    if (!isMarco && fdData && fdData.names && fdData.days && fdData.days.length) {
+      fdWrap.style.display = 'block';
+      window._chFoodDaily = fdData;
+      _fdState.date = -1;   // 再描画時は最新日に戻す（料理の選択は保持）
+      renderFoodDaily();
+    } else {
+      fdWrap.style.display = 'none';
+    }
+  }
+
   // 数量限定 出数の推移（曜日別・指定商品）— 本店のみ
   var limWrap = document.getElementById('ch-limited-wrap');
   if (limWrap) {
@@ -3468,6 +3486,130 @@ function resetDessertMission() {
 // すべて消えるため、集計が根本的に壊れた時の最終手段。
 // 二段確認＋「リセット」入力で誤操作を防ぐ。リセット後は当月分の
 // 累計CSV(aggregateMenu)と各CSVを取り込み直すこと。
+// ===== 料理別 出数（日別・曜日平均）【追加 R8.10.16】 =====
+// food_daily = { names:[品目名…出数順], days:[{k,d:'10/15(木)',wd:0-6,q:[品目ごとの出数]}] }
+// 曜日平均 = その曜日の出数合計 ÷ その曜日の営業日数（CSVに載っている日付を営業日とみなす）
+var _fdState = { date: -1, dish: -1 };
+function fdEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function fdFmt(v) { return v === 0 ? '0' : (Math.round(v * 10) / 10).toFixed(1); }
+function fdCalc(fd) {
+  var n = fd.names.length, days = fd.days;
+  var wdCnt = [0,0,0,0,0,0,0], sum = [];
+  for (var i = 0; i < n; i++) sum.push([0,0,0,0,0,0,0]);
+  days.forEach(function(dy){
+    wdCnt[dy.wd]++;
+    var q = dy.q || [];
+    for (var i = 0; i < n; i++) sum[i][dy.wd] += (q[i] || 0);
+  });
+  var avg = sum.map(function(row){
+    return row.map(function(v, w){ return wdCnt[w] ? v / wdCnt[w] : 0; });
+  });
+  return { wdCnt: wdCnt, sum: sum, avg: avg };
+}
+function fdSetDate(v) { _fdState.date = parseInt(v, 10); renderFoodDaily(); }
+function fdSetDish(v) { _fdState.dish = parseInt(v, 10); renderFoodDaily(); }
+function renderFoodDaily() {
+  var el = document.getElementById('ch-fooddaily');
+  var fd = window._chFoodDaily;
+  if (!el || !fd || !fd.days || !fd.days.length) return;
+  var WDL = ['月','火','水','木','金','土','日'];
+  var names = fd.names || [], days = fd.days, n = names.length;
+  var c = fdCalc(fd);
+  if (_fdState.date < 0 || _fdState.date >= days.length) _fdState.date = days.length - 1;
+  var cur = days[_fdState.date], cq = cur.q || [];
+  var td = 'padding:3px 5px;border-bottom:1px dashed var(--border);';
+  var th = 'padding:3px 5px;border-bottom:1px solid var(--border);';
+  var h = '';
+
+  // ── ① この日の出数 ──
+  h += '<div style="font-size:12px;font-weight:700;margin:2px 0 6px">① この日、何が何食出たか</div>';
+  h += '<select class="ch-inp" style="font-size:13px;padding:4px 6px;margin-bottom:6px" onchange="fdSetDate(this.value)">';
+  for (var di = days.length - 1; di >= 0; di--) {
+    h += '<option value="' + di + '"' + (di === _fdState.date ? ' selected' : '') + '>' + fdEsc(days[di].d) + (di === days.length - 1 ? '（最新）' : '') + '</option>';
+  }
+  h += '</select>';
+  var rows = [], dayTotal = 0, avgTotal = 0;
+  for (var i = 0; i < n; i++) {
+    var q = cq[i] || 0, a = c.avg[i][cur.wd];
+    dayTotal += q; avgTotal += a;
+    if (q > 0 || a >= 0.5) rows.push({ i: i, q: q, a: a });
+  }
+  rows.sort(function(x, y){ return (y.q - x.q) || (y.a - x.a); });
+  var wdName = WDL[cur.wd];
+  h += '<div style="font-size:11.5px;margin-bottom:4px">合計 <strong>' + dayTotal + '食</strong>' +
+       '<span style="color:var(--text2)">（' + wdName + '曜の平均 ' + fdFmt(avgTotal) + '食・' + wdName + '曜の営業日 ' + c.wdCnt[cur.wd] + '日分）</span></div>';
+  h += '<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:360px">';
+  h += '<tr><th style="text-align:left;' + th + '">料理</th><th style="' + th + '">出数</th><th style="' + th + '">' + wdName + '曜平均</th><th style="' + th + '">平均との差</th></tr>';
+  rows.forEach(function(r){
+    var diff = r.q - r.a;
+    var dCol = Math.abs(diff) < 0.5 ? 'var(--text2)' : (diff > 0 ? '#15803d' : 'var(--accent3)');
+    var dTxt = Math.abs(diff) < 0.05 ? '±0' : (diff > 0 ? '▲' : '▼') + fdFmt(Math.abs(diff));
+    h += '<tr style="cursor:pointer" onclick="fdSetDish(' + r.i + ')">' +
+         '<td style="text-align:left;' + td + (r.q === 0 ? 'color:var(--text2);' : '') + '">' + fdEsc(names[r.i]) + '</td>' +
+         '<td style="text-align:center;' + td + 'font-weight:700;' + (r.q === 0 ? 'color:var(--border);' : '') + '">' + r.q + '</td>' +
+         '<td style="text-align:center;' + td + 'color:var(--text2)">' + fdFmt(r.a) + '</td>' +
+         '<td style="text-align:center;' + td + 'color:' + dCol + '">' + dTxt + '</td></tr>';
+  });
+  h += '</table>';
+
+  // ── ② 曜日ごとの1日平均（全料理） ──
+  h += '<div style="font-size:12px;font-weight:700;margin:14px 0 2px">② この料理は、この曜日に1日何食出るか（1日平均）</div>';
+  h += '<div style="font-size:10.5px;color:var(--text2);margin-bottom:4px">合計ではなく「その曜日の営業日1日あたり」。曜日ごとの日数の違いに左右されません。行をタップすると③に日別推移が出ます。</div>';
+  h += '<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:480px">';
+  h += '<tr><th style="text-align:left;' + th + '">料理</th>';
+  for (var w = 0; w < 7; w++) h += '<th style="' + th + '">' + WDL[w] + '<div style="font-weight:400;font-size:9.5px;color:var(--text2)">' + c.wdCnt[w] + '日</div></th>';
+  h += '<th style="' + th + '">月計</th></tr>';
+  for (var j = 0; j < n; j++) {
+    var tot = c.sum[j].reduce(function(x, y){ return x + y; }, 0);
+    if (tot <= 0) continue;
+    var mx = Math.max.apply(null, c.avg[j]);
+    var sel = j === _fdState.dish;
+    h += '<tr style="cursor:pointer;' + (sel ? 'background:rgba(26,95,160,0.08);' : '') + '" onclick="fdSetDish(' + j + ')">';
+    h += '<td style="text-align:left;' + td + 'white-space:nowrap">' + fdEsc(names[j]) + '</td>';
+    for (var w2 = 0; w2 < 7; w2++) {
+      var av = c.avg[j][w2];
+      var st = !c.wdCnt[w2] ? 'color:var(--border)' : (av === 0 ? 'color:var(--border)' : (av === mx ? 'font-weight:700;color:var(--accent2)' : ''));
+      h += '<td style="text-align:center;' + td + st + '">' + (!c.wdCnt[w2] ? '—' : (av === 0 ? '·' : fdFmt(av))) + '</td>';
+    }
+    h += '<td style="text-align:center;' + td + 'font-weight:700">' + tot + '</td></tr>';
+  }
+  h += '</table>';
+
+  // ── ③ 選んだ料理の日別推移 ──
+  h += '<div style="font-size:12px;font-weight:700;margin:14px 0 6px">③ 料理ごとの日別推移</div>';
+  h += '<select class="ch-inp" style="font-size:13px;padding:4px 6px;margin-bottom:6px;max-width:100%" onchange="fdSetDish(this.value)">';
+  h += '<option value="-1">料理を選ぶ…</option>';
+  for (var k = 0; k < n; k++) h += '<option value="' + k + '"' + (k === _fdState.dish ? ' selected' : '') + '>' + fdEsc(names[k]) + '</option>';
+  h += '</select>';
+  if (_fdState.dish >= 0 && _fdState.dish < n) {
+    var ix = _fdState.dish, vals = days.map(function(dy){ return (dy.q && dy.q[ix]) || 0; });
+    var vmax = Math.max(1, Math.max.apply(null, vals));
+    var bw = 18, gap = 6, padX = 8, GH = 150, baseY = 118, plotH = 92;
+    var GW = Math.max(300, padX * 2 + days.length * (bw + gap));
+    var s = '<svg viewBox="0 0 ' + GW + ' ' + GH + '" style="width:100%;min-width:' + Math.min(GW, 700) + 'px;max-width:' + GW * 1.4 + 'px;display:block">';
+    days.forEach(function(dy, p){
+      var x = padX + p * (bw + gap), v = vals[p], hh = v / vmax * plotH;
+      var col = dy.wd >= 5 ? 'var(--accent3)' : 'var(--accent2)';
+      if (v > 0) s += '<rect x="' + x + '" y="' + (baseY - hh) + '" width="' + bw + '" height="' + hh + '" fill="' + col + '" opacity="' + (p === _fdState.date ? 1 : 0.75) + '" rx="1"/>';
+      s += '<text x="' + (x + bw / 2) + '" y="' + (baseY - hh - 3) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--text)">' + v + '</text>';
+      var lbl = String(dy.d).replace(/\(.\)/, '').split('/');
+      s += '<text x="' + (x + bw / 2) + '" y="' + (baseY + 12) + '" text-anchor="middle" font-size="9" fill="var(--text2)">' + fdEsc(lbl[1] || lbl[0]) + '</text>';
+      s += '<text x="' + (x + bw / 2) + '" y="' + (baseY + 24) + '" text-anchor="middle" font-size="9" fill="' + col + '">' + WDL[dy.wd] + '</text>';
+    });
+    s += '<line x1="' + padX + '" y1="' + baseY + '" x2="' + (GW - padX) + '" y2="' + baseY + '" stroke="var(--border)"/></svg>';
+    h += '<div style="overflow-x:auto">' + s + '</div>';
+    var best = 0;
+    for (var bw2 = 1; bw2 < 7; bw2++) if (c.avg[ix][bw2] > c.avg[ix][best]) best = bw2;
+    var worst = -1;
+    for (var ww = 0; ww < 7; ww++) if (c.wdCnt[ww] && (worst === -1 || c.avg[ix][ww] < c.avg[ix][worst])) worst = ww;
+    h += '<div style="font-size:11px;margin-top:4px">いちばん出る曜日 <strong style="color:var(--accent2)">' + WDL[best] + '曜（1日' + fdFmt(c.avg[ix][best]) + '食）</strong>' +
+         (worst >= 0 ? '　／　少ない曜日 ' + WDL[worst] + '曜（1日' + fdFmt(c.avg[ix][worst]) + '食）' : '') + '</div>';
+    h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">青＝平日、赤＝土日。</div>';
+  }
+  h += '<div style="font-size:10px;color:var(--text2);margin-top:8px">フードのみ・売上¥0の指示行とお通し等は除外。日別CSV（Daily_Item_Sales）取込時に更新されます。最新日は最後に取り込んだCSVの最終営業日です。</div>';
+  el.innerHTML = h;
+}
+
 function resetChallengeAll() {
   var shopKey = getChShopKey();
   var shopName = (shopKey === 'enya') ? '本店' : 'マルコ';
@@ -3937,6 +4079,50 @@ function processCsvResultsCore(results, shopKey, existingCh) {
       foodGrand += it.total;
     });
     upd.big_item_weekday = { items: foodItems, totals: foodTotals, grand: foodGrand };
+
+    // ── 料理別 日別出数（全フード品目・日付単位）── 【追加 R8.10.16】
+    // TOP5に入らない料理も含め、日付ごと・料理ごとの出数を保存する。
+    // 曜日平均は「出数 ÷ その曜日の営業日数」で出すため、データのある日付を営業日として数える。
+    // Firebaseのキーに使えない文字を避けるため、品目名は配列 names、日別は数量配列 q で持つ。
+    var fdNamesAll = Object.keys(byFood).sort(function(a,b){
+      var ta = byFood[a].reduce(function(x,y){ return x+y; }, 0);
+      var tb = byFood[b].reduce(function(x,y){ return x+y; }, 0);
+      return tb - ta;
+    });
+    var fdIdx = {};
+    fdNamesAll.forEach(function(n, i){ fdIdx[n] = i; });
+    var fdDays = {};   // 並び替えキー → { d:表示ラベル, wd:曜日index, k:キー, q:[...] }
+    for (var fdj = 1; fdj < dRows.length; fdj++) {
+      var fdRow = dRows[fdj];
+      if (!fdRow[dIdxName]) continue;
+      var fdRaw = String(fdRow[dIdxDate]||'');
+      var fdWm = fdRaw.match(/[（(]([月火水木金土日])[)）]/);
+      if (!fdWm) continue;
+      var fdWi = WD.indexOf(fdWm[1]);
+      if (fdWi === -1) continue;
+      var fdYmd = fdRaw.match(/(\d{4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);
+      var fdMd = fdYmd ? null : fdRaw.match(/(\d{1,2})[\/\-.月](\d{1,2})/);
+      var fdM, fdD, fdKey;
+      if (fdYmd) { fdM = +fdYmd[2]; fdD = +fdYmd[3]; fdKey = (+fdYmd[1]) * 10000 + fdM * 100 + fdD; }
+      else if (fdMd) { fdM = +fdMd[1]; fdD = +fdMd[2]; fdKey = fdM * 100 + fdD; }
+      else continue;
+      var fdK = String(fdKey);
+      // 営業日として登録（フード以外の行しかない日も営業日に数える）
+      if (!fdDays[fdK]) {
+        var fdQ = [];
+        for (var fz = 0; fz < fdNamesAll.length; fz++) fdQ.push(0);
+        fdDays[fdK] = { k: fdKey, d: fdM + '/' + fdD + '(' + WD[fdWi] + ')', wd: fdWi, q: fdQ };
+      }
+      var fdName = fdRow[dIdxName].replace(/　/g,' ').trim();
+      if (!(fdName in fdIdx)) continue;   // TOP5集計と同じ条件で除外された行
+      if (dIdxCat1 !== -1 && fdRow[dIdxCat1] !== 'フード') continue;
+      var fdAmt = parseInt(String(fdRow[dIdxAmt]||'').replace(/[¥,]/g,'')) || 0;
+      if (fdAmt <= 0) continue;
+      fdDays[fdK].q[fdIdx[fdName]] += parseInt((fdRow[dIdxQty]||'0').replace(/,/g,'')) || 0;
+    }
+    var fdDayList = Object.keys(fdDays).map(function(k){ return fdDays[k]; })
+      .sort(function(a,b){ return a.k - b.k; });
+    upd.food_daily = { names: fdNamesAll, days: fdDayList, updated: ts };
 
     // ── 数量限定 出数（曜日別・指定商品のみ） ──
     // 保存済みの limited_names（無ければ既定）にマッチする商品の曜日別出数を集計
