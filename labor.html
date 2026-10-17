@@ -156,6 +156,13 @@ body.annual-mode #app,body.annual-mode #empty{display:none!important}
     <div class="wrap"><table id="dayType"></table></div>
     <p class="note" id="dtNote"></p>
   </section>
+  <section>
+    <h2>人時売上高（売上 ÷ 実働時間）</h2>
+    <div class="toolbar"><span class="note">スタッフ1人が1時間で稼いだ売上。高いほど少ない人数で回せている</span>
+      <label for="prodTarget" class="note">目標 ¥<input id="prodTarget" type="number" min="500" step="100" style="width:80px"> ／h</label></div>
+    <div class="wrap"><table id="prodTable"></table></div>
+    <p class="note" id="prodNote"></p>
+  </section>
   <section class="alerts" id="alerts"></section>
 
   <section>
@@ -668,13 +675,19 @@ function renderDaily(){
   const yl=st=>yy[st].p>0?`<div class="d">売上昨対 <b class="rtv">${(yy[st].c/yy[st].p*100).toFixed(1)}%</b>（前年同曜日と比較）</div>`:"";
   const yAll=yy.本店.p+yy.マルコ.p>0?`<div class="d">売上昨対 <b class="rtv">${((yy.本店.c+yy.マルコ.c)/(yy.本店.p+yy.マルコ.p)*100).toFixed(1)}%</b>（前年のある店のみ）</div>`:"";
   const rl=(c,s,n)=>n?`<div class="d">人件費率 <b class="rtv">${ratioTxt(c,s)}</b>（売上 ${yen(s)}）</div>`:`<div class="d">売上未入力</div>`;
+  // 人時売上高：売上のある日だけの売上÷その日の実働時間
+  const ph={本店:{s:0,h:0},マルコ:{s:0,h:0},全社:{s:0,h:0}};
+  shown.forEach(d=>{STORES.forEach(s=>{const v=salesOf(d,s);if(v!=null&&res[d][s].h>0){ph[s].s+=v;ph[s].h+=res[d][s].h}});
+    const hb=res[d].本店.h+res[d].マルコ.h, sv=(salesOf(d,"本店")||0)+(salesOf(d,"マルコ")||0)+fhSales(d); if(hb>0&&sv>0){ph.全社.s+=sv;ph.全社.h+=hb}});
+  const pl=k=>ph[k].h>0?`<div class="d">人時売上高 <b class="rtv">${prodPill(ph[k].s/ph[k].h)}</b></div>`:"";
   document.getElementById("sum").innerHTML=`
-    <div class="tile"><div class="lb">全社（${shown[0].slice(5)}〜${lastPunch.slice(5)}）</div><div class="v">${yen(all)}</div><div class="d">実働 ${(hrs.本店+hrs.マルコ).toFixed(1)}h</div>${rl(allC,allS,both.length)}${yAll}</div>
-    <div class="tile h"><div class="lb">本店</div><div class="v">${yen(tot.本店)}</div><div class="d">営業日平均 ${yen(tot.本店/Math.max(1,openN.本店))} ／ ${openN.本店}日</div>${rl(rs.本店.c,rs.本店.s,rs.本店.n)}${yl("本店")}</div>
-    <div class="tile m"><div class="lb">マルコ</div><div class="v">${yen(tot.マルコ)}</div><div class="d">営業日平均 ${yen(tot.マルコ/Math.max(1,openN.マルコ))} ／ ${openN.マルコ}日</div>${rl(rs.マルコ.c,rs.マルコ.s,rs.マルコ.n)}${yl("マルコ")}</div>
+    <div class="tile"><div class="lb">全社（${shown[0].slice(5)}〜${lastPunch.slice(5)}）</div><div class="v">${yen(all)}</div><div class="d">実働 ${(hrs.本店+hrs.マルコ).toFixed(1)}h</div>${rl(allC,allS,both.length)}${pl("全社")}${yAll}</div>
+    <div class="tile h"><div class="lb">本店</div><div class="v">${yen(tot.本店)}</div><div class="d">営業日平均 ${yen(tot.本店/Math.max(1,openN.本店))} ／ ${openN.本店}日</div>${rl(rs.本店.c,rs.本店.s,rs.本店.n)}${pl("本店")}${yl("本店")}</div>
+    <div class="tile m"><div class="lb">マルコ</div><div class="v">${yen(tot.マルコ)}</div><div class="d">営業日平均 ${yen(tot.マルコ/Math.max(1,openN.マルコ))} ／ ${openN.マルコ}日</div>${rl(rs.マルコ.c,rs.マルコ.s,rs.マルコ.n)}${pl("マルコ")}${yl("マルコ")}</div>
     <div class="tile f"><div class="lb">FishHack 売上（${cfg.tax||"税抜"}）</div><div class="v">${yen(fhTot)}</div><div class="d">納品 ${fhN}件 ／ 人件費は本店に含む</div>${after.length&&after.some(d=>fhSales(d)>0)?`<div class="d">${after[0].slice(5)}〜の納品 ${yen(after.reduce((a,d)=>a+fhSales(d),0))}は打刻取込後に集計へ反映</div>`:""}<div class="d" id="fhStatus"></div><button class="btn sm" id="fhReload" type="button">再取得</button></div>`;
   renderFhStatus(); document.getElementById("fhReload").onclick=loadFishHack;
   renderDayType(res,shown,issuesToday(issues));
+  renderProd(res,shown,issuesToday(issues));
   const missingM=people.filter(p=>cfg.staff[p.name].type==="月給"&&cfg.staff[p.name].include!==false&&!num(cfg.staff[p.name].rate)).map(p=>p.name);
   const notM=people.filter(p=>cfg.staff[p.name].notInMaster).map(p=>p.name);
   const prov=people.filter(p=>cfg.staff[p.name].prov).length;
@@ -753,6 +766,38 @@ function renderDayType(res,shown,todayOpen){
   document.getElementById("dtNote").textContent=`営業日のみで平均（定休日${todayOpen?"・勤務中の今日":""}は除外）。率＝その区分の人件費合計÷売上合計。全社の率はFishHack売上を含む（FishHackの作業は本店の人件費に含まれる）。祝日は国民の祝日・振替休日・国民の休日。`;
 }
 function sg(v){return (v>=0?"+":"−")+yen(Math.abs(v))}
+// ===== 人時売上高【追加 R8.10.17】 =====
+// 人時売上高＝売上÷実働時間（その店に打刻があり、売上が入っている営業日だけで計算）
+// 色：目標以上＝緑／目標の85%以上＝黄／それ未満＝赤
+function prodPill(v){if(v==null||!isFinite(v))return "—";const t=num(cfg.prodTarget||4000);
+  return `<span class="pill ${v>=t?"ok":v>=t*0.85?"w":"c"}">${yen(v)}</span>`}
+function renderProd(res,shown,todayOpen){
+  const el=document.getElementById("prodTable"); if(!el)return;
+  const today=dstr(new Date());
+  const use=shown.filter(d=>!(todayOpen&&d===today));
+  const groups=[["平日",d=>dayKind(d)==="平",1],["土日祝",d=>dayKind(d)!=="平",1]];
+  "月火水木金土日".split("").forEach(w=>groups.push(["　"+w,d=>dayKind(d)!=="祝"&&DOW[new Date(d).getDay()]===w,0]));
+  groups.push(["　祝",d=>dayKind(d)==="祝",0]);
+  const st=(ds,k)=>{let s=0,h=0,n=0;ds.forEach(d=>{
+      if(k==="全社"){const hb=res[d].本店.h+res[d].マルコ.h, sv=(salesOf(d,"本店")||0)+(salesOf(d,"マルコ")||0)+fhSales(d);if(hb>0&&sv>0){s+=sv;h+=hb;n++}}
+      else{const v=salesOf(d,k);if(v!=null&&v>0&&res[d][k].h>0&&!closedSet(k).has(d)){s+=v;h+=res[d][k].h;n++}}});
+    return {n,h:n?h/n:null,s:n?s/n:null,p:h>0?s/h:null}};
+  const fh=v=>v==null?"—":v.toFixed(1);
+  let h=`<thead><tr><th class="l" rowspan="2">区分</th><th colspan="4" class="grp gh">本店（1日平均）</th><th colspan="4" class="grp gm">マルコ（1日平均）</th><th colspan="2" class="grp">全社（FishHack売上含む）</th></tr>
+    <tr><th>日数</th><th>実働h</th><th>売上</th><th>人時売上高</th><th>日数</th><th>実働h</th><th>売上</th><th>人時売上高</th><th>実働h</th><th>人時売上高</th></tr></thead><tbody>`;
+  groups.forEach(([lb,fn,bold])=>{const ds=use.filter(fn), b=st(ds,"本店"), m=st(ds,"マルコ"), a=st(ds,"全社");
+    if(!b.n&&!m.n)return;
+    h+=`<tr${bold?' style="font-weight:700"':' class="subrow"'}><td class="l">${lb}</td>
+      <td>${b.n||"—"}</td><td>${fh(b.h)}</td><td class="sl">${b.s==null?"—":yen(b.s)}</td><td class="rt">${prodPill(b.p)}</td>
+      <td>${m.n||"—"}</td><td>${fh(m.h)}</td><td class="sl">${m.s==null?"—":yen(m.s)}</td><td class="rt">${prodPill(m.p)}</td>
+      <td>${fh(a.h)}</td><td class="rt">${prodPill(a.p)}</td></tr>`});
+  // 必要人時：目標を達成するには、その区分の平均売上なら何時間で回すべきか
+  const t=num(cfg.prodTarget||4000), wd=use.filter(d=>dayKind(d)==="平"), b=st(wd,"本店");
+  let tip="";
+  if(b.n&&b.s&&b.h){const need=b.s/t;tip=`本店の平日：売上 ${yen(b.s)}／日 を目標 ${yen(t)}/h で回すと <b>${need.toFixed(1)}h</b>（今は ${b.h.toFixed(1)}h → ${b.h>need?"1日あたり "+(b.h-need).toFixed(1)+"h 多い":"目標達成"}）。`}
+  el.innerHTML=h+"</tbody>";
+  document.getElementById("prodNote").innerHTML=(tip?tip+"<br>":"")+`売上が入っていて打刻のある営業日のみで計算（勤務中の今日は除外）。本店の実働にはFishHackの作業時間も含まれるため、本店単独の人時売上高は低めに出ます。実働には月給者の打刻時間も含みます。売上は「売上の基準」（${cfg.tax||"税抜"}）に従います。`;
+}
 function detail(day){
   let h=`<table><thead><tr><th class="l">店</th><th class="l">氏名</th><th class="l">区分</th><th>実働</th><th>残業</th><th>深夜</th><th>支給</th><th>会社負担</th><th>計</th></tr></thead><tbody>`;
   STORES.forEach(s=>day[s].items.sort((a,b)=>(b.gross+b.er)-(a.gross+a.er)).forEach(i=>{
@@ -909,6 +954,8 @@ document.getElementById("csvIn").onchange=e=>{[...e.target.files].forEach(f=>rea
   openOpen.clear();ingest(t)}));e.target.value=""};
 STORES.forEach(s=>{document.getElementById("sales-"+s).onchange=e=>{const f=e.target.files[0];if(!f)return;readFile(f,t=>salesUpload(t,s));e.target.value=""}});
 document.getElementById("target").value=cfg.target||30;
+document.getElementById("prodTarget").value=cfg.prodTarget||4000;
+document.getElementById("prodTarget").oninput=e=>{cfg.prodTarget=num(e.target.value)||4000;saveCfg();renderDaily()};
 document.getElementById("tax").value=cfg.tax||"税抜";
 document.getElementById("tax").onchange=e=>{cfg.tax=e.target.value;saveCfg();
   const rs=rawGet().sales||{};STORES.forEach(st=>{if(rs[st])importSales(rs[st],st,true)});applyFbSales();if(rows.length)renderDaily();toast(`売上の基準を${cfg.tax}にしました（マルコの日報一覧に反映。本店の当年実績は列が1つのため変わりません）`,"w")};
