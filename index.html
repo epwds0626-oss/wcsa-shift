@@ -421,6 +421,11 @@ nav{display:flex;gap:2px}
       </div>
     </div>
 
+    <div class="ch-section" id="prep-section" style="display:none">
+      <div class="ch-section-title">🔪 仕込み目安</div>
+      <div class="ch-card" id="prep-card"><div id="prep-body"></div></div>
+    </div>
+
     <div class="ch-section">
       <div class="ch-section-title">🔴 MONTHLY BIG CHALLENGE</div>
       <div class="ch-card" id="ch-big-card">
@@ -2934,6 +2939,9 @@ function updateChallengUI(d, shopKey) {
     }
   }
 
+  // 仕込み目安（直近8週・同じ曜日の80%タイル）
+  renderPrep(isMarco ? 'marco' : 'enya');
+
   // 料理別 出数（日別・曜日平均）— 本店：日別CSVの food_daily ／ マルコ：差分取込で蓄積した food_daily_hist
   var fdWrap = document.getElementById('ch-fooddaily-wrap');
   if (fdWrap) {
@@ -3817,6 +3825,100 @@ function renderFoodDaily() {
   h += '<div style="font-size:10px;color:var(--text2);margin-top:8px">' + (getChShopKey() === 'marco'
     ? '料理のみ（セットで選ばれた料理も含む。セット本体・デザート・ドリンク・サラダバー・大盛り等の指示行は除外）。毎営業日の差分取込、または1日分CSVの取込で追加されます。定休日（木）は表示されません。'
     : 'フードのみ・売上¥0の指示行とお通し等は除外。日別CSV（Daily_Item_Sales）取込時に更新されます。最新日は最後に取り込んだCSVの最終営業日です。') + '</div>';
+  el.innerHTML = h;
+}
+
+// ===== 仕込み目安【追加 R8.10.17】 =====
+// 直近8週（food_daily_hist）の「同じ曜日」の出数から、料理ごとの仕込み目安を出す。
+// 目安＝80%タイル（8日分なら多い方から2番目）。平均だと2回に1回は足りなくなるため。
+// 対象日の曜日にデータが無い（定休日）ときは、次にデータのある曜日へ進める。
+var _prepState = { target: null, showAll: false };   // target: 'today' | 'tomorrow'（null＝時刻で自動）
+var _prepCache = null;                                // { shop, fd }
+function prepPct(vals, p) {
+  if (!vals.length) return 0;
+  var s = vals.slice().sort(function(a, b){ return a - b; });
+  return s[Math.max(0, Math.ceil(p * s.length) - 1)];
+}
+function prepSetTarget(t) { _prepState.target = t; prepDraw(); }
+function prepToggleAll() { _prepState.showAll = !_prepState.showAll; prepDraw(); }
+function renderPrep(shopKey) {
+  var sec = document.getElementById('prep-section');
+  if (!sec || !db) return;
+  if (getMonthKey() !== getMonthKey(0)) { sec.style.display = 'none'; return; }   // 過去の月を見ているときは出さない
+  loadFoodDaily8w(shopKey).then(function(fd){
+    if (getChShopKey() !== shopKey) return;
+    _prepCache = { shop: shopKey, fd: fd };
+    sec.style.display = 'block';
+    prepDraw();
+  }).catch(function(e){ console.warn('prep', e); });
+}
+function prepDraw() {
+  var el = document.getElementById('prep-body');
+  if (!el || !_prepCache) return;
+  var fd = _prepCache.fd;
+  var WDL = ['月','火','水','木','金','土','日'];
+  if (!fd || !fd.days || !fd.days.length) {
+    el.innerHTML = '<div style="padding:8px 10px;background:#fef3c7;border-radius:6px;font-size:11.5px;color:#92400e">日別の出数データがまだありません。下の「📅 料理別 出数」と同じデータを使います。CSVを取り込むと表示されます。</div>';
+    return;
+  }
+  var now = new Date();
+  var target = _prepState.target || (now.getHours() < 15 ? 'today' : 'tomorrow');
+  var base = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (target === 'tomorrow' ? 1 : 0));
+  // 曜日ごとの営業日（データのある日）
+  var byWd = [[],[],[],[],[],[],[]];
+  fd.days.forEach(function(dy){ byWd[dy.wd].push(dy); });
+  var skip = 0, wd = (base.getDay() + 6) % 7;
+  while (!byWd[wd].length && skip < 7) { skip++; base = new Date(base.getTime() + 86400000); wd = (base.getDay() + 6) % 7; }
+  var dayList = byWd[wd], n = dayList.length;
+  var rows = [];
+  fd.names.forEach(function(name, i){
+    var vals = dayList.map(function(dy){ return (dy.q && dy.q[i]) || 0; });
+    var sum = vals.reduce(function(a, b){ return a + b; }, 0);
+    if (!sum) return;
+    var avg = sum / n, p80 = prepPct(vals, 0.8), mx = Math.max.apply(null, vals);
+    var hit = vals.filter(function(v){ return v > 0; }).length;
+    rows.push({ name: name, avg: avg, p80: p80, max: mx, hit: hit });
+  });
+  rows.sort(function(a, b){ return (b.p80 - a.p80) || (b.avg - a.avg); });
+  var main = rows.filter(function(r){ return r.p80 >= 1 && r.avg >= 1; });
+  var minor = rows.filter(function(r){ return !(r.p80 >= 1 && r.avg >= 1); });
+  var totalP80 = main.reduce(function(a, r){ return a + r.p80; }, 0);
+  var totalAvg = rows.reduce(function(a, r){ return a + r.avg; }, 0);
+
+  var btn = function(t, label){
+    var on = target === t;
+    return '<button onclick="prepSetTarget(\'' + t + '\')" style="font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;border:1px solid ' + (on ? 'var(--accent)' : 'var(--border)') + ';background:' + (on ? 'var(--accent)' : 'transparent') + ';color:' + (on ? '#fff' : 'var(--text2)') + ';font-weight:' + (on ? 700 : 400) + '">' + label + '</button>';
+  };
+  var h = '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' + btn('today', '今日') + btn('tomorrow', '明日') + '</div>';
+  var dLabel = (base.getMonth() + 1) + '/' + base.getDate() + '(' + WDL[wd] + ')';
+  h += '<div style="font-size:15px;font-weight:700;margin-bottom:2px">' + dLabel + ' の仕込み目安</div>';
+  if (skip) h += '<div style="font-size:11px;color:var(--accent3);margin-bottom:2px">※定休日のため次の営業日（' + dLabel + '）を表示しています</div>';
+  h += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">直近8週の' + WDL[wd] + '曜 ' + n + '日分から算出・料理合計 平均' + fdFmt(totalAvg) + '皿' +
+       (n < 4 ? '　<span style="color:var(--accent3)">（' + WDL[wd] + '曜のデータが' + n + '日分しかないため参考値）</span>' : '') + '</div>';
+  var td = 'padding:5px 6px;border-bottom:1px dashed var(--border);';
+  var th = 'padding:4px 6px;border-bottom:1px solid var(--border);font-size:10.5px;color:var(--text2);font-weight:400;';
+  h += '<table style="width:100%;border-collapse:collapse;font-size:12.5px">';
+  h += '<tr><th style="text-align:left;' + th + '">料理</th><th style="' + th + '">目安</th><th style="' + th + '">平均</th><th style="' + th + '">最大</th><th style="' + th + '">出た日</th></tr>';
+  main.forEach(function(r){
+    h += '<tr><td style="text-align:left;' + td + '">' + fdEsc(r.name) + '</td>' +
+         '<td style="text-align:center;' + td + 'font-size:15px;font-weight:700;color:var(--accent)">' + r.p80 + '</td>' +
+         '<td style="text-align:center;' + td + 'color:var(--text2)">' + fdFmt(r.avg) + '</td>' +
+         '<td style="text-align:center;' + td + 'color:var(--text2)">' + r.max + '</td>' +
+         '<td style="text-align:center;' + td + 'color:var(--text2);font-size:11px">' + r.hit + '/' + n + '日</td></tr>';
+  });
+  h += '<tr><td style="text-align:left;padding:5px 6px;font-weight:700">目安合計</td><td style="text-align:center;padding:5px 6px;font-weight:700">' + totalP80 + '</td><td colspan="3"></td></tr>';
+  h += '</table>';
+  if (minor.length) {
+    h += '<div style="margin-top:8px;font-size:11.5px"><a href="javascript:void(0)" onclick="prepToggleAll()" style="color:var(--accent2)">' +
+         (_prepState.showAll ? '▲ 閉じる' : '▼ 少量の料理（' + minor.length + '品）＝作り置きせず注文後に対応') + '</a></div>';
+    if (_prepState.showAll) {
+      h += '<div style="font-size:11.5px;color:var(--text2);margin-top:4px;line-height:1.8">' + minor.map(function(r){
+        return fdEsc(r.name) + '（平均' + fdFmt(r.avg) + '・最大' + r.max + '）';
+      }).join('<br>') + '</div>';
+    }
+  }
+  h += '<div style="font-size:10px;color:var(--text2);margin-top:8px;line-height:1.6">目安＝同じ曜日の出数の80%タイル（8日分なら多い方から2番目）。平均で仕込むと2日に1日は足りなくなるため、5日に4日は足りる量にしています。' +
+       '売り切れた日は実際の需要より少なく記録されるため、完売が多い料理は目安より多めに。祝日・イベント・天気は反映されていません。</div>';
   el.innerHTML = h;
 }
 
