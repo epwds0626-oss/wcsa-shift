@@ -3507,14 +3507,17 @@ var _fdMonthData = null;   // 表示中の月の food_daily（モード切替で
 
 // ===== マルコ用：品目リスト → 1日分の food_daily =====
 // マルコのPOSには日付つき品目CSVもカテゴリ列も無いため、品名キーワードで判定する。
-// 対象：単価>0・デザート／ドリンク／お通し・サラダバー・ドリンクバー・大盛り・特盛・「〜無し」以外。
+// 【修正 R8.10.17】セット（シェアセット・日替りパスタセット等）で選ばれた料理は¥0行で出るため、
+// ¥0行も料理として数え、同名の有料行と合算する（＝実際に厨房で作った皿数）。
+// セット本体・指示行（普通・〜無し・大盛り等）・容器・デザート・ドリンクは数えない。
 var MARCO_FD_DESSERT = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ','ジェラート','ソルベ','パンナコッタ'];
 var MARCO_FD_DRINK = ['ドリンクバー','ワイン','ビール','グラッパ','スプマンテ','ハイボール','サワー',
   'カクテル','スプリッツ','リモンチェッロ','コーヒー','紅茶','エスプレッソ','カプチーノ','ラテ',
   'ジュース','コーラ','ウーロン','オレンジ','レモネード','リモナータ','炭酸','ソーダ','ノンアル'];
-var MARCO_FD_EXCL = ['お通し','サラダバー','ドリンクバー','大盛り','特盛','無し'];
-function marcoIsFood(name, price) {
-  if (!name || name === '合計' || !(price > 0)) return false;
+var MARCO_FD_EXCL = ['お通し','サラダバー','ドリンクバー','大盛り','特盛','少なめ','無し','セット','容器','テイクアウト'];
+var MARCO_FD_EXACT = ['普通','合計'];
+function marcoIsFood(name) {
+  if (!name || MARCO_FD_EXACT.indexOf(name) !== -1) return false;
   var has = function(list){ return list.some(function(t){ return name.indexOf(t) !== -1; }); };
   return !has(MARCO_FD_EXCL) && !has(MARCO_FD_DESSERT) && !has(MARCO_FD_DRINK);
 }
@@ -3525,7 +3528,7 @@ function marcoFoodDailyFromItems(items, dateKey) {
   var wd = (new Date(y, m - 1, dd).getDay() + 6) % 7;
   var map = {};
   (items || []).forEach(function(it){
-    if (!it || !marcoIsFood(it.name, it.price || 0)) return;
+    if (!it || !marcoIsFood(it.name)) return;
     map[it.name] = (map[it.name] || 0) + (it.qty || 0);
   });
   var names = Object.keys(map).filter(function(n){ return map[n] > 0; }).sort(function(a, b){ return map[b] - map[a]; });
@@ -3812,7 +3815,7 @@ function renderFoodDaily() {
     h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">青＝平日、赤＝土日。</div>';
   }
   h += '<div style="font-size:10px;color:var(--text2);margin-top:8px">' + (getChShopKey() === 'marco'
-    ? 'フードのみ（デザート・ドリンク・サラダバー・大盛り等と¥0の指示行は除外）。毎営業日の差分取込のたびに、その日の分が追加されます。定休日（木）は表示されません。'
+    ? '料理のみ（セットで選ばれた料理も含む。セット本体・デザート・ドリンク・サラダバー・大盛り等の指示行は除外）。毎営業日の差分取込、または1日分CSVの取込で追加されます。定休日（木）は表示されません。'
     : 'フードのみ・売上¥0の指示行とお通し等は除外。日別CSV（Daily_Item_Sales）取込時に更新されます。最新日は最後に取り込んだCSVの最終営業日です。') + '</div>';
   el.innerHTML = h;
 }
@@ -3913,6 +3916,10 @@ function handleCsvImport(event) {
               var mp1 = String(rows2[kp][1] || '').match(/(\d{4}-\d{2}-\d{2})\s*[〜～~]\s*(\d{4}-\d{2}-\d{2})/);
               if (mp1) { if (mp1[1] === mp1[2]) oneDay = mp1[1]; break; }
             }
+            // 今月1日の累計CSV（1日〜1日）は通常の差分取込（初回スナップショット）として扱う
+            var nowD1 = new Date();
+            var thisMonth1 = nowD1.getFullYear() + '-' + String(nowD1.getMonth() + 1).padStart(2, '0') + '-01';
+            if (oneDay === thisMonth1) oneDay = null;
             if (shopKey === 'marco' && oneDay) {
               (results.marcoOneDayFiles = results.marcoOneDayFiles || []).push({ date: oneDay, rows: rows2 });
             } else
@@ -4613,7 +4620,13 @@ function processCsvResultsCore(results, shopKey, existingCh) {
       var desSum = 0;
       for (var dz = 0; dz < deltaDes.length; dz++) desSum += deltaDes[dz].qty;
       // 【追加 R8.10.17】この営業日の料理別出数（フードのみ・ドリンク除外）を日付つきで蓄積
-      var fdM = marcoFoodDailyFromItems(deltaFood, bizKeys[0]);
+      // 同名行（有料版と¥0のセット内版）を合算してから前回との差を取る
+      var aggCur = {}, aggPrev = {};
+      snapItems.forEach(function(it){ aggCur[it.name] = (aggCur[it.name] || 0) + (it.qty || 0); });
+      (prev.items || []).forEach(function(it){ if (it && it.name) aggPrev[it.name] = (aggPrev[it.name] || 0) + (it.qty || 0); });
+      var deltaAll = Object.keys(aggCur).map(function(n){ return { name: n, qty: aggCur[n] - (aggPrev[n] || 0) }; })
+        .filter(function(it){ return it.qty > 0; });
+      var fdM = marcoFoodDailyFromItems(deltaAll, bizKeys[0]);
       if (fdM) saveFoodDailyHist('marco', fdM).catch(function(e){ console.warn('food_daily_hist', e); });
       return getChRef(shopKey).update(updS).then(function() {
         showToast('✅ ' + wdChar + '曜（' + prev.end + '→' + sEnd + '）の差分を計上：デザート+' + desSum + '食');
