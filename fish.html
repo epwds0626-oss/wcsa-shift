@@ -232,13 +232,15 @@ footer hr{border:0;border-top:1px solid var(--line);margin:0 0 16px}
 .yc-res b{font-family:var(--mono);color:var(--chiai)}
 .yc-res .btn{appearance:none;border:1px solid var(--ai);background:var(--ai);color:#fff;font-size:11.5px;padding:3px 10px;border-radius:2px;cursor:pointer;margin-left:8px}
 .yc-2{margin-top:12px}
+.yc-out4{grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr))}
 .yc-auto{color:var(--kombu);font-weight:600}
 .yc-in input[readonly]{color:var(--kombu)}
 .yc-sync{font-family:var(--mono);font-size:10px;color:var(--gin-2);margin-top:10px;text-align:right}
 @media (max-width:640px){
   .yc-grid,.yc-sub{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .yc-grid .yc-f:first-child{grid-column:1/-1}
-  .yc-out{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .yc-out,.yc-out4{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .yc-out4 .yc-o:nth-child(3){border-right:0}
   .yc-o.main{grid-column:1/-1;border-right:0;border-bottom:1px solid var(--line)}
 }
 </style>
@@ -1600,28 +1602,30 @@ function yieldCard(f){
         <div class="yc-in"><input id="ycPrice" inputmode="numeric" placeholder="0"><span>円/kg</span></div>
         <div class="yc-def">税抜・丸（仕入れ形態）の単価</div></div>
       <div class="yc-f"><label for="ycW">丸の重量</label>
-        <div class="yc-in"><input id="ycW" inputmode="decimal" placeholder="0"><span>g</span></div>
-        <div class="yc-def" id="ycWamt">仕入れたときの重さ</div></div>
-      <div class="yc-f"><label for="ycN">取れた切れ数</label>
-        <div class="yc-in"><input id="ycN" inputmode="numeric" placeholder="—"><span>切れ</span></div>
-        <div class="yc-def" id="ycNdef">切り終えたら数を入力</div></div>
-    </div>
-    <div class="yc-grid yc-2">
-      <div class="yc-f"><label for="ycY">歩留まり率</label>
-        <div class="yc-in"><input id="ycY" inputmode="decimal"><span>%</span></div>
-        <div class="yc-def" id="ycYdef"></div></div>
-      <div class="yc-f"><label for="ycG">1切れの重さ <span class="yc-auto" id="ycGauto"></span></label>
+        <div class="yc-in"><input id="ycW" inputmode="decimal" placeholder="例 1.2"><span>kg</span></div>
+        <div class="yc-def" id="ycWamt">1尾（1本）の重さ</div></div>
+      <div class="yc-f"><label for="ycG">1切れの重さ</label>
         <div class="yc-in"><input id="ycG" inputmode="decimal"><span>g</span></div>
         <div class="yc-pre" id="ycPre"></div></div>
-      <div class="yc-f"><label for="ycRate">目標原価率</label>
-        <div class="yc-in"><input id="ycRate" inputmode="numeric"><span>%</span></div>
-        <div class="yc-def">売価目安の計算に使用</div></div>
     </div>
-    <div class="yc-out">
+    <div class="yc-out yc-out4">
       <div class="yc-o main"><div class="l">1切れの原価</div><div class="v" id="ycCut">—</div><div class="s" id="ycCutS"></div></div>
-      <div class="yc-o"><div class="l">可食部のキロ単価</div><div class="v" id="ycNet">—</div><div class="s">ロス込みの実質単価</div></div>
+      <div class="yc-o"><div class="l">取れる切れ数</div><div class="v" id="ycCnt">—</div><div class="s" id="ycCntS"></div></div>
+      <div class="yc-o"><div class="l">1尾の仕入れ額</div><div class="v" id="ycAmt">—</div><div class="s" id="ycAmtS"></div></div>
       <div class="yc-o"><div class="l">1切れの売価目安</div><div class="v" id="ycSell">—</div><div class="s" id="ycSellS"></div></div>
     </div>
+    <details class="yc-more">
+      <summary>歩留まり率・原価率を変える</summary>
+      <div class="yc-sub">
+        <div class="yc-f"><label for="ycY">歩留まり率</label>
+          <div class="yc-in"><input id="ycY" inputmode="decimal"><span>%</span></div>
+          <div class="yc-def" id="ycYdef"></div></div>
+        <div class="yc-f"><label for="ycRate">目標原価率</label>
+          <div class="yc-in"><input id="ycRate" inputmode="numeric"><span>%</span></div>
+          <div class="yc-def">売価目安の計算に使用</div></div>
+        <div class="yc-f"></div>
+      </div>
+    </details>
     <div class="yc-sync" id="ycSync"></div>
   </div>`;
 }
@@ -1631,61 +1635,50 @@ function drawYieldValues(){
   const s=YS[f.n]||{};
   $('#ycBasis').textContent='基準：'+c.b;
   $('#ycPrice').value=c.price===''?'':Number(c.price).toLocaleString('ja-JP');
-  $('#ycW').value=s.w?s.w:''; $('#ycN').value=s.n?s.n:'';
+  $('#ycW').value=s.wk?s.wk:'';
   $('#ycY').value=c.y; $('#ycG').value=c.g; $('#ycRate').value=c.rate;
   $('#ycSync').textContent=ySyncNote;
   yCalc();
 }
 function yCalc(){
   const f=cur, c=yCur(f);
-  const price=num($('#ycPrice').value), y=num($('#ycY').value), rate=num($('#ycRate').value);
-  const w=num($('#ycW').value), n=num($('#ycN').value);
-  const okY=y>0&&y<=100, okP=price>0;
-  const auto=w>0&&n>0&&okY;           // 丸の重量と切れ数があれば1切れgを自動計算
-  let g;
-  if(auto){
-    g=Math.round(w*y/100/n*10)/10;
-    $('#ycG').value=g; $('#ycG').readOnly=true;
-    $('#ycGauto').textContent='（自動）';
-    $('#ycPre').innerHTML=`<span class="yc-def">丸 ${w.toLocaleString('ja-JP')}g × ${y}% ÷ ${n}切れ</span>`;
-  }else{
-    if($('#ycG').readOnly) $('#ycG').value=c.g;   // 自動→手動に戻ったら保存値に戻す
-    $('#ycG').readOnly=false; $('#ycGauto').textContent='';
-    g=num($('#ycG').value);
-    $('#ycPre').innerHTML=G_PRESET.map(([l,v])=>`<button type="button" data-g="${v}" aria-pressed="${g===v}">${l}${v}g</button>`).join('');
-    $('#ycPre').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('#ycG').value=b.dataset.g;yPut(f.n,{g:+b.dataset.g});yCalc();});
-  }
+  const price=num($('#ycPrice').value), y=num($('#ycY').value), g=num($('#ycG').value), rate=num($('#ycRate').value);
+  const wk=num($('#ycW').value), w=wk*1000;                 // kg → g
+  const okP=price>0, okY=y>0&&y<=100, okG=g>0, okW=wk>0, okR=rate>0&&rate<100;
 
+  $('#ycPre').innerHTML=G_PRESET.map(([l,v])=>`<button type="button" data-g="${v}" aria-pressed="${g===v}">${l}${v}g</button>`).join('');
+  $('#ycPre').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('#ycG').value=b.dataset.g;yPut(f.n,{g:+b.dataset.g});yCalc();});
   $('#ycYdef').innerHTML=c.ownY&&c.y!==c.dy
     ? `店の値／標準 ${c.dy}% <button type="button" id="ycYreset">標準に戻す</button>`
     : `標準 ${c.dy}%（店の実績で上書き可）`;
   const rb=$('#ycYreset'); if(rb) rb.onclick=()=>{yPut(f.n,{y:null});drawYieldValues();};
+  $('#ycWamt').textContent=okW&&wk<0.05?'kgで入力（例 1.2）':'1尾（1本）の重さ';
 
-  $('#ycWamt').innerHTML=w>0&&okP?`仕入れ額 <b style="color:var(--chiai)">${yen(price*w/1000)}</b>${okY?` ／ 可食部 約${Math.round(w*y/100).toLocaleString('ja-JP')}g`:''}`:'仕入れたときの重さ';
-  $('#ycNdef').textContent=n>0?'実際の切れ数で計算中'
-    :(w>0&&okY&&g>0?`見込み 約${Math.floor(w*y/100/g)}切れ（${g}gで切った場合）`:'切り終えたら数を入力');
-
-  // 原価：切れ数が分かれば「仕入れ額÷切れ数」で直接出す（歩留まりの誤差が乗らない）
-  let cut=NaN, how='';
-  if(okP&&w>0&&n>0){cut=price*w/1000/n; how=`仕入れ額 ÷ ${n}切れ`;}
-  else if(okP&&okY&&g>0){cut=price/(y/100)*g/1000; how=`${g}g ／ 仕入れ1kgから約${Math.floor(1000*y/100/g)}切れ`;}
-  $('#ycNet').textContent=okP&&okY?yen(price/(y/100)):'—';
+  // 1切れ原価 ＝ キロ単価 ÷ 歩留まり × 1切れg（丸の重量に関係なく決まる）
+  const net=okP&&okY?price/(y/100):NaN;
+  const cut=isFinite(net)&&okG?net*g/1000:NaN;
   $('#ycCut').textContent=isFinite(cut)?yen1(cut):'—';
-  $('#ycCutS').textContent=isFinite(cut)?how:'キロ単価を入れると出ます';
-  const okR=rate>0&&rate<100;
+  $('#ycCutS').textContent=isFinite(cut)?`可食部 ${yen(net)}/kg × ${g}g（歩留まり${y}%）`:'キロ単価を入れると出ます';
+
+  // 丸の重量 → 可食部 ÷ 1切れg ＝ 切れ数
+  const edible=okW&&okY?w*y/100:NaN;
+  const cnt=isFinite(edible)&&okG?Math.floor(edible/g):NaN;
+  $('#ycCnt').textContent=isFinite(cnt)?cnt+'切れ':'—';
+  $('#ycCntS').textContent=isFinite(edible)?`可食部 約${Math.round(edible).toLocaleString('ja-JP')}g ÷ ${g}g`:'丸の重量を入れると出ます';
+  $('#ycAmt').textContent=okP&&okW?yen(price*wk):'—';
+  $('#ycAmtS').textContent=okP&&okW?`${wk}kg × ${price.toLocaleString('ja-JP')}円`:'';
   $('#ycSell').textContent=isFinite(cut)&&okR?yen(cut/(rate/100)):'—';
   $('#ycSellS').textContent=okR?`原価率${rate}%`:'';
 }
 function bindYield(){
   if(!$('#yc')) return;
   const f=cur;
-  const put=(k,lo,hi)=>e=>{const v=num(e.target.value);yPut(f.n,{[k]:(v>lo&&(hi==null||v<=hi))?v:null});yCalc();};
-  $('#ycPrice').oninput=put('price',0);
+  $('#ycPrice').oninput=e=>{const v=num(e.target.value);yPut(f.n,{price:v>0?v:null});yCalc();};
   $('#ycPrice').onblur=e=>{const v=num(e.target.value);e.target.value=isFinite(v)?v.toLocaleString('ja-JP'):'';};
   $('#ycPrice').onfocus=e=>{const v=num(e.target.value);e.target.value=isFinite(v)?v:'';};
-  $('#ycW').oninput=put('w',0); $('#ycN').oninput=put('n',0);
+  $('#ycW').oninput=e=>{const v=num(e.target.value);yPut(f.n,{wk:v>0?v:null});yCalc();};
   $('#ycY').oninput=e=>{const v=num(e.target.value);if(v>0&&v<=100)yPut(f.n,{y:v});yCalc();};
-  $('#ycG').oninput=e=>{if(e.target.readOnly)return;const v=num(e.target.value);if(v>0)yPut(f.n,{g:v});yCalc();};
+  $('#ycG').oninput=e=>{const v=num(e.target.value);if(v>0)yPut(f.n,{g:v});yCalc();};
   $('#ycRate').oninput=e=>{const v=num(e.target.value);if(v>0&&v<100)yPut(f.n,{rate:v});yCalc();};
   drawYieldValues();
 }
