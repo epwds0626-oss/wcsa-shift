@@ -197,6 +197,50 @@ footer hr{border:0;border-top:1px solid var(--line);margin:0 0 16px}
 .back-wcsa:hover{background:#fff;border-color:var(--ai-2)}
 .back-wcsa:active{transform:scale(.96)}
 @media(max-width:600px){.back-wcsa{top:10px;right:10px;font-size:12px;padding:6px 12px}}
+
+/* ---------- 歩留まり・原価 ---------- */
+.yc{background:#fff;border:1px solid var(--line);border-top:3px solid var(--ai);padding:18px 18px 16px;margin-bottom:26px}
+.yc-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.yc-head h3{font-family:var(--serif);font-size:16px;margin:0;letter-spacing:.1em;font-weight:600}
+.yc-basis{font-family:var(--mono);font-size:10.5px;color:var(--gin);letter-spacing:.06em}
+.yc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.yc-f{min-width:0}
+.yc-f label{display:block;font-size:11px;color:var(--gin);letter-spacing:.08em;margin-bottom:4px}
+.yc-in{display:flex;align-items:center;border:1px solid var(--line);background:var(--ice-2);border-radius:3px}
+.yc-in input{flex:1;min-width:0;width:100%;border:0;background:transparent;font-family:var(--mono);font-size:20px;padding:8px 10px;color:var(--ink);text-align:right;outline:none}
+.yc-in:focus-within{border-color:var(--ai-2);background:#fff}
+.yc-in span{font-size:12px;color:var(--gin);padding-right:10px;white-space:nowrap}
+.yc-def{font-size:10.5px;color:var(--gin);margin-top:3px;font-family:var(--mono)}
+.yc-def button{appearance:none;border:0;background:none;color:var(--ai-2);font-size:10.5px;cursor:pointer;padding:0;text-decoration:underline}
+.yc-pre{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.yc-pre button{appearance:none;border:1px solid var(--line);background:#fff;font-size:11px;padding:2px 8px;border-radius:2px;cursor:pointer;color:var(--ai)}
+.yc-pre button[aria-pressed="true"]{background:var(--ai);color:#fff;border-color:var(--ai)}
+.yc-out{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:0;margin-top:16px;border-top:1px solid var(--line)}
+.yc-o{padding:12px 12px 4px;border-right:1px solid var(--line)}
+.yc-o:last-child{border-right:0}
+.yc-o .l{font-size:11px;color:var(--gin);letter-spacing:.08em}
+.yc-o .v{font-family:var(--mono);font-size:22px;color:var(--ink);line-height:1.3}
+.yc-o.main .v{font-size:34px;color:var(--chiai);font-weight:600}
+.yc-o .s{font-family:var(--mono);font-size:10.5px;color:var(--gin)}
+.yc-more{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+.yc-more summary{cursor:pointer;font-size:12px;color:var(--ai);list-style:none}
+.yc-more summary::-webkit-details-marker{display:none}
+.yc-more summary::before{content:'＋ '}
+.yc-more[open] summary::before{content:'－ '}
+.yc-sub{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:10px}
+.yc-res{font-size:13px;margin-top:8px;color:var(--ink)}
+.yc-res b{font-family:var(--mono);color:var(--chiai)}
+.yc-res .btn{appearance:none;border:1px solid var(--ai);background:var(--ai);color:#fff;font-size:11.5px;padding:3px 10px;border-radius:2px;cursor:pointer;margin-left:8px}
+.yc-2{margin-top:12px}
+.yc-auto{color:var(--kombu);font-weight:600}
+.yc-in input[readonly]{color:var(--kombu)}
+.yc-sync{font-family:var(--mono);font-size:10px;color:var(--gin-2);margin-top:10px;text-align:right}
+@media (max-width:640px){
+  .yc-grid,.yc-sub{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .yc-grid .yc-f:first-child{grid-column:1/-1}
+  .yc-out{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .yc-o.main{grid-column:1/-1;border-right:0;border-bottom:1px solid var(--line)}
+}
 </style>
 </head>
 <body>
@@ -1375,6 +1419,8 @@ function drawDetail(){
       <div class="readout" id="ro">グラフをなぞると、その時点の状態が出ます。</div>
     </div>
 
+    ${yieldCard(f)}
+
     <div class="blocks">
       <div class="block wide">
         <h4>時間とともに何が起きるか</h4>
@@ -1410,6 +1456,7 @@ function drawDetail(){
       </div>
     </div>`;
   bindChart();
+  bindYield();
 }
 
 function bindChart(){
@@ -1466,6 +1513,183 @@ function drawGloss(){
     <div class="cls">${h.c}</div><h5>${h.n}</h5>
     <p>${h.d}</p><div class="tl">効く場面：${h.t}</div></div>`).join('');
 }
+
+
+/* ============================================================
+   歩留まり・原価
+   y: 標準歩留まり(%)  g: 1切れの標準重量(g)  b: 歩留まりの基準
+   数値は一般的な目安。実測値で上書きして使う前提。
+============================================================ */
+const B_SAKU='丸（ラウンド）→ 刺身用の柵', B_BLOCK='ブロック仕入れ → 皮・血合い・筋を除いた柵',
+      B_MUKI='殻付き → むき身', B_WHOLE='丸のまま提供（1尾＝1切れで計算）', B_AS='仕入れ形態のまま使用',
+      B_KIRI='丸 → 切り身', B_HIRAKI='丸 → 開き';
+const YIELD = {
+ 'ヒラメ':{y:40,g:8,b:B_SAKU},'マダイ':{y:38,g:10,b:B_SAKU},'スズキ':{y:40,g:10,b:B_SAKU},
+ 'カワハギ':{y:30,g:8,b:B_SAKU+'（肝は別）'},'クエ':{y:40,g:10,b:B_SAKU},'アンコウ':{y:50,g:40,b:'丸 → 鍋用の身・皮・肝（七つ道具）'},
+ 'ホウボウ':{y:30,g:10,b:B_SAKU},'キンメダイ':{y:40,g:12,b:B_SAKU},'トラフグ':{y:25,g:5,b:B_SAKU+'（皮・アラ除く）'},
+ 'メバル':{y:35,g:10,b:B_SAKU},'本マグロ（赤身）':{y:85,g:15,b:B_BLOCK},'本マグロ（中トロ）':{y:80,g:15,b:B_BLOCK},
+ 'カツオ':{y:50,g:15,b:'丸 → 節（皮付き）'},'ブリ':{y:50,g:15,b:B_SAKU},'カンパチ':{y:48,g:12,b:B_SAKU},
+ 'マアジ':{y:40,g:10,b:B_SAKU},'マイワシ':{y:40,g:10,b:B_SAKU},'サバ':{y:45,g:12,b:B_SAKU},'サンマ':{y:45,g:10,b:B_SAKU},
+ 'シマアジ':{y:45,g:12,b:B_SAKU},'サワラ':{y:50,g:12,b:B_SAKU},'タチウオ':{y:50,g:12,b:B_SAKU},
+ '伊勢海老':{y:30,g:15,b:'活 → むき身'},'車海老':{y:45,g:15,b:'活 → むき身（頭・殻除く）'},'甘エビ':{y:40,g:6,b:'殻付き → むき身'},
+ 'ズワイガニ':{y:25,g:15,b:'丸 → かに身'},'アオリイカ':{y:50,g:10,b:'丸 → 胴の柵（皮引き）'},'スルメイカ':{y:50,g:10,b:'丸 → 胴の柵（皮引き）'},
+ 'マダコ':{y:55,g:10,b:'活 → 茹で上がりの足'},'ホタテ':{y:15,g:30,b:'殻付き → 貝柱（1個＝1切れ）'},'ハマグリ':{y:30,g:15,b:B_MUKI},
+ 'アワビ':{y:35,g:10,b:B_MUKI+'（肝は別）'},'赤貝':{y:25,g:10,b:B_MUKI},'真牡蠣':{y:20,g:20,b:B_MUKI+'（1個＝1切れ）'},
+ 'ウニ':{y:100,g:10,b:B_AS+'（折・塩水）'},'シラス':{y:100,g:30,b:B_AS},'サーモン（トラウト）':{y:55,g:15,b:B_SAKU},
+ 'マコガレイ':{y:40,g:8,b:B_SAKU},'イサキ':{y:40,g:10,b:B_SAKU},'アマダイ':{y:40,g:12,b:B_SAKU},
+ 'アカムツ（ノドグロ）':{y:40,g:12,b:B_SAKU},'シロギス':{y:45,g:8,b:B_HIRAKI},'カサゴ':{y:30,g:10,b:B_SAKU},
+ 'マハタ':{y:40,g:10,b:B_SAKU},'サヨリ':{y:45,g:8,b:B_SAKU},'イシダイ':{y:40,g:10,b:B_SAKU},
+ 'マダラ':{y:50,g:80,b:B_KIRI},'ハタハタ':{y:100,g:40,b:B_WHOLE},'アイナメ':{y:40,g:10,b:B_SAKU},
+ 'アナゴ':{y:50,g:15,b:B_HIRAKI},'ハモ':{y:50,g:12,b:'丸 → 骨切りした身'},'キハダマグロ':{y:85,g:15,b:B_BLOCK},
+ 'メバチマグロ':{y:85,g:15,b:B_BLOCK},'コハダ':{y:50,g:10,b:B_HIRAKI},'キビナゴ':{y:60,g:5,b:B_HIRAKI},
+ 'トビウオ':{y:45,g:10,b:B_SAKU},'ニシン':{y:50,g:12,b:B_SAKU},'ホッケ':{y:70,g:150,b:B_HIRAKI+'（半身＝1切れ）'},
+ 'ボタンエビ':{y:40,g:15,b:'活 → むき身'},'シャコ':{y:35,g:15,b:'活 → 茹でむき身'},'タラバガニ':{y:35,g:20,b:'丸 → かに身'},
+ '毛ガニ':{y:25,g:15,b:'丸 → かに身'},'ヤリイカ':{y:50,g:10,b:'丸 → 胴の柵（皮引き）'},'コウイカ（スミイカ）':{y:45,g:10,b:'丸 → 胴の柵（皮引き）'},
+ 'イイダコ':{y:65,g:20,b:'活 → 下処理後'},'アサリ':{y:25,g:5,b:B_MUKI},'サザエ':{y:30,g:10,b:B_MUKI},
+ 'ホッキ貝':{y:30,g:15,b:B_MUKI},'ミル貝':{y:35,g:10,b:'殻付き → 水管'},'タイラギ':{y:15,g:15,b:'殻付き → 貝柱'},
+ 'つぶ貝':{y:35,g:10,b:B_MUKI},'シジミ':{y:20,g:5,b:B_MUKI},'岩牡蠣':{y:20,g:60,b:B_MUKI+'（1個＝1切れ）'},
+ 'イクラ':{y:100,g:10,b:B_AS+'（醤油漬け）'},'白子（真鱈）':{y:85,g:20,b:'掃除後'},'ホヤ':{y:30,g:10,b:'殻付き → むき身'},
+ 'ナマコ':{y:50,g:10,b:'丸 → 下処理後の身'},'シラウオ':{y:100,g:20,b:B_AS},'メヒカリ':{y:80,g:15,b:'丸 → 頭・内臓除く'},
+ 'アユ':{y:100,g:80,b:B_WHOLE},'ニジマス':{y:50,g:12,b:B_SAKU},'ヤマメ':{y:100,g:80,b:B_WHOLE},
+ 'イワナ':{y:100,g:100,b:B_WHOLE},'サクラマス':{y:55,g:12,b:B_SAKU},'ビワマス':{y:55,g:12,b:B_SAKU},
+ 'ウナギ':{y:55,g:100,b:'活 → 開き（1尾分＝1切れ目安）'},'コイ':{y:40,g:10,b:'丸 → 洗い用の身'},'ワカサギ':{y:100,g:10,b:B_WHOLE},
+ 'ナマズ':{y:40,g:30,b:B_KIRI},'ドジョウ':{y:100,g:8,b:B_WHOLE},'ヒメマス':{y:55,g:12,b:B_SAKU}
+};
+const yDef=f=>YIELD[f.n]||{y:40,g:10,b:B_SAKU};
+const G_PRESET=[['薄造り',5],['刺身',10],['鮨ネタ',15],['切り身',80]];
+
+/* 保存：WCSAのFirebase（親フレーム）があれば全端末で共有、無ければこの端末だけ */
+const YK='fish_yield';
+let YS={};            // {魚名:{y,g,price,updated}}
+let ySyncNote='この端末に保存';
+function yDb(){try{return (window.parent&&window.parent!==window&&window.parent.db)||null;}catch(e){return null;}}
+function yLoadLocal(){try{YS=JSON.parse(localStorage.getItem(YK)||'{}')||{};}catch(e){YS={};}}
+function ySaveLocal(){try{localStorage.setItem(YK,JSON.stringify(YS));}catch(e){}}
+function yInitSync(){
+  yLoadLocal();
+  const db=yDb(); if(!db) return;
+  ySyncNote='全端末で共有';
+  db.ref(YK).on('value',snap=>{
+    const v=snap.val()||{};
+    YS=v; ySaveLocal();
+    const a=document.activeElement;
+    if(!(a&&a.closest&&a.closest('.yc'))) drawYieldValues();   // 入力中は上書きしない
+  },()=>{ySyncNote='この端末に保存（共有に失敗）';});
+}
+let ySaveT=null;
+function yPut(name,patch){
+  YS[name]=Object.assign({},YS[name]||{},patch,{updated:Date.now()});
+  ySaveLocal();
+  clearTimeout(ySaveT);
+  ySaveT=setTimeout(()=>{const db=yDb(); if(db) db.ref(YK+'/'+name).set(YS[name]).catch(()=>{});},500);
+}
+function yCur(f){
+  const d=yDef(f), s=YS[f.n]||{};
+  return {y:s.y!=null?s.y:d.y, g:s.g!=null?s.g:d.g, price:s.price!=null?s.price:'', rate:s.rate!=null?s.rate:30,
+          ownY:s.y!=null, ownG:s.g!=null, b:d.b, dy:d.y, dg:d.g};
+}
+const yen=n=>isFinite(n)?'¥'+Math.round(n).toLocaleString('ja-JP'):'—';
+const yen1=n=>isFinite(n)?'¥'+(n<100?n.toFixed(1):Math.round(n).toLocaleString('ja-JP')):'—';
+const num=v=>{const x=parseFloat(String(v).replace(/[,，¥円%％g]/g,''));return isFinite(x)?x:NaN;};
+
+function yieldCard(f){
+  return `<div class="yc" id="yc">
+    <div class="yc-head"><h3>歩留まり・原価</h3><span class="yc-basis" id="ycBasis"></span></div>
+    <div class="yc-grid">
+      <div class="yc-f"><label for="ycPrice">仕入れキロ単価</label>
+        <div class="yc-in"><input id="ycPrice" inputmode="numeric" placeholder="0"><span>円/kg</span></div>
+        <div class="yc-def">税抜・丸（仕入れ形態）の単価</div></div>
+      <div class="yc-f"><label for="ycW">丸の重量</label>
+        <div class="yc-in"><input id="ycW" inputmode="decimal" placeholder="0"><span>g</span></div>
+        <div class="yc-def" id="ycWamt">仕入れたときの重さ</div></div>
+      <div class="yc-f"><label for="ycN">取れた切れ数</label>
+        <div class="yc-in"><input id="ycN" inputmode="numeric" placeholder="—"><span>切れ</span></div>
+        <div class="yc-def" id="ycNdef">切り終えたら数を入力</div></div>
+    </div>
+    <div class="yc-grid yc-2">
+      <div class="yc-f"><label for="ycY">歩留まり率</label>
+        <div class="yc-in"><input id="ycY" inputmode="decimal"><span>%</span></div>
+        <div class="yc-def" id="ycYdef"></div></div>
+      <div class="yc-f"><label for="ycG">1切れの重さ <span class="yc-auto" id="ycGauto"></span></label>
+        <div class="yc-in"><input id="ycG" inputmode="decimal"><span>g</span></div>
+        <div class="yc-pre" id="ycPre"></div></div>
+      <div class="yc-f"><label for="ycRate">目標原価率</label>
+        <div class="yc-in"><input id="ycRate" inputmode="numeric"><span>%</span></div>
+        <div class="yc-def">売価目安の計算に使用</div></div>
+    </div>
+    <div class="yc-out">
+      <div class="yc-o main"><div class="l">1切れの原価</div><div class="v" id="ycCut">—</div><div class="s" id="ycCutS"></div></div>
+      <div class="yc-o"><div class="l">可食部のキロ単価</div><div class="v" id="ycNet">—</div><div class="s">ロス込みの実質単価</div></div>
+      <div class="yc-o"><div class="l">1切れの売価目安</div><div class="v" id="ycSell">—</div><div class="s" id="ycSellS"></div></div>
+    </div>
+    <div class="yc-sync" id="ycSync"></div>
+  </div>`;
+}
+
+function drawYieldValues(){
+  const f=cur, c=yCur(f); if(!$('#yc')) return;
+  const s=YS[f.n]||{};
+  $('#ycBasis').textContent='基準：'+c.b;
+  $('#ycPrice').value=c.price===''?'':Number(c.price).toLocaleString('ja-JP');
+  $('#ycW').value=s.w?s.w:''; $('#ycN').value=s.n?s.n:'';
+  $('#ycY').value=c.y; $('#ycG').value=c.g; $('#ycRate').value=c.rate;
+  $('#ycSync').textContent=ySyncNote;
+  yCalc();
+}
+function yCalc(){
+  const f=cur, c=yCur(f);
+  const price=num($('#ycPrice').value), y=num($('#ycY').value), rate=num($('#ycRate').value);
+  const w=num($('#ycW').value), n=num($('#ycN').value);
+  const okY=y>0&&y<=100, okP=price>0;
+  const auto=w>0&&n>0&&okY;           // 丸の重量と切れ数があれば1切れgを自動計算
+  let g;
+  if(auto){
+    g=Math.round(w*y/100/n*10)/10;
+    $('#ycG').value=g; $('#ycG').readOnly=true;
+    $('#ycGauto').textContent='（自動）';
+    $('#ycPre').innerHTML=`<span class="yc-def">丸 ${w.toLocaleString('ja-JP')}g × ${y}% ÷ ${n}切れ</span>`;
+  }else{
+    if($('#ycG').readOnly) $('#ycG').value=c.g;   // 自動→手動に戻ったら保存値に戻す
+    $('#ycG').readOnly=false; $('#ycGauto').textContent='';
+    g=num($('#ycG').value);
+    $('#ycPre').innerHTML=G_PRESET.map(([l,v])=>`<button type="button" data-g="${v}" aria-pressed="${g===v}">${l}${v}g</button>`).join('');
+    $('#ycPre').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('#ycG').value=b.dataset.g;yPut(f.n,{g:+b.dataset.g});yCalc();});
+  }
+
+  $('#ycYdef').innerHTML=c.ownY&&c.y!==c.dy
+    ? `店の値／標準 ${c.dy}% <button type="button" id="ycYreset">標準に戻す</button>`
+    : `標準 ${c.dy}%（店の実績で上書き可）`;
+  const rb=$('#ycYreset'); if(rb) rb.onclick=()=>{yPut(f.n,{y:null});drawYieldValues();};
+
+  $('#ycWamt').innerHTML=w>0&&okP?`仕入れ額 <b style="color:var(--chiai)">${yen(price*w/1000)}</b>${okY?` ／ 可食部 約${Math.round(w*y/100).toLocaleString('ja-JP')}g`:''}`:'仕入れたときの重さ';
+  $('#ycNdef').textContent=n>0?'実際の切れ数で計算中'
+    :(w>0&&okY&&g>0?`見込み 約${Math.floor(w*y/100/g)}切れ（${g}gで切った場合）`:'切り終えたら数を入力');
+
+  // 原価：切れ数が分かれば「仕入れ額÷切れ数」で直接出す（歩留まりの誤差が乗らない）
+  let cut=NaN, how='';
+  if(okP&&w>0&&n>0){cut=price*w/1000/n; how=`仕入れ額 ÷ ${n}切れ`;}
+  else if(okP&&okY&&g>0){cut=price/(y/100)*g/1000; how=`${g}g ／ 仕入れ1kgから約${Math.floor(1000*y/100/g)}切れ`;}
+  $('#ycNet').textContent=okP&&okY?yen(price/(y/100)):'—';
+  $('#ycCut').textContent=isFinite(cut)?yen1(cut):'—';
+  $('#ycCutS').textContent=isFinite(cut)?how:'キロ単価を入れると出ます';
+  const okR=rate>0&&rate<100;
+  $('#ycSell').textContent=isFinite(cut)&&okR?yen(cut/(rate/100)):'—';
+  $('#ycSellS').textContent=okR?`原価率${rate}%`:'';
+}
+function bindYield(){
+  if(!$('#yc')) return;
+  const f=cur;
+  const put=(k,lo,hi)=>e=>{const v=num(e.target.value);yPut(f.n,{[k]:(v>lo&&(hi==null||v<=hi))?v:null});yCalc();};
+  $('#ycPrice').oninput=put('price',0);
+  $('#ycPrice').onblur=e=>{const v=num(e.target.value);e.target.value=isFinite(v)?v.toLocaleString('ja-JP'):'';};
+  $('#ycPrice').onfocus=e=>{const v=num(e.target.value);e.target.value=isFinite(v)?v:'';};
+  $('#ycW').oninput=put('w',0); $('#ycN').oninput=put('n',0);
+  $('#ycY').oninput=e=>{const v=num(e.target.value);if(v>0&&v<=100)yPut(f.n,{y:v});yCalc();};
+  $('#ycG').oninput=e=>{if(e.target.readOnly)return;const v=num(e.target.value);if(v>0)yPut(f.n,{g:v});yCalc();};
+  $('#ycRate').oninput=e=>{const v=num(e.target.value);if(v>0&&v<100)yPut(f.n,{rate:v});yCalc();};
+  drawYieldValues();
+}
+yInitSync();
 
 /* tabs */
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
