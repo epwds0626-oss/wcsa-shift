@@ -486,8 +486,13 @@ function renderAnnual(fy,months,M,fhOk,labNote){
   const yoy=(c,p)=>p>0&&c>0?`<div class="yoy ${c>=p?"up":"down"}">昨対 ${(c/p*100).toFixed(1)}%</div>`:"";
   const P={本店:0,マルコ:0,fh:0,cmpCur:0,cmpPrev:0,hc:0,mc:0,fc:0};
   const maxS=Math.max(1,...months.map(k=>M[k].本店.s+M[k].マルコ.s+M[k].fh));
-  let h=`<thead><tr><th class="l" rowspan="2">月</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th class="grp gf">FishHack</th><th colspan="3" class="grp">全社</th><th class="l" rowspan="2"></th><th rowspan="2">人件費<br>の日数</th></tr>
-  <tr><th>売上</th><th>人件費</th><th>率</th><th>売上</th><th>人件費</th><th>率</th><th class="rt">売上</th><th>売上</th><th>人件費</th><th>率</th></tr></thead><tbody>`;
+  let h=`<thead><tr><th class="l" rowspan="2">月</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th class="grp gf">FishHack</th><th colspan="3" class="grp">全社</th><th colspan="5" class="grp">利益（全社）</th><th class="l" rowspan="2"></th><th rowspan="2">人件費<br>の日数</th></tr>
+  <tr><th>売上</th><th>人件費</th><th>率</th><th>売上</th><th>人件費</th><th>率</th><th class="rt">売上</th><th>売上</th><th>人件費</th><th class="rt">率</th><th>食材費</th><th>FL比率</th><th>利益<div class="note">固定費前</div></th><th>固定費</th><th class="rt">営業利益</th></tr></thead><tbody>`;
+  // 食材費（月の仕入合計・税込→売上の基準に合わせて換算）。利益＝全社売上−人件費−食材費（固定費は含まない）
+  const foodYen=k=>{const fo=typeof foodOf==="function"?foodOf(k):null;if(!fo)return null;return (cfg.tax||"税抜")==="税抜"?fo.P/1.08:fo.P};
+  const flp=(c,f,s)=>{if(s<=0||f==null)return "—";const v=(c+f)/s*100;return `<span class="pill ${v<=60?"ok":v<=65?"w":"c"}">${v.toFixed(1)}%</span>`};
+  const pf=v=>v==null?"—":`<b style="color:${v>=0?"var(--ok)":"var(--crit)"}">${v<0?"−":""}${yen(Math.abs(v))}</b>`;
+  const FT={f:0,s:0,c:0,n:0,x:0};
   months.forEach(k=>{
     const m=M[k],hs=m.本店,ms=m.マルコ,allS=hs.s+ms.s+m.fh,allC=hs.c+ms.c,allSL=hs.sl+ms.sl+m.fhl,allCM=hs.cm+ms.cm,n=m.lab.size;
     const dim=new Date(+k.slice(0,4),+k.slice(5,7),0).getDate();
@@ -503,22 +508,33 @@ function renderAnnual(fy,months,M,fhOk,labNote){
       <td class="sl">${y(ms.s)}${yoy(ms.s,pv.マルコ)}</td><td>${y(ms.c)}</td><td class="rt">${fr(pct(ms.cm,ms.sl))}</td>
       <td class="sl rt">${y(m.fh)}${yoy(m.fh,pv.fh)}</td>
       <td class="sl">${y(allS)}${yoy(cc,cp)}</td><td><b>${y(allC)}</b></td><td class="rt">${fr(pct(allCM,allSL))}</td>
+      ${(()=>{const f=foodYen(k);const fo=typeof foodOf==="function"?foodOf(k):null;
+        const fx=fixedOf(k);
+        if(f==null||!allS)return `<td>—</td><td>—</td><td>—</td><td>${fx==null?"—":yen(fx)}</td><td class="rt">—</td>`;
+        FT.f+=f;FT.s+=allS;FT.c+=allC;FT.n++;FT.x+=fx||0;
+        const op=allS-allC-f-(fx||0);
+        const part=n&&n<dim?' <span class="chip w" title="人件費が月の一部の日だけのため、利益が多めに出ています">人件費一部</span>':"";
+        return `<td>${yen(f)}${fo&&fo.src==="台帳"?'':' <span class="chip s">入力</span>'}<div class="note">${(f/allS*100).toFixed(1)}%</div></td><td>${flp(allC,f,allS)}</td><td>${pf(allS-allC-f)}<div class="note">${((allS-allC-f)/allS*100).toFixed(1)}%</div></td><td>${fx==null?"—":yen(fx)}</td><td class="rt">${pf(op)}<div class="note">${(op/allS*100).toFixed(1)}%</div>${part}</td>`})()}
       <td class="l"><div class="bar"><i class="bh" style="width:${hs.s/maxS*100}%"></i><i class="bm" style="width:${ms.s/maxS*100}%"></i><i class="bf" style="width:${m.fh/maxS*100}%"></i></div></td>
       <td>${n?(n<dim?`<span class="chip w">${n}/${dim}日</span>`:`${n}日`):'<span class="note">打刻なし</span>'}</td></tr>`;
   });
   const tS=T.本店.s+T.マルコ.s+T.fh,tC=T.本店.c+T.マルコ.c,tSL=T.本店.sl+T.マルコ.sl+T.fhl,tCM=T.本店.cm+T.マルコ.cm;
   h+=`<tr class="tot"><td class="l">年間計</td><td class="sl">${y(T.本店.s)}${yoy(P.hc,P.本店)}</td><td>${y(T.本店.c)}</td><td class="rt">${fr(pct(T.本店.cm,T.本店.sl))}</td>
     <td class="sl">${y(T.マルコ.s)}${yoy(P.mc,P.マルコ)}</td><td>${y(T.マルコ.c)}</td><td class="rt">${fr(pct(T.マルコ.cm,T.マルコ.sl))}</td>
-    <td class="sl rt">${y(T.fh)}${yoy(P.fc,P.fh)}</td><td class="sl">${y(tS)}${yoy(P.cmpCur,P.cmpPrev)}</td><td><b>${y(tC)}</b></td><td class="rt">${fr(pct(tCM,tSL))}</td><td></td><td>${T.lab}日</td></tr></tbody>`;
+    <td class="sl rt">${y(T.fh)}${yoy(P.fc,P.fh)}</td><td class="sl">${y(tS)}${yoy(P.cmpCur,P.cmpPrev)}</td><td><b>${y(tC)}</b></td><td class="rt">${fr(pct(tCM,tSL))}</td>
+    ${FT.n?`<td>${yen(FT.f)}<div class="note">${(FT.f/FT.s*100).toFixed(1)}%</div></td><td>${flp(FT.c,FT.f,FT.s)}</td><td>${pf(FT.s-FT.c-FT.f)}<div class="note">${((FT.s-FT.c-FT.f)/FT.s*100).toFixed(1)}%</div></td><td>${yen(FT.x)}</td><td class="rt">${pf(FT.s-FT.c-FT.f-FT.x)}<div class="note">${((FT.s-FT.c-FT.f-FT.x)/FT.s*100).toFixed(1)}%・${FT.n}か月</div></td>`:`<td>—</td><td>—</td><td>—</td><td>—</td><td class="rt">—</td>`}<td></td><td>${T.lab}日</td></tr></tbody>`;
   document.getElementById("anTable").innerHTML=h;
   const labMonths=months.filter(k=>M[k].lab.size).map(k=>+k.slice(5)+"月");
   document.getElementById("anTiles").innerHTML=`
     <div class="tile"><div class="lb">全社 売上（${cfg.tax||"税抜"}）</div><div class="v">${yen(tS)}</div><div class="d">本店 ${yen(T.本店.s)} ／ マルコ ${yen(T.マルコ.s)} ／ FishHack ${yen(T.fh)}</div>${P.cmpPrev>0?`<div class="d">昨対 <b class="rtv">${(P.cmpCur/P.cmpPrev*100).toFixed(1)}%</b>（前年と比べられる月・事業で計算）</div>`:`<div class="d">昨対：前年の売上データなし</div>`}</div>
     <div class="tile"><div class="lb">人件費（打刻のある日）</div><div class="v">${yen(tC)}</div><div class="d">本店 ${yen(T.本店.c)} ／ マルコ ${yen(T.マルコ.c)} ／ 実働 ${T.h.toFixed(0)}h</div></div>
-    <div class="tile"><div class="lb">人件費率（同じ日の売上で計算）</div><div class="v">${pct(tCM,tSL)!=null?pct(tCM,tSL).toFixed(1)+"%":"—"}</div><div class="d">人件費 ${yen(tCM)} ÷ 売上 ${yen(tSL)}（両方そろった日）</div></div>`;
+    <div class="tile"><div class="lb">人件費率（同じ日の売上で計算）</div><div class="v">${pct(tCM,tSL)!=null?pct(tCM,tSL).toFixed(1)+"%":"—"}</div><div class="d">人件費 ${yen(tCM)} ÷ 売上 ${yen(tSL)}（両方そろった日）</div></div>
+    ${FT.n?`<div class="tile"><div class="lb">利益（売上−人件費−食材費・${FT.n}か月）</div><div class="v">${yen(FT.s-FT.c-FT.f)}</div><div class="d">食材費 ${yen(FT.f)}（${(FT.f/FT.s*100).toFixed(1)}%）／ FL比率 <b class="rtv">${((FT.c+FT.f)/FT.s*100).toFixed(1)}%</b></div><div class="d">利益率 ${((FT.s-FT.c-FT.f)/FT.s*100).toFixed(1)}%（固定費を引く前）</div></div>
+    <div class="tile"><div class="lb">営業利益（固定費も引いた後・${FT.n}か月）</div><div class="v" style="color:${FT.s-FT.c-FT.f-FT.x>=0?"var(--ok)":"var(--crit)"}">${yen(FT.s-FT.c-FT.f-FT.x)}</div><div class="d">固定費 ${yen(FT.x)}（月平均 ${yen(FT.x/FT.n)}）</div><div class="d">営業利益率 <b class="rtv">${((FT.s-FT.c-FT.f-FT.x)/FT.s*100).toFixed(1)}%</b>（借入返済・税金・役員の個人負担分は含まない）</div></div>`:""}`;
   document.getElementById("anStatus").textContent=
     `人件費は給与システムに打刻がある日だけ計算しています（${labMonths.length?labMonths.join("・"):"該当なし"}）${labNote}。率は人件費と売上が両方そろった日だけで計算（全社はFishHack売上を含む）。`+
-    (fhOk?"":" FishHackの売上を取得できませんでした。")+" 売上が「—」の月は、その月のPOSの売上CSVを読み込むと入ります。昨対は前年同月の売上と比べています（本店の前年分は売上実績CSVの「前年実績」から保存。全社はマルコ開店前の月は本店＋FishHackで比較）。";
+    (fhOk?"":" FishHackの売上を取得できませんでした。")+
+    " 食材費は預金台帳・現金出納帳から「仕入れた月」で集計した全社の仕入（ドリンク込み・FishHackの仕入も含む）を"+(cfg.tax||"税抜")+"に換算（税込÷1.08）。FL比率＝（人件費＋食材費）÷売上、目安60%以内。固定費は預金台帳の水道光熱費・リース・通信・燃料・雑費・手数料等（年払いの保険・税・修繕は12か月に均等割、"+(cfg.tax||"税抜")+"換算は÷1.1）。営業利益＝利益−固定費（消費税・借入返済・社用車の購入代は含まない）。食材費の月ごとの波は、まとめ払い（水戸中央水産・清水商店など）の影響が大きいため、年間・四半期の合計で見るのが確実です。日別の画面で入力した月は入力値を使います。"+" 売上が「—」の月は、その月のPOSの売上CSVを読み込むと入ります。昨対は前年同月の売上と比べています（本店の前年分は売上実績CSVの「前年実績」から保存。全社はマルコ開店前の月は本店＋FishHackで比較）。";
 }
 function closeAnnual(){document.body.classList.remove("annual-mode")}
 
@@ -807,11 +823,23 @@ function prodPill(v){if(v==null||!isFinite(v))return "—";const t=num(cfg.prodT
 // 預金台帳（2025/10〜2026/9）＋マルコ現金出納帳（2026/1〜9）から集計した「仕入れた月」ごとの食材費（税込・ドリンク込み）
 // 判定：摘要の「N月問屋支払」等はN月分、月の表記がない支払（水戸中央水産・バンクカード等）は支払月の分。
 //       マルコ現金出納帳は「仕入」行（貸方）を出金日の月で計上（月数千〜1.7万円）。
-// 除外：レジロール代、社内振替（水産代→ワンテーブル 30万×2）。「1月～4月なかむら農園」は4か月に均等割。
+// 除外：レジロール代、社内振替（水産代→ワンテーブル 30万×2）、返金された二重振込（修正振込有：小美玉ふるさと食品公社 6月 ¥23,436）。「1月～4月なかむら農園」は4か月に均等割。
 // 9月は10月の台帳（9月問屋支払）が未取込のため入れていない（判明分 ¥1,442,833）。
 // 画面で金額を入力した月は、入力値が優先される。
 const FOOD_LEDGER={"2025/10":2165411,"2025/11":3972280,"2025/12":4497194,"2026/01":1944961,"2026/02":2222332,"2026/03":2439661,
-  "2026/04":2488238,"2026/05":4158408,"2026/06":3074902,"2026/07":3059770,"2026/08":3115704};
+  "2026/04":2488238,"2026/05":4158408,"2026/06":3051466,"2026/07":3059770,"2026/08":3115704};
+// 固定費（預金台帳＋マルコ現金出納帳・支払月ベース・税込）
+// 含む：水道光熱費・リース料・通信費・旅費交通費（燃料等）・雑費・消耗品費・支払手数料・手数料・管理費・賃借料・荷造運賃・広告宣伝費・交際費・福利厚生費・研修費・退職金共済掛金・マルコ現金の経費
+//       年払い（保険料・固定資産税/自動車税/住民税均等割・修繕費・車輌費・支払報酬 計¥2,909,296）は12か月に均等割
+// 含まない：人件費（給与・賞与・社保・労働保険・預り金＝打刻から別計算）、派遣・業務委託（打刻で人件費に入るため）、
+//           消費税、借入金返済、社用車の購入代（資産）、口座間振替、小口現金の引出し、立替金、返金された二重振込
+const FIXED_LEDGER={"2025/10":1603839,"2025/11":1731420,"2025/12":1943355,"2026/01":2080775,"2026/02":1751407,"2026/03":1617775,
+  "2026/04":1680416,"2026/05":1648535,"2026/06":1732225,"2026/07":1743972,"2026/08":1714002,"2026/09":1607057};
+// 台帳が未取込の月は、直近3か月の平均を仮の固定費として使う（固定費は月ごとの差が小さいため）
+function fixedProv(ym){return !num((cfg.fixed||{})[ym])&&!FIXED_LEDGER[ym]}
+function fixedOf(ym){const v=num((cfg.fixed||{})[ym]);let P=v||FIXED_LEDGER[ym];
+  if(!P){const ks=Object.keys(FIXED_LEDGER).sort().filter(k=>k<ym).slice(-3);if(!ks.length)return null;P=ks.reduce((a,k)=>a+FIXED_LEDGER[k],0)/ks.length}
+  return (cfg.tax||"税抜")==="税抜"?P/1.1:P}
 function foodOf(ym){const v=num((cfg.food||{})[ym]);return v?{P:v,src:"入力"}:FOOD_LEDGER[ym]?{P:FOOD_LEDGER[ym],src:"台帳"}:null}
 function foodRateOf(ym){
   const fo=foodOf(ym); if(!fo)return null; const P=fo.P;
@@ -850,22 +878,24 @@ function renderProfit(res,shown,todayOpen){
     return {d,S,L,F,P:F==null?null:S-L-F,prov:R&&R.prov,closed:closedSet("本店").has(d)&&closedSet("マルコ").has(d)}});
   const pc=(p,s)=>s>0&&p!=null?(p/s*100).toFixed(1)+"%":"—";
   const pv=v=>v==null?"—":`<b style="color:${v>=0?"var(--ok)":"var(--crit)"}">${v<0?"−":""}${yen(Math.abs(v))}</b>`;
-  let h=`<thead><tr><th class="l">日付</th><th>売上（全社）</th><th>人件費</th><th>食材費</th><th>利益</th><th>利益率</th></tr></thead><tbody>`;
+  const fxDay=d=>{const ym=d.slice(0,7);const v=fixedOf(ym);if(v==null)return null;const[yy,mm]=ym.split("/").map(Number);return v/new Date(yy,mm,0).getDate()};
+  rowsP.forEach(x=>{x.X=fxDay(x.d);x.O=x.P==null||x.X==null?null:x.P-x.X});
+  let h=`<thead><tr><th class="l">日付</th><th>売上（全社）</th><th>人件費</th><th>食材費</th><th>利益<div class="note">固定費前</div></th><th>利益率</th><th>固定費<div class="note">日割</div></th><th class="rt">営業利益</th></tr></thead><tbody>`;
   rowsP.forEach(x=>{const dw=DOW[new Date(x.d).getDay()],hol=HOLIDAYS[x.d];
     h+=`<tr${x.closed?' class="closed"':""}><td class="l">${x.d.slice(5)} <span class="dow-${hol?"日":dw}">${dw}</span>${x.prov?'<span class="chip w" title="この月の食材費が未入力のため、入力済みの月の率で仮計算">仮</span>':""}</td>
-      <td class="sl">${x.S?yen(x.S):"—"}</td><td>${x.L?yen(x.L):"—"}</td><td>${x.F==null?"—":yen(x.F)}</td><td>${pv(x.P)}</td><td class="rt">${pc(x.P,x.S)}</td></tr>`});
+      <td class="sl">${x.S?yen(x.S):"—"}</td><td>${x.L?yen(x.L):"—"}</td><td>${x.F==null?"—":yen(x.F)}</td><td>${pv(x.P)}</td><td>${pc(x.P,x.S)}</td><td>${x.X==null?"—":yen(x.X)+(fixedProv(x.d.slice(0,7))?'<span class="chip w" title="この月の台帳が未取込のため直近3か月平均で仮計算">仮</span>':"")}</td><td class="rt">${pv(x.O)}</td></tr>`});
   const sum=(xs,k)=>xs.reduce((a,x)=>a+(x[k]||0),0), ok=rowsP.filter(x=>x.F!=null);
-  const grp=(lb,xs)=>{if(!xs.length)return "";const n=xs.length,S=sum(xs,"S"),L=sum(xs,"L"),F=sum(xs,"F"),P=S-L-F;
-    return `<tr class="tot"><td class="l">${lb}</td><td class="sl">${yen(S/n)}</td><td>${yen(L/n)}</td><td>${yen(F/n)}</td><td>${pv(P/n)}</td><td class="rt">${pc(P,S)}</td></tr>`};
-  if(ok.length){const S=sum(ok,"S"),L=sum(ok,"L"),F=sum(ok,"F"),P=S-L-F;
-    h+=`<tr class="tot"><td class="l">計（${ok.length}日）</td><td class="sl">${yen(S)}</td><td>${yen(L)}</td><td>${yen(F)}</td><td>${pv(P)}</td><td class="rt">${pc(P,S)}</td></tr>`;
+  const grp=(lb,xs)=>{if(!xs.length)return "";const n=xs.length,S=sum(xs,"S"),L=sum(xs,"L"),F=sum(xs,"F"),P=S-L-F,X=sum(xs,"X");
+    return `<tr class="tot"><td class="l">${lb}</td><td class="sl">${yen(S/n)}</td><td>${yen(L/n)}</td><td>${yen(F/n)}</td><td>${pv(P/n)}</td><td>${pc(P,S)}</td><td>${yen(X/n)}</td><td class="rt">${pv((P-X)/n)}</td></tr>`};
+  if(ok.length){const S=sum(ok,"S"),L=sum(ok,"L"),F=sum(ok,"F"),P=S-L-F,X=sum(ok,"X");
+    h+=`<tr class="tot"><td class="l">計（${ok.length}日）</td><td class="sl">${yen(S)}</td><td>${yen(L)}</td><td>${yen(F)}</td><td>${pv(P)}</td><td>${pc(P,S)}</td><td>${yen(X)}</td><td class="rt">${pv(P-X)}</td></tr>`;
     h+=grp("平日 1日平均",ok.filter(x=>dayKind(x.d)==="平"&&!x.closed))+grp("土日祝 1日平均",ok.filter(x=>dayKind(x.d)!=="平"&&!x.closed));}
   el.innerHTML=h+"</tbody>";
   const notes=yms.map(ym=>{const r=RM[ym];const mm=+ym.slice(5)+"月";
     if(!r)return `${mm}：食材費が未入力（入力すると計算します）`;
     if(r.prov)return `${mm}：未入力のため ${+r.from.slice(5)}月の率（店の食材費率 ${(r.rate*100).toFixed(1)}%）で仮計算`;
     return `${mm}：仕入 ${yen(r.P)}（${cfg.tax||"税抜"}・${r.src==="台帳"?"預金台帳から集計":"手入力"}）− FishHack原価 ${yen(r.fhCost)}（売上 ${yen(r.fhS)}×${Math.round(fr*100)}%${r.fhOk?"":"・未取得"}）＝ 店の食材費 ${yen(r.P-r.fhCost)} ÷ 店の売上 ${yen(r.R)}（${r.n}日分）→ <b>食材費率 ${(r.rate*100).toFixed(1)}%</b>${r.rate<0.2||r.rate>0.5?' <span class="chip w">要確認</span>':""}`});
-  document.getElementById("profitNote").innerHTML=notes.join("<br>")+`<br>利益＝売上（本店＋マルコ＋FishHack）− 人件費 − 食材費。家賃・リース・水道光熱費などの固定費は含まない「店の稼ぎ（貢献利益）」です。食材費は月の合計を売上に比例して日に割り振った推定値で、月の合計は正確ですが日ごとの数字は目安です。食材費は支払月ではなく<b>仕入れた月</b>の金額を入れてください（例：9月分＝10月に払う「9月問屋支払」＋9月の小口・カード仕入）。`;
+  document.getElementById("profitNote").innerHTML=notes.join("<br>")+`<br>利益＝売上（本店＋マルコ＋FishHack）− 人件費 − 食材費。営業利益＝利益−固定費（月の固定費を暦日で日割り。定休日にも固定費はかかるため、定休日は営業利益がマイナスになります）。食材費は月の合計を売上に比例して日に割り振った推定値で、月の合計は正確ですが日ごとの数字は目安です。食材費は支払月ではなく<b>仕入れた月</b>の金額を入れてください（例：9月分＝10月に払う「9月問屋支払」＋9月の小口・カード仕入）。`;
 }
 function renderProd(res,shown,todayOpen){
   const el=document.getElementById("prodTable"); if(!el)return;
