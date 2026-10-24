@@ -1040,7 +1040,7 @@ function foodRateOf(ym){
   const fo=foodOf(ym); if(!fo)return null; const P=fo.P;
   const net=(cfg.tax||"税抜")==="税抜";
   const pIn=net?P/1.08:P;                       // 仕入は大半が軽減税率8%のため税抜換算は÷1.08
-  const fr=num(cfg.fhRate!=null?cfg.fhRate:70)/100;
+  const fr=num(cfg.fhRate!=null?cfg.fhRate:55)/100;
   const fm=fhMonth[ym], fhS=fm?(net?fm.net:fm.gross):0, fhCost=fhS*fr;
   let R=0,n=0;Object.keys(cfg.sales||{}).forEach(d=>{if(d.startsWith(ym+"/")){const b=salesOf(d,"本店"),m=salesOf(d,"マルコ");if(b!=null||m!=null){R+=(b||0)+(m||0);n++}}});
   if(R<=0)return null;
@@ -1049,7 +1049,7 @@ function foodRateOf(ym){
 function renderProfit(res,shown,todayOpen){
   const el=document.getElementById("profitTable");
   cfg.food=cfg.food||{};
-  const fr=num(cfg.fhRate!=null?cfg.fhRate:70)/100;
+  const fr=num(cfg.fhRate!=null?cfg.fhRate:55)/100;
   const yms=[...new Set(dates.map(d=>d.slice(0,7)))];
   // 入力欄（表示期間にかかる暦月ぶん）
   const box=document.getElementById("foodInputs");
@@ -1057,7 +1057,7 @@ function renderProfit(res,shown,todayOpen){
     box.innerHTML=yms.map(ym=>`<label class="note">${+ym.slice(5)}月 ¥<input data-ym="${ym}" type="number" min="0" step="1" style="width:110px" value="${cfg.food[ym]||""}" placeholder="${foodLedgerVal(ym)?"台帳 "+Math.round(foodLedgerVal(ym)):"未確定"}"></label>`).join("");
     box.querySelectorAll("input").forEach(inp=>inp.onchange=()=>{const v=num(inp.value);if(v)cfg.food[inp.dataset.ym]=v;else delete cfg.food[inp.dataset.ym];saveCfg();renderDaily()});
   }
-  const fhr=document.getElementById("fhRate"); if(fhr&&document.activeElement!==fhr)fhr.value=cfg.fhRate!=null?cfg.fhRate:70;
+  const fhr=document.getElementById("fhRate"); if(fhr&&document.activeElement!==fhr)fhr.value=cfg.fhRate!=null?cfg.fhRate:55;
   // 月ごとの率（未入力の月は直近の入力済みの月で仮置き）
   const known=[...new Set(Object.keys(cfg.food).filter(k=>num(cfg.food[k])).concat(Object.keys(ledgerCalc().food)))].sort();
   const rateFor=ym=>{const r=foodRateOf(ym);if(r)return {...r,prov:false};
@@ -1282,7 +1282,9 @@ document.getElementById("ledgerFile").onchange=e=>{const fs=[...e.target.files];
 [["cardFee",3.24],["marcoFood",400000],["marcoFixed",288000]].forEach(([id,def])=>{const el=document.getElementById(id);el.value=cfg[id]!=null?cfg[id]:def;
   el.onchange=()=>{cfg[id]=el.value===""?def:num(el.value);ledgerCalc._c=null;saveCfg();renderDaily()}});
 document.getElementById("ledgerBox").addEventListener("toggle",renderLedgerList);
-document.getElementById("fhRate").oninput=e=>{cfg.fhRate=e.target.value===""?70:num(e.target.value);saveCfg();renderDaily()};
+// FishHack原価率は55%に統一（R8.10.24）。以前の既定値・保存値は一度だけ55%に置き換える
+if(cfg.fhRateVer!==2){cfg.fhRate=55;cfg.fhRateVer=2;saveCfg()}
+document.getElementById("fhRate").oninput=e=>{cfg.fhRate=e.target.value===""?55:num(e.target.value);saveCfg();renderDaily()};
 document.getElementById("prodTarget").oninput=e=>{cfg.prodTarget=num(e.target.value)||4000;saveCfg();renderDaily()};
 document.getElementById("tax").value=cfg.tax||"税抜";
 document.getElementById("tax").onchange=e=>{cfg.tax=e.target.value;saveCfg();
