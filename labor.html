@@ -200,6 +200,17 @@ tr.avg td{font-size:12.5px}
       <button class="btn" id="clearSales" type="button">売上を全消去</button></div>
     <div class="toolbar"><span class="note">月の食材費（全社の仕入合計・ドリンク込み・<b>税込</b>。空欄＝台帳から集計した値）</span><span id="foodInputs" style="display:flex;gap:10px;flex-wrap:wrap"></span>
       <label for="fhRate" class="note">FishHack原価率 <input id="fhRate" type="number" min="0" max="100" step="1" style="width:60px"> %</label></div>
+    <details id="ledgerBox" style="margin-bottom:8px"><summary class="note" style="cursor:pointer">📥 台帳（食材費・固定費の元データ）：取込・設定</summary>
+      <div class="toolbar" style="margin-top:6px">
+        <label class="btn" for="ledgerFile" style="display:inline-block">台帳Excelを取込（預金台帳・現金出納帳／複数可）</label>
+        <input id="ledgerFile" type="file" accept=".xlsx,.xlsm,.xls" multiple hidden>
+        <label class="note" for="cardFee">カード手数料 <input id="cardFee" type="number" min="0" max="10" step="0.01" style="width:64px"> %</label>
+        <label class="note" for="marcoFood">マルコ食材費（別口座分）¥<input id="marcoFood" type="number" min="0" step="1000" style="width:96px">/月</label>
+        <label class="note" for="marcoFixed">マルコ固定費（家賃込み）¥<input id="marcoFixed" type="number" min="0" step="1000" style="width:96px">/月</label>
+      </div>
+      <div id="ledgerList"></div>
+      <p class="note">毎月、前月分の預金台帳（と現金出納帳）を取り込んでください。同じ月を取り込み直すと置き換わります。ある月の食材費は、翌月の台帳（その月の「問屋支払」）まで取り込むと確定します。取り込んだデータはこの端末に保存されます。</p>
+    </details>
     <p class="note" id="colNote"></p>
     <div class="wrap stick" id="dailyWrap"><table id="daily"></table></div>
     <p class="note" id="profitNote"></p>
@@ -859,33 +870,172 @@ function prodPill(v){if(v==null||!isFinite(v))return "—";const t=num(cfg.prodT
 //   2) 店の食材費率 ＝（月の食材費 − その月のFishHack原価）÷ その月の本店＋マルコ売上
 //   3) その日の食材費 ＝ 店の売上 × 店の食材費率 ＋ FishHack売上 × 原価率
 // 食材費が未入力の月は、入力済みの直近の月の率を「仮」として使う。
-// 預金台帳（2025/10〜2026/9）＋マルコ現金出納帳（2026/1〜9）から集計した「仕入れた月」ごとの食材費（税込・ドリンク込み）
-// 判定：摘要の「N月問屋支払」等はN月分、月の表記がない支払（水戸中央水産・バンクカード等）は支払月の分。
-//       マルコ現金出納帳は「仕入」行（貸方）を出金日の月で計上（月数千〜1.7万円）。
-// 除外：レジロール代、返金された二重振込（修正振込有：小美玉ふるさと食品公社 6月 ¥23,436）。「1月～4月なかむら農園」は4か月に均等割。
-// 本店の小口現金（預金台帳の「現金」引出し）は主に食材費のため、引き出した月の食材費に全額含める（雑費分も含むが分けられないため）。
-// 市場の支払い：同名義（ワンテーブルデザイン）の別口座へ振り込み、そこから引き落とし。年度の差引 ¥17,290,729（水産代30万×2を含む）を
-//   振込の時期がばらつくため12か月に均等割（月 ¥1,440,894）して各月に加算。
-// マルコの食材費（別口座払い）は概算 ¥400,000/月を2025/11から加算。
-// 9月は10月の台帳（9月問屋支払）が未取込のため入れていない（判明分 ¥3,403,727＝小口 ¥120,000・市場分の月割・マルコ概算 ¥400,000 を含む）。
-// 画面で金額を入力した月は、入力値が優先される。
-const FOOD_LEDGER={"2025/10":4206305,"2025/11":6013174,"2025/12":6738088,"2026/01":4235855,"2026/02":4363226,"2026/03":4480555,
-  "2026/04":4679132,"2026/05":6109302,"2026/06":5142360,"2026/07":5000664,"2026/08":5211598};
-// 固定費（預金台帳＋マルコ現金出納帳・支払月ベース・税込）
-// 含む：水道光熱費・リース料・通信費・旅費交通費（燃料等）・雑費・消耗品費・支払手数料・手数料・管理費・賃借料・荷造運賃・広告宣伝費・交際費・福利厚生費・研修費・退職金共済掛金・マルコ現金の経費
-//       マルコの家賃 ¥88,000/月＋マルコのその他固定費 ¥200,000/月（2025/11開店から・別口座払いのため概算）
-//       クレジットカード手数料 3.24%（カード入金額÷(1−3.24%)×3.24%。非課税のため税抜換算で目減りしないよう×1.1して計上）
-//       年払い（保険料・固定資産税/自動車税/住民税均等割・修繕費・車輌費・支払報酬 計¥2,909,296）は12か月に均等割
-// 含まない：人件費（給与・賞与・社保・労働保険・預り金＝打刻から別計算）、派遣・業務委託（打刻で人件費に入るため）、
-//           消費税、借入金返済、社用車の購入代（資産）、口座間振替、小口現金の引出し（＝食材費側に計上）、立替金、返金された二重振込
-const FIXED_LEDGER={"2025/10":1737777,"2025/11":2145257,"2025/12":2382308,"2026/01":2575288,"2026/02":2241711,"2026/03":2099756,
-  "2026/04":2141179,"2026/05":2102044,"2026/06":2155107,"2026/07":2133824,"2026/08":2155568,"2026/09":2032033};
-// 台帳が未取込の月は、直近3か月の平均を仮の固定費として使う（固定費は月ごとの差が小さいため）
-function fixedProv(ym){return !num((cfg.fixed||{})[ym])&&!FIXED_LEDGER[ym]}
-function fixedOf(ym){const v=num((cfg.fixed||{})[ym]);let P=v||FIXED_LEDGER[ym];
-  if(!P){const ks=Object.keys(FIXED_LEDGER).sort().filter(k=>k<ym).slice(-3);if(!ks.length)return null;P=ks.reduce((a,k)=>a+FIXED_LEDGER[k],0)/ks.length}
+// ===== 食材費・固定費の集計ルール =====
+// 食材費（税込・ドリンク込み・「仕入れた月」）：
+//   ・預金台帳の「仕入」：摘要の「N月問屋支払」等はN月分、月の表記がない支払（水戸中央水産・バンクカード等）は支払月。「1月～4月」のような表記は均等割
+//   ・本店の小口現金（預金台帳の「現金」引出し）：主に食材費のため、引き出した月に全額
+//   ・市場の支払い（同名義＝ワンテーブルデザインの別口座へ振込→そこから引き落とし）：振込−戻りを年度内の取込済みの月で均等割
+//   ・マルコの現金出納帳の「仕入・食材費・おそのえ酒店」／マルコの別口座払いの概算（設定値・月額）
+//   ・除外：レジロール代、返金された二重振込（摘要「修正振込有」）
+//   ・ある月の食材費は、翌月の台帳（N月問屋支払）まで取り込んで確定。未確定の月は直近の確定月の食材費率で「仮」計算
+// 固定費（税込・支払月）：水道光熱費・リース料・通信費・旅費交通費・雑費・消耗品費・手数料類・管理費・賃借料・荷造運賃・広告宣伝費・交際費・福利厚生費・研修費・退職金共済掛金・地代家賃・マルコ現金の経費
+//   ・年払い（保険料・租税公課（消費税を除く）・修繕費・車輌費・支払報酬）は年度の12か月に均等割
+//   ・クレジットカード手数料（設定の料率。カード入金額÷(1−料率)×料率。非課税のため税抜換算で目減りしないよう×1.1）
+//   ・マルコの家賃・その他固定費（設定値・月額）
+//   ・含まない：人件費（打刻から別計算）、派遣・業務委託（打刻で人件費に入る）、消費税、借入金返済、車両購入、口座間振替、立替金
+// 台帳の取込：日別の表の上「台帳Excelを取込」（預金台帳・現金出納帳。同じ月を取り込み直すと置き換え）
+// ===== 台帳Excel（預金台帳・現金出納帳）→ 食材費・固定費の月別データ【追加 R8.10.24】 =====
+// 1ファイル＝1か月分の台帳。結果は { key, kind, label, food, market, fixed, annual, fee } （金額は税込のまま）
+//   food  : 仕入れた月ごとの食材費（摘要「N月問屋支払」等はN月、月表記なしは支払月。小口現金の引出しは支払月）
+//   market: 市場の支払い（同名義の別口座＝ワンテーブル宛ての振込−戻り）。表示時に年度内で均等割
+//   fixed : 固定費（支払月）
+//   annual: 年払いの固定費（保険・税・修繕・車輌・報酬）。表示時に年度の12か月へ均等割
+//   fee   : クレジットカード入金額（手数料は表示時に料率で計算）
+var LEDGER_FIXED_MONTHLY = ['リース料','水道光熱費','通信費','手数料','支払手数料','管理費','賃借料','雑費','消耗品費','旅費交通費','荷造運賃','広告宣伝費','交際費','福利厚生','福利厚生費','研修費','退職金共済掛金','地代家賃'];
+var LEDGER_FIXED_ANNUAL = ['保険料','租税公課','修繕費','車輌費','支払報酬'];
+var CASHBOOK_SKIP = ['仕入','食材費','おそのえ酒店','前期繰越','前月繰越','売上','レジプラス','レジマイナス','不明金'];
+var CASHBOOK_FOOD = ['仕入','食材費','おそのえ酒店'];
+function ledgerYm(y, m) { return y + '/' + String(m).padStart(2, '0'); }
+function ledgerFy(ym) { var y = +ym.slice(0, 4), m = +ym.slice(5, 7); return m >= 10 ? y + 1 : y; }
+function ledgerAdd(o, k, v) { if (!v) return; o[k] = (o[k] || 0) + v; }
+function ledgerNum(v) { if (typeof v === 'number') return v; var n = parseFloat(String(v == null ? '' : v).replace(/[¥,\s]/g, '')); return isNaN(n) ? 0 : n; }
+function ledgerToDate(v) {
+  // Excelの日付は環境のタイムゾーンで数分〜数時間ずれることがあるため、12時間足して日付を確定させる
+  if (v instanceof Date && !isNaN(v)) { var t = new Date(v.getTime() + 12 * 36e5); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); }
+  if (typeof v === 'number' && v > 30000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5) + new Date().getTimezoneOffset() * 6e4);
+  return null;
+}
+function parseLedgerWorkbook(wb, XLSX) {
+  var names = wb.SheetNames;
+  var dep = names.filter(function (n) { return n.indexOf('預金') !== -1; })[0];
+  if (dep) return parseDepositSheet(dep, XLSX.utils.sheet_to_json(wb.Sheets[dep], { header: 1, raw: true, defval: null }));
+  if (names.indexOf('出納帳') !== -1) return parseCashbookSheet(XLSX.utils.sheet_to_json(wb.Sheets['出納帳'], { header: 1, raw: true, defval: null }));
+  return null;
+}
+// 預金台帳（B:日付 C:出金 D:入金 E:カテゴリー F:科目 G:% H:摘要）
+function parseDepositSheet(title, aoa) {
+  var R = { key: 'dep:' + title, kind: '預金台帳', label: title, food: {}, market: {}, fixed: {}, annual: {}, fee: {} };
+  var rows = [];
+  aoa.forEach(function (r) {
+    var d = ledgerToDate(r[1]); if (!d) return;
+    rows.push({ d: d, ym: ledgerYm(d.getFullYear(), d.getMonth() + 1), o: ledgerNum(r[2]), i: ledgerNum(r[3]), cat: r[4], k: r[5] == null ? '' : String(r[5]).trim(), t: String(r[7] == null ? '' : r[7]).replace(/　/g, ' ').trim() });
+  });
+  // 返金された二重振込（摘要に「修正振込有」）：同じ科目・金額・摘要の支払が別にあれば片方だけ数える
+  var isRefundedDup = function (x) {
+    if (x.t.indexOf('修正振込有') === -1) return false;
+    var base = x.t.replace(/\s*修正振込有/, '').trim();
+    return rows.some(function (y) { return y !== x && y.k === x.k && y.o === x.o && y.t === base; });
+  };
+  rows.forEach(function (x) {
+    var isMarket = /ワン/.test(x.t) && /テ/.test(x.t) && (x.k === '振替' || x.k === '仕入');
+    if (isMarket) { ledgerAdd(R.market, x.ym, x.o - x.i); return; }
+    if (x.k === 'クレジット売上' || (!x.k && /ユウセンフインテツク/.test(x.t))) { ledgerAdd(R.fee, x.ym, x.i); return; }
+    if (!x.o) return;
+    if (isRefundedDup(x)) return;
+    if (x.k === '仕入') {
+      if (/レジロール/.test(x.t)) return;
+      var span = x.t.match(/(\d{1,2})月\s*[～~〜\-]\s*(\d{1,2})月/);
+      var y = x.d.getFullYear(), m = x.d.getMonth() + 1;
+      if (span) {
+        var a = +span[1], b = +span[2], list = [];
+        for (var mm = a; ; mm = mm % 12 + 1) { list.push(mm); if (mm === b || list.length > 12) break; }
+        list.forEach(function (lm) { ledgerAdd(R.food, ledgerYm(lm <= m ? y : y - 1, lm), x.o / list.length); });
+        return;
+      }
+      var mt = x.t.match(/(\d{1,2})月/);
+      if (mt && +mt[1] >= 1 && +mt[1] <= 12) { var lm2 = +mt[1]; ledgerAdd(R.food, ledgerYm(lm2 <= m ? y : y - 1, lm2), x.o); }
+      else ledgerAdd(R.food, x.ym, x.o);
+      return;
+    }
+    if (x.k === '現金') { ledgerAdd(R.food, x.ym, x.o); return; }   // 本店の小口現金（主に食材）
+    if (x.k === '租税公課' && /消費税/.test(x.t)) return;
+    if (LEDGER_FIXED_ANNUAL.indexOf(x.k) !== -1) { ledgerAdd(R.annual, String(ledgerFy(x.ym)), x.o); return; }
+    if (LEDGER_FIXED_MONTHLY.indexOf(x.k) !== -1) { ledgerAdd(R.fixed, x.ym, x.o); return; }
+  });
+  return R;
+}
+// 現金出納帳（A:月 C:出金月 D:日 F:科目名 G:摘要 M:貸方金額）。タイトル「2026年7月  現金出納帳」
+function parseCashbookSheet(aoa) {
+  var by = null, bm = null;
+  for (var i = 0; i < Math.min(5, aoa.length) && by == null; i++) (aoa[i] || []).forEach(function (c) {
+    var m = String(c == null ? '' : c).match(/(\d{4})年\s*(\d{1,2})月\s*現金出納帳/); if (m) { by = +m[1]; bm = +m[2]; }
+  });
+  if (by == null) return null;
+  var R = { key: 'cash:' + by + '/' + bm, kind: '現金出納帳', label: by + '年' + bm + '月 現金出納帳', food: {}, market: {}, fixed: {}, annual: {}, fee: {} };
+  aoa.forEach(function (r, idx) {
+    if (idx < 5) return;
+    var k = r[5] == null ? '' : String(r[5]).trim(), amt = ledgerNum(r[12]);
+    if (!k || !amt) return;
+    var pm = typeof r[2] === 'number' ? r[2] : bm;
+    var ym = ledgerYm(pm <= bm ? by : by - 1, pm);
+    if (CASHBOOK_FOOD.indexOf(k) !== -1) ledgerAdd(R.food, ym, amt);
+    else if (CASHBOOK_SKIP.indexOf(k) === -1) ledgerAdd(R.fixed, ym, amt);
+  });
+  return R;
+}
+
+// 2025/10〜2026/9 の台帳（預金12か月・マルコ現金出納帳9か月）を同じルールで読み込んだ結果（初期値）
+const LEDGER_BASE=[{"key":"dep:2026年9月預金","kind":"預金台帳","label":"2026年9月預金","food":{"2026/09":1561348,"2026/08":2525314},"market":{"2026/09":-550000},"fixed":{"2026/09":1364396},"annual":{},"fee":{"2026/09":3718805}},{"key":"dep:2026年4月預金","kind":"預金台帳","label":"2026年4月預金","food":{"2026/03":2041901,"2026/04":695786,"2026/01":20905,"2026/02":20905},"market":{"2026/04":800000},"fixed":{"2026/04":1434113},"annual":{"2026":82200},"fee":{"2026/04":4690385}},{"key":"dep:2025年10月預金","kind":"預金台帳","label":"2025年10月預金","food":{"2025/10":911064,"2025/09":1791067},"market":{"2025/10":2800000},"fixed":{"2025/10":1361398},"annual":{"2026":740660},"fee":{"2025/10":3636328}},{"key":"dep:2026年2月預金","kind":"預金台帳","label":"2026年2月預金","food":{"2026/01":1596665,"2026/02":683565},"market":{"2026/02":3000000},"fixed":{"2026/02":1508966},"annual":{"2026":110200},"fee":{"2026/02":5492418}},{"key":"dep:2026年5月預金","kind":"預金台帳","label":"2026年5月預金","food":{"2026/05":1647549,"2026/04":1959306},"market":{"2026/05":2800000},"fixed":{"2026/05":1399017},"annual":{"2026":51500},"fee":{"2026/05":4493464}},{"key":"dep:2026年1月預金","kind":"預金台帳","label":"2026年1月預金","food":{"2026/01":766733,"2025/12":3537857},"market":{"2026/01":1000000},"fixed":{"2026/01":1837454},"annual":{},"fee":{"2026/01":5606686}},{"key":"dep:2025年11月預金","kind":"預金台帳","label":"2025年11月預金","food":{"2025/09":3240,"2025/10":1849552,"2025/11":1237807},"market":{"2025/11":1500000},"fixed":{"2025/11":1488979},"annual":{"2026":1056611},"fee":{"2025/11":3416375}},{"key":"dep:2026年8月預金","kind":"預金台帳","label":"2026年8月預金","food":{"2026/07":2764137,"2026/08":837099},"market":{"2026/08":100000},"fixed":{"2026/08":1452201},"annual":{"2026":151217},"fee":{"2026/08":4169189}},{"key":"dep:2026年6月預金","kind":"預金台帳","label":"2026年6月預金","food":{"2026/06":749773,"2026/05":2615341,"2026/04":174215},"market":{"2026/06":500000},"fixed":{"2026/06":1489674},"annual":{"2026":30800},"fee":{"2026/06":3661935}},{"key":"dep:2026年3月預金","kind":"預金台帳","label":"2026年3月預金","food":{"2026/03":593360,"2026/02":1813907},"market":{"2026/03":2000000},"fixed":{"2026/03":1372518},"annual":{},"fee":{"2026/03":5266435}},{"key":"dep:2025年12月預金","kind":"預金台帳","label":"2025年12月預金","food":{"2025/11":2934473,"2025/10":4795,"2025/12":1342294},"market":{"2025/12":2340729},"fixed":{"2025/12":1700914},"annual":{"2026":367968},"fee":{"2025/12":4098265}},{"key":"dep:2026年7月預金","kind":"預金台帳","label":"2026年7月預金","food":{"2026/06":2546203,"2026/07":383105},"market":{"2026/07":1000000},"fixed":{"2026/07":1500981},"annual":{"2026":318140},"fee":{"2026/07":2765226}},{"key":"cash:2026/9","kind":"現金出納帳","label":"2026年9月 現金出納帳","food":{"2026/09":1485},"market":{},"fixed":{"2026/09":220},"annual":{},"fee":{}},{"key":"cash:2026/3","kind":"現金出納帳","label":"2026年3月 現金出納帳","food":{"2026/03":3286},"market":{},"fixed":{"2026/03":2816},"annual":{},"fee":{}},{"key":"cash:2026/8","kind":"現金出納帳","label":"2026年8月 現金出納帳","food":{"2026/07":1479,"2026/08":8291},"market":{},"fixed":{"2026/08":19360},"annual":{},"fee":{}},{"key":"cash:2026/5","kind":"現金出納帳","label":"2026年5月 現金出納帳","food":{"2026/05":3690},"market":{},"fixed":{"2026/05":7077},"annual":{},"fee":{}},{"key":"cash:2026/2","kind":"現金出納帳","label":"2026年2月 現金出納帳","food":{"2026/02":3955},"market":{},"fixed":{},"annual":{},"fee":{}},{"key":"cash:2026/6","kind":"現金出納帳","label":"2026年6月 現金出納帳","food":{"2026/05":1828,"2026/06":4484},"market":{},"fixed":{"2026/06":110},"annual":{},"fee":{}},{"key":"cash:2026/1","kind":"現金出納帳","label":"2026年1月 現金出納帳","food":{"2026/01":10658,"2025/12":17043},"market":{},"fixed":{"2026/01":880},"annual":{},"fee":{}},{"key":"cash:2026/4","kind":"現金出納帳","label":"2026年4月 現金出納帳","food":{"2026/04":8931,"2026/03":1114},"market":{},"fixed":{"2026/04":3862},"annual":{},"fee":{}},{"key":"cash:2026/7","kind":"現金出納帳","label":"2026年7月 現金出納帳","food":{"2026/06":1006,"2026/07":11049},"market":{},"fixed":{"2026/07":550},"annual":{},"fee":{}}];
+function ledgerAll(){const m={};LEDGER_BASE.forEach(r=>m[r.key]=r);Object.entries(cfg.ledgers||{}).forEach(([k,r])=>{m[k]=r});
+  Object.keys(cfg.ledgerOff||{}).forEach(k=>delete m[k]);return Object.values(m)}
+function ledgerDepMonths(L){return new Set(L.filter(r=>r.kind==="預金台帳").map(r=>{const m=r.label.match(/(\d{4})年(\d{1,2})月/);return m?m[1]+"/"+m[2].padStart(2,"0"):null}).filter(Boolean))}
+function ledgerFyMonths(fy){const o=[];for(let i=0;i<12;i++){const d=new Date(fy-1,9+i,1);o.push(d.getFullYear()+"/"+String(d.getMonth()+1).padStart(2,"0"))}return o}
+function ledgerNextYm(ym){const d=new Date(+ym.slice(0,4),+ym.slice(5,7),1);return d.getFullYear()+"/"+String(d.getMonth()+1).padStart(2,"0")}
+const MARCO_FROM="2025/11";
+function ledgerCalc(){
+  if(ledgerCalc._c&&ledgerCalc._v===JSON.stringify([cfg.ledgers&&Object.keys(cfg.ledgers),cfg.ledgerOff,cfg.marcoFood,cfg.marcoFixed,cfg.cardFee]))return ledgerCalc._c;
+  const L=ledgerAll(), dep=ledgerDepMonths(L), sum=(f,ym)=>L.reduce((a,r)=>a+((r[f]||{})[ym]||0),0);
+  const mf=num(cfg.marcoFood!=null?cfg.marcoFood:400000), mx=num(cfg.marcoFixed!=null?cfg.marcoFixed:288000), fr=num(cfg.cardFee!=null?cfg.cardFee:3.24)/100;
+  const food={},fixed={},foodPart={};
+  [...dep].forEach(ym=>{
+    const fy=ledgerFy(ym), ms=ledgerFyMonths(fy).filter(m=>dep.has(m));
+    const mk=ms.reduce((a,m)=>a+sum("market",m),0)/(ms.length||1);
+    const an=L.reduce((a,r)=>a+((r.annual||{})[String(fy)]||0),0)/12;
+    const marco=ym>=MARCO_FROM;
+    const fv=sum("food",ym)+mk+(marco?mf:0);
+    if(dep.has(ledgerNextYm(ym)))food[ym]=fv; else foodPart[ym]=fv;   // 翌月の台帳（N月問屋支払）まで揃って確定
+    fixed[ym]=sum("fixed",ym)+an+sum("fee",ym)*fr/(1-fr)*1.1+(marco?mx:0);
+  });
+  ledgerCalc._v=JSON.stringify([cfg.ledgers&&Object.keys(cfg.ledgers),cfg.ledgerOff,cfg.marcoFood,cfg.marcoFixed,cfg.cardFee]);
+  return ledgerCalc._c={food,fixed,foodPart,dep,L};
+}
+// 台帳が未取込の月の固定費は、直近3か月の平均で「仮」
+function fixedProv(ym){return !num((cfg.fixed||{})[ym])&&ledgerCalc().fixed[ym]==null}
+function fixedOf(ym){const v=num((cfg.fixed||{})[ym]);const F=ledgerCalc().fixed;let P=v||F[ym];
+  if(!P){const ks=Object.keys(F).sort().filter(k=>k<ym).slice(-3);if(!ks.length)return null;P=ks.reduce((a,k)=>a+F[k],0)/ks.length}
   return (cfg.tax||"税抜")==="税抜"?P/1.1:P}
-function foodOf(ym){const v=num((cfg.food||{})[ym]);return v?{P:v,src:"入力"}:FOOD_LEDGER[ym]?{P:FOOD_LEDGER[ym],src:"台帳"}:null}
+function foodLedgerVal(ym){return ledgerCalc().food[ym]}
+function foodOf(ym){const v=num((cfg.food||{})[ym]);const F=ledgerCalc().food;return v?{P:v,src:"入力"}:F[ym]?{P:F[ym],src:"台帳"}:null}
+// ── 台帳Excelの取込（SheetJSは使うときだけ読み込む） ──
+function loadXLSX(){return window.XLSX?Promise.resolve(window.XLSX):new Promise((ok,ng)=>{const s=document.createElement("script");
+  s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";s.onload=()=>ok(window.XLSX);s.onerror=()=>ng(new Error("Excel読込ライブラリを取得できませんでした"));document.head.appendChild(s)})}
+async function importLedgerFiles(files){
+  const msg=[];let XL;
+  try{XL=await loadXLSX()}catch(e){toast(e.message,"c");return}
+  cfg.ledgers=cfg.ledgers||{};cfg.ledgerOff=cfg.ledgerOff||{};
+  for(const f of files){
+    try{const buf=await f.arrayBuffer();const wb=XL.read(buf,{type:"array",cellDates:true});const r=parseLedgerWorkbook(wb,XL);
+      if(!r){msg.push(`${f.name}：預金台帳・現金出納帳として読めませんでした`);continue}
+      ["food","market","fixed","annual","fee"].forEach(k=>Object.keys(r[k]).forEach(kk=>r[k][kk]=Math.round(r[k][kk])));
+      cfg.ledgers[r.key]=r;delete cfg.ledgerOff[r.key];
+      const tf=Object.values(r.food).reduce((a,b)=>a+b,0),tx=Object.values(r.fixed).reduce((a,b)=>a+b,0)+Object.values(r.annual).reduce((a,b)=>a+b,0);
+      msg.push(`${r.label}：仕入 ${yen(tf)}／固定費 ${yen(tx)}`);
+    }catch(e){msg.push(`${f.name}：読込エラー（${e.message}）`)}
+  }
+  ledgerCalc._c=null;saveCfg();renderLedgerList();renderDaily();toast("台帳を取り込みました　"+msg.join("　"),"ok");
+}
+function renderLedgerList(){
+  const el=document.getElementById("ledgerList");if(!el)return;
+  const C=ledgerCalc(),L=C.L.slice().sort((a,b)=>a.key<b.key?-1:1);
+  const dep=[...C.dep].sort();
+  const lastDep=dep[dep.length-1];
+  el.innerHTML=`<div class="note" style="margin:4px 0">預金台帳 ${dep.length}か月（${dep[0]||"—"}〜${lastDep||"—"}）・現金出納帳 ${L.filter(r=>r.kind==="現金出納帳").length}か月。`+
+    (lastDep?`食材費の確定は ${Object.keys(C.food).sort().pop()||"—"} まで（${lastDep}分は翌月の台帳で確定）。`:"")+`</div>`+
+    `<div style="display:flex;flex-wrap:wrap;gap:6px">`+L.map(r=>`<span class="chip s" style="display:inline-flex;gap:4px;align-items:center">${r.label}${(cfg.ledgers||{})[r.key]?"":" <span class=\"note\">初期</span>"}<button type="button" data-k="${r.key}" title="この台帳を集計から外す" style="border:none;background:none;cursor:pointer;color:var(--crit);padding:0 2px">×</button></span>`).join("")+`</div>`+
+    (Object.keys(cfg.ledgerOff||{}).length?`<div class="note" style="margin-top:4px">外した台帳：${Object.keys(cfg.ledgerOff).join("、")} <button class="btn sm" type="button" id="ledgerRestore">元に戻す</button></div>`:"");
+  el.querySelectorAll("button[data-k]").forEach(b=>b.onclick=()=>{const k=b.dataset.k;if(!confirm(k+" を集計から外しますか？"))return;cfg.ledgerOff=cfg.ledgerOff||{};cfg.ledgerOff[k]=1;if(cfg.ledgers)delete cfg.ledgers[k];ledgerCalc._c=null;saveCfg();renderLedgerList();renderDaily()});
+  const rs=document.getElementById("ledgerRestore");if(rs)rs.onclick=()=>{cfg.ledgerOff={};ledgerCalc._c=null;saveCfg();renderLedgerList();renderDaily()};
+}
 function foodRateOf(ym){
   const fo=foodOf(ym); if(!fo)return null; const P=fo.P;
   const net=(cfg.tax||"税抜")==="税抜";
@@ -904,12 +1054,12 @@ function renderProfit(res,shown,todayOpen){
   // 入力欄（表示期間にかかる暦月ぶん）
   const box=document.getElementById("foodInputs");
   if(box&&!box.contains(document.activeElement)){
-    box.innerHTML=yms.map(ym=>`<label class="note">${+ym.slice(5)}月 ¥<input data-ym="${ym}" type="number" min="0" step="1" style="width:110px" value="${cfg.food[ym]||""}" placeholder="${FOOD_LEDGER[ym]?"台帳 "+FOOD_LEDGER[ym]:"未入力"}"></label>`).join("");
+    box.innerHTML=yms.map(ym=>`<label class="note">${+ym.slice(5)}月 ¥<input data-ym="${ym}" type="number" min="0" step="1" style="width:110px" value="${cfg.food[ym]||""}" placeholder="${foodLedgerVal(ym)?"台帳 "+Math.round(foodLedgerVal(ym)):"未確定"}"></label>`).join("");
     box.querySelectorAll("input").forEach(inp=>inp.onchange=()=>{const v=num(inp.value);if(v)cfg.food[inp.dataset.ym]=v;else delete cfg.food[inp.dataset.ym];saveCfg();renderDaily()});
   }
   const fhr=document.getElementById("fhRate"); if(fhr&&document.activeElement!==fhr)fhr.value=cfg.fhRate!=null?cfg.fhRate:70;
   // 月ごとの率（未入力の月は直近の入力済みの月で仮置き）
-  const known=[...new Set(Object.keys(cfg.food).filter(k=>num(cfg.food[k])).concat(Object.keys(FOOD_LEDGER)))].sort();
+  const known=[...new Set(Object.keys(cfg.food).filter(k=>num(cfg.food[k])).concat(Object.keys(ledgerCalc().food)))].sort();
   const rateFor=ym=>{const r=foodRateOf(ym);if(r)return {...r,prov:false};
     // 直近の（売上もそろっている）入力済みの月を前からさかのぼって探す
     const cand=known.filter(k=>k<ym).reverse().concat(known.filter(k=>k>ym));
@@ -1128,6 +1278,10 @@ document.getElementById("csvIn").onchange=e=>{[...e.target.files].forEach(f=>rea
 STORES.forEach(s=>{document.getElementById("sales-"+s).onchange=e=>{const f=e.target.files[0];if(!f)return;readFile(f,t=>salesUpload(t,s));e.target.value=""}});
 document.getElementById("target").value=cfg.target||30;
 document.getElementById("prodTarget").value=cfg.prodTarget||4000;
+document.getElementById("ledgerFile").onchange=e=>{const fs=[...e.target.files];e.target.value="";if(fs.length)importLedgerFiles(fs)};
+[["cardFee",3.24],["marcoFood",400000],["marcoFixed",288000]].forEach(([id,def])=>{const el=document.getElementById(id);el.value=cfg[id]!=null?cfg[id]:def;
+  el.onchange=()=>{cfg[id]=el.value===""?def:num(el.value);ledgerCalc._c=null;saveCfg();renderDaily()}});
+document.getElementById("ledgerBox").addEventListener("toggle",renderLedgerList);
 document.getElementById("fhRate").oninput=e=>{cfg.fhRate=e.target.value===""?70:num(e.target.value);saveCfg();renderDaily()};
 document.getElementById("prodTarget").oninput=e=>{cfg.prodTarget=num(e.target.value)||4000;saveCfg();renderDaily()};
 document.getElementById("tax").value=cfg.tax||"税抜";
