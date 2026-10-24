@@ -106,7 +106,33 @@ body.annual-mode #app,body.annual-mode #empty{display:none!important}
 .pnav.dark button{color:var(--ink);border-color:var(--line)}
 .bar .bf{background:var(--fish)}
 #anTable .bar{width:80px}
-#anTable th,#anTable td{padding:8px 7px}
+/* 年間まとめ：画面幅いっぱい・コンパクト表示・見出し行と月の列を固定 */
+.annual{max-width:min(1680px,100%)}
+#anWrap{max-height:calc(100vh - 120px);overflow:auto}
+#anTable th,#anTable td{padding:6px 6px;font-size:13px}
+#anTable th{font-size:11.5px;line-height:1.25}
+#anTable .yoy,#anTable td .note,#anTable .chip{font-size:10.5px}
+#anTable thead{position:sticky;top:0;z-index:3}
+#anTable thead th{position:static;background:var(--panel)}
+#anTable td:first-child,#anTable thead tr:first-child th:first-child{position:sticky;left:0;z-index:1;background:var(--panel);box-shadow:1px 0 0 var(--line)}
+#anTable thead tr:first-child th:first-child{z-index:4}
+#anTable tr.tot td{position:sticky;bottom:0;z-index:1;background:var(--panel);box-shadow:0 -1px 0 var(--ink)}
+#anTable tr.tot td:first-child{z-index:2}
+#anTable tr.closed td:first-child{background:var(--panel)}
+/* 日別の表：見出し行・日付の列・計の行を固定 */
+main{max-width:min(1680px,100%)}
+.stick{max-height:calc(100vh - 120px);overflow:auto}
+.stick>table th,.stick>table td{padding:6px 7px;font-size:13px}
+.stick>table th{font-size:11.5px}
+.stick>table,#anTable{border-collapse:separate;border-spacing:0}
+.stick>table thead{position:sticky;top:0;z-index:3}
+.stick>table thead th{position:static;background:var(--panel)}
+.stick>table>tbody>tr>td:first-child,.stick>table thead tr:first-child th:first-child{position:sticky;left:0;z-index:1;background:var(--panel);box-shadow:1px 0 0 var(--line)}
+.stick>table thead tr:first-child th:first-child{z-index:4}
+.stick>table>tbody>tr.tot>td{position:sticky;bottom:0;z-index:1;background:var(--panel)}
+.stick>table>tbody>tr.tot>td:first-child{z-index:2}
+.stick>table>tbody>tr.det>td:first-child{position:static}
+tr.avg td{font-size:12.5px}
 .yoy{font-size:11px;font-weight:700;line-height:1.2}
 .yoy.up{color:var(--ok)} .yoy.down{color:var(--crit)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -142,8 +168,8 @@ body.annual-mode #app,body.annual-mode #empty{display:none!important}
     <span class="pnav dark"><button type="button" id="anPrev" aria-label="前の年度">‹</button><h2 id="anTitle"></h2><button type="button" id="anNext" aria-label="次の年度">›</button></span></div>
   <div class="sum" id="anTiles"></div>
   <p class="note" id="anStatus"></p>
-  <div class="wrap"><table id="anTable"></table></div>
-  <div class="legend" style="margin-top:8px"><span style="--c:var(--honten)">本店</span><span style="--c:var(--marco)">マルコ</span><span style="--c:var(--fish)">FishHack</span><span style="--c:var(--line)">棒＝売上</span></div>
+  <div class="wrap" id="anWrap"><table id="anTable"></table></div>
+  <div class="legend" style="margin-top:8px"><span style="--c:var(--honten)">本店</span><span style="--c:var(--marco)">マルコ</span><span style="--c:var(--fish)">FishHack</span></div>
 </section>
 <main id="app" hidden>
   <section>
@@ -163,13 +189,6 @@ body.annual-mode #app,body.annual-mode #empty{display:none!important}
     <div class="wrap"><table id="prodTable"></table></div>
     <p class="note" id="prodNote"></p>
   </section>
-  <section>
-    <h2>日別利益（売上 − 人件費 − 食材費）</h2>
-    <div class="toolbar"><span class="note">月の食材費（全社の仕入合計・ドリンク込み・<b>税込</b>）</span><span id="foodInputs" style="display:flex;gap:10px;flex-wrap:wrap"></span>
-      <label for="fhRate" class="note">FishHack原価率 <input id="fhRate" type="number" min="0" max="100" step="1" style="width:60px"> %</label></div>
-    <div class="wrap"><table id="profitTable"></table></div>
-    <p class="note" id="profitNote"></p>
-  </section>
   <section class="alerts" id="alerts"></section>
 
   <section>
@@ -179,8 +198,11 @@ body.annual-mode #app,body.annual-mode #empty{display:none!important}
       <span class="legend"><span style="--c:var(--ok)">目標以内</span><span style="--c:var(--warn)">+5pt以内</span><span style="--c:var(--crit)">超過</span></span>
       <label for="tax" class="note">売上の基準 <select id="tax" style="width:auto"><option>税抜</option><option>税込</option></select></label>
       <button class="btn" id="clearSales" type="button">売上を全消去</button></div>
+    <div class="toolbar"><span class="note">月の食材費（全社の仕入合計・ドリンク込み・<b>税込</b>。空欄＝台帳から集計した値）</span><span id="foodInputs" style="display:flex;gap:10px;flex-wrap:wrap"></span>
+      <label for="fhRate" class="note">FishHack原価率 <input id="fhRate" type="number" min="0" max="100" step="1" style="width:60px"> %</label></div>
     <p class="note" id="colNote"></p>
-    <div class="wrap"><table id="daily"></table></div>
+    <div class="wrap stick" id="dailyWrap"><table id="daily"></table></div>
+    <p class="note" id="profitNote"></p>
   </section>
 
   <section class="grid2">
@@ -486,7 +508,7 @@ function renderAnnual(fy,months,M,fhOk,labNote){
   const yoy=(c,p)=>p>0&&c>0?`<div class="yoy ${c>=p?"up":"down"}">昨対 ${(c/p*100).toFixed(1)}%</div>`:"";
   const P={本店:0,マルコ:0,fh:0,cmpCur:0,cmpPrev:0,hc:0,mc:0,fc:0};
   const maxS=Math.max(1,...months.map(k=>M[k].本店.s+M[k].マルコ.s+M[k].fh));
-  let h=`<thead><tr><th class="l" rowspan="2">月</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th class="grp gf">FishHack</th><th colspan="3" class="grp">全社</th><th colspan="5" class="grp">利益（全社）</th><th class="l" rowspan="2"></th><th rowspan="2">人件費<br>の日数</th></tr>
+  let h=`<thead><tr><th class="l" rowspan="2">月</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th class="grp gf">FishHack</th><th colspan="3" class="grp">全社</th><th colspan="5" class="grp">利益（全社）</th><th rowspan="2">人件費<br>の日数</th></tr>
   <tr><th>売上</th><th>人件費</th><th>率</th><th>売上</th><th>人件費</th><th>率</th><th class="rt">売上</th><th>売上</th><th>人件費</th><th class="rt">率</th><th>食材費</th><th>FL比率</th><th>利益<div class="note">固定費前</div></th><th>固定費</th><th class="rt">営業利益</th></tr></thead><tbody>`;
   // 食材費（月の仕入合計・税込→売上の基準に合わせて換算）。利益＝全社売上−人件費−食材費（固定費は含まない）
   const foodYen=k=>{const fo=typeof foodOf==="function"?foodOf(k):null;if(!fo)return null;return (cfg.tax||"税抜")==="税抜"?fo.P/1.08:fo.P};
@@ -515,15 +537,16 @@ function renderAnnual(fy,months,M,fhOk,labNote){
         const op=allS-allC-f-(fx||0);
         const part=n&&n<dim?' <span class="chip w" title="人件費が月の一部の日だけのため、利益が多めに出ています">人件費一部</span>':"";
         return `<td>${yen(f)}${fo&&fo.src==="台帳"?'':' <span class="chip s">入力</span>'}<div class="note">${(f/allS*100).toFixed(1)}%</div></td><td>${flp(allC,f,allS)}</td><td>${pf(allS-allC-f)}<div class="note">${((allS-allC-f)/allS*100).toFixed(1)}%</div></td><td>${fx==null?"—":yen(fx)}</td><td class="rt">${pf(op)}<div class="note">${(op/allS*100).toFixed(1)}%</div>${part}</td>`})()}
-      <td class="l"><div class="bar"><i class="bh" style="width:${hs.s/maxS*100}%"></i><i class="bm" style="width:${ms.s/maxS*100}%"></i><i class="bf" style="width:${m.fh/maxS*100}%"></i></div></td>
       <td>${n?(n<dim?`<span class="chip w">${n}/${dim}日</span>`:`${n}日`):'<span class="note">打刻なし</span>'}</td></tr>`;
   });
   const tS=T.本店.s+T.マルコ.s+T.fh,tC=T.本店.c+T.マルコ.c,tSL=T.本店.sl+T.マルコ.sl+T.fhl,tCM=T.本店.cm+T.マルコ.cm;
   h+=`<tr class="tot"><td class="l">年間計</td><td class="sl">${y(T.本店.s)}${yoy(P.hc,P.本店)}</td><td>${y(T.本店.c)}</td><td class="rt">${fr(pct(T.本店.cm,T.本店.sl))}</td>
     <td class="sl">${y(T.マルコ.s)}${yoy(P.mc,P.マルコ)}</td><td>${y(T.マルコ.c)}</td><td class="rt">${fr(pct(T.マルコ.cm,T.マルコ.sl))}</td>
     <td class="sl rt">${y(T.fh)}${yoy(P.fc,P.fh)}</td><td class="sl">${y(tS)}${yoy(P.cmpCur,P.cmpPrev)}</td><td><b>${y(tC)}</b></td><td class="rt">${fr(pct(tCM,tSL))}</td>
-    ${FT.n?`<td>${yen(FT.f)}<div class="note">${(FT.f/FT.s*100).toFixed(1)}%</div></td><td>${flp(FT.c,FT.f,FT.s)}</td><td>${pf(FT.s-FT.c-FT.f)}<div class="note">${((FT.s-FT.c-FT.f)/FT.s*100).toFixed(1)}%</div></td><td>${yen(FT.x)}</td><td class="rt">${pf(FT.s-FT.c-FT.f-FT.x)}<div class="note">${((FT.s-FT.c-FT.f-FT.x)/FT.s*100).toFixed(1)}%・${FT.n}か月</div></td>`:`<td>—</td><td>—</td><td>—</td><td>—</td><td class="rt">—</td>`}<td></td><td>${T.lab}日</td></tr></tbody>`;
-  document.getElementById("anTable").innerHTML=h;
+    ${FT.n?`<td>${yen(FT.f)}<div class="note">${(FT.f/FT.s*100).toFixed(1)}%</div></td><td>${flp(FT.c,FT.f,FT.s)}</td><td>${pf(FT.s-FT.c-FT.f)}<div class="note">${((FT.s-FT.c-FT.f)/FT.s*100).toFixed(1)}%</div></td><td>${yen(FT.x)}</td><td class="rt">${pf(FT.s-FT.c-FT.f-FT.x)}<div class="note">${((FT.s-FT.c-FT.f-FT.x)/FT.s*100).toFixed(1)}%・${FT.n}か月</div></td>`:`<td>—</td><td>—</td><td>—</td><td>—</td><td class="rt">—</td>`}<td>${T.lab}日</td></tr></tbody>`;
+  const anT=document.getElementById("anTable");anT.innerHTML=h;
+  // 2段目の見出しを1段目の高さぶん下にずらして固定
+  requestAnimationFrame(()=>{const r1=anT.querySelector("thead tr");if(r1)anT.style.setProperty("--anH1",r1.getBoundingClientRect().height+"px")});
   const labMonths=months.filter(k=>M[k].lab.size).map(k=>+k.slice(5)+"月");
   document.getElementById("anTiles").innerHTML=`
     <div class="tile"><div class="lb">全社 売上（${cfg.tax||"税抜"}）</div><div class="v">${yen(tS)}</div><div class="d">本店 ${yen(T.本店.s)} ／ マルコ ${yen(T.マルコ.s)} ／ FishHack ${yen(T.fh)}</div>${P.cmpPrev>0?`<div class="d">昨対 <b class="rtv">${(P.cmpCur/P.cmpPrev*100).toFixed(1)}%</b>（前年と比べられる月・事業で計算）</div>`:`<div class="d">昨対：前年の売上データなし</div>`}</div>
@@ -743,9 +766,15 @@ function renderDaily(){
   const sc=cfg.salesCol||{};document.getElementById("colNote").textContent="売上："+STORES.map(st=>`${st}＝${sc[st]||"未取込"}`).join("　")+(fbSalesStatus?"　｜ "+fbSalesStatus:"");
   document.getElementById("alerts").innerHTML=al.concat(issues).map(a=>`<div class="al ${a.lv}">${a.t}</div>`).join("");
   document.getElementById("sumNote").textContent=`月給者は営業日ごとに一定額を計上（休みの日も含む）。人件費率＝期間の人件費合計÷売上合計（売上0円の営業日も含む。休業日はカレンダーで定休に）。`;
-  let h=`<thead><tr><th class="l" rowspan="2">日付</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th class="grp gf">FishHack</th><th colspan="3" class="grp">全社</th><th rowspan="2">実働h</th></tr>
-    <tr><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>売上</th><th>率</th><th class="rt">売上</th><th>人件費</th><th>売上</th><th>率</th></tr></thead><tbody>`;
+  let h=`<thead><tr><th class="l" rowspan="2">日付</th><th colspan="3" class="grp gh">本店</th><th colspan="3" class="grp gm">マルコ</th><th class="grp gf">FishHack</th><th colspan="3" class="grp">全社</th><th colspan="4" class="grp">利益（全社）</th><th rowspan="2">実働h</th></tr>
+    <tr><th>人件費</th><th>売上</th><th>率</th><th>人件費</th><th>売上</th><th>率</th><th class="rt">売上</th><th>人件費</th><th>売上</th><th class="rt">率</th><th>食材費</th><th>固定費</th><th>営業利益</th><th class="rt">利益率</th></tr></thead><tbody>`;
   const sumS={本店:0,マルコ:0};
+  // 食材費＝店の売上×その月の食材費率＋FishHack売上×原価率／固定費＝月の固定費÷暦日数／営業利益＝売上−人件費−食材費−固定費
+  const PC=window.PCTX||{RM:{},fr:0.7,fxDay:()=>null};
+  const PT={F:0,X:0,O:0,S:0,n:0}, PG={平:{S:0,L:0,F:0,X:0,n:0},休:{S:0,L:0,F:0,X:0,n:0}};
+  const ov=v=>v==null?"—":`<b style="color:${v>=0?"var(--ok)":"var(--crit)"}">${v<0?"−":""}${yen(Math.abs(v))}</b>`;
+  const orc=(o,s)=>o==null||!(s>0)?"—":`<span class="pill ${o>=0?"ok":"c"}">${(o/s*100).toFixed(1)}%</span>`;
+  const todayK=dstr(new Date()), inProg=issuesToday(issues);
   shown.forEach(d=>{
     const b=res[d].本店, m=res[d].マルコ, t=b.cost+m.cost, dw=DOW[new Date(d).getDay()];
     const sb=salesOf(d,"本店"), sm=salesOf(d,"マルコ"), sf=fhSales(d), st=(sb||0)+(sm||0)+sf;
@@ -759,8 +788,14 @@ function renderDaily(){
       <td>${m.cost?yen(m.cost):"—"}</td><td class="sl">${sm!=null?yen(sm):"—"}${yoyTag(sm,pm)}${fbEst.has(d)?'<span class="chip s" title="年間売上CSVの当月累計−同じ月のほかの日の売上。日報一覧CSVを取り込むと確定値になります">推定</span>':""}</td>${ratioCell(m.cost,sm)}
       <td class="sl rt">${sf?yen(sf):"—"}</td>
       <td><b>${t?yen(t):"—"}</b></td><td class="sl">${st?yen(st):"—"}${yoyTag(rc,rp)}</td>${ratioCell(t,st>0?st:null)}
+      ${(()=>{const R=PC.RM[d.slice(0,7)], F=R?((sb||0)+(sm||0))*R.rate+sf*PC.fr:null, X=PC.fxDay(d);
+        const live=inProg&&d===todayK;  // 勤務中の今日は人件費が未確定のため利益は出さない
+        const O=F==null||X==null||live?null:st-t-F-X;
+        if(O!=null){PT.F+=F;PT.X+=X;PT.O+=O;PT.S+=st;PT.n++;if(!cl){const g=PG[dayKind(d)==="平"?"平":"休"];g.S+=st;g.L+=t;g.F+=F;g.X+=X;g.n++}}
+        const pv=(R&&R.prov)||fixedProv(d.slice(0,7));
+        return `<td>${F==null?"—":yen(F)}${pv?'<span class="chip w" title="食材費または固定費が未確定の月のため仮の率で計算">仮</span>':""}</td><td>${X==null?"—":yen(X)}</td><td>${live?'<span class="note">勤務中</span>':ov(O)}</td><td class="rt">${orc(O,st)}</td>`})()}
       <td>${(b.h+m.h).toFixed(1)}</td></tr>`;
-    if(openOpen.has(d)) h+=`<tr class="det"><td colspan="12"><div class="det-in">
+    if(openOpen.has(d)) h+=`<tr class="det"><td colspan="16"><div class="det-in">
       <div class="sin"><label for="sb-${d}">本店 売上<input id="sb-${d}" data-d="${d}" data-s="本店" type="number" min="0" step="1" value="${sb??""}"></label>
       <label for="sm-${d}">マルコ 売上<input id="sm-${d}" data-d="${d}" data-s="マルコ" type="number" min="0" step="1" value="${sm??""}"></label></div>
       ${detail(res[d])}</div></td></tr>`;
@@ -768,9 +803,12 @@ function renderDaily(){
   h+=`<tr class="tot"><td class="l">計</td><td>${yen(tot.本店)}</td><td class="sl">${sumS.本店?yen(sumS.本店):"—"}</td><td class="rt">${ratioTxt(rs.本店.c,rs.本店.s)}</td>
     <td>${yen(tot.マルコ)}</td><td class="sl">${sumS.マルコ?yen(sumS.マルコ):"—"}</td><td class="rt">${ratioTxt(rs.マルコ.c,rs.マルコ.s)}</td>
     <td class="sl rt">${fhTot?yen(fhTot):"—"}</td>
-    <td>${yen(all)}</td><td class="sl">${allS?yen(allS):"—"}</td><td class="rt">${ratioTxt(allC,allS)}</td><td>${(hrs.本店+hrs.マルコ).toFixed(1)}</td></tr>`;
+    <td>${yen(all)}</td><td class="sl">${allS?yen(allS):"—"}</td><td class="rt">${ratioTxt(allC,allS)}</td>
+    <td>${PT.n?yen(PT.F):"—"}</td><td>${PT.n?yen(PT.X):"—"}</td><td>${PT.n?ov(PT.O):"—"}</td><td class="rt">${PT.n?orc(PT.O,PT.S):"—"}</td><td>${(hrs.本店+hrs.マルコ).toFixed(1)}</td></tr>`;
+  [["平","平日 1日平均"],["休","土日祝 1日平均"]].forEach(([k,lb])=>{const g=PG[k];if(!g.n)return;const O=g.S-g.L-g.F-g.X;
+    h+=`<tr class="subrow avg"><td class="l">${lb}</td><td colspan="7"></td><td></td><td>${yen(g.L/g.n)}</td><td class="sl">${yen(g.S/g.n)}</td><td class="rt">${ratioTxt(g.L,g.S)}</td><td>${yen(g.F/g.n)}</td><td>${yen(g.X/g.n)}</td><td>${ov(O/g.n)}</td><td class="rt">${orc(O,g.S)}</td><td></td></tr>`});
   if(after.length){
-    h+=`<tr class="sep"><td class="l" colspan="12">打刻CSV未取込の日（売上のみ・人件費率は計算しません）</td></tr>`;
+    h+=`<tr class="sep"><td class="l" colspan="16">打刻CSV未取込の日（売上のみ・人件費率は計算しません）</td></tr>`;
     after.forEach(d=>{
       const dw=DOW[new Date(d).getDay()], hol=HOLIDAYS[d];
       const sb=salesOf(d,"本店"), sm=salesOf(d,"マルコ"), sf=fhSales(d), st=(sb||0)+(sm||0)+sf;
@@ -778,11 +816,12 @@ function renderDaily(){
         <td>—</td><td class="sl">${sb!=null?yen(sb):"—"}</td><td class="rt">—</td>
         <td>—</td><td class="sl">${sm!=null?yen(sm):"—"}</td><td class="rt">—</td>
         <td class="sl rt">${sf?yen(sf):"—"}</td>
-        <td>—</td><td class="sl">${st?yen(st):"—"}</td><td class="rt">—</td><td>—</td></tr>`;
+        <td>—</td><td class="sl">${st?yen(st):"—"}</td><td class="rt">—</td><td>—</td><td>—</td><td>—</td><td class="rt">—</td><td>—</td></tr>`;
     });
   }
   h+=`</tbody>`;
   const tb=document.getElementById("daily"); tb.innerHTML=h;
+  requestAnimationFrame(()=>{const r1=tb.querySelector("thead tr");if(r1)tb.style.setProperty("--h1",r1.getBoundingClientRect().height+"px")});
   tb.querySelectorAll("tr.day").forEach(tr=>tr.onclick=()=>{const d=tr.dataset.d;openOpen.has(d)?openOpen.delete(d):openOpen.add(d);renderDaily()});
   tb.querySelectorAll(".sin input").forEach(inp=>{inp.onclick=e=>e.stopPropagation();inp.onchange=e=>{
     const d=inp.dataset.d,s=inp.dataset.s;cfg.sales=cfg.sales||{};cfg.sales[d]=cfg.sales[d]||{};cfg.sales[d][s]=inp.value===""?null:num(inp.value);saveCfg();renderDaily()}});
@@ -853,7 +892,7 @@ function foodRateOf(ym){
   return {rate:(pIn-fhCost)/R, P:pIn, fhCost, fhS, R, n, fhOk:!!fm, src:fo.src};
 }
 function renderProfit(res,shown,todayOpen){
-  const el=document.getElementById("profitTable"); if(!el)return;
+  const el=document.getElementById("profitTable");
   cfg.food=cfg.food||{};
   const fr=num(cfg.fhRate!=null?cfg.fhRate:70)/100;
   const yms=[...new Set(dates.map(d=>d.slice(0,7)))];
@@ -881,6 +920,8 @@ function renderProfit(res,shown,todayOpen){
   const pv=v=>v==null?"—":`<b style="color:${v>=0?"var(--ok)":"var(--crit)"}">${v<0?"−":""}${yen(Math.abs(v))}</b>`;
   const fxDay=d=>{const ym=d.slice(0,7);const v=fixedOf(ym);if(v==null)return null;const[yy,mm]=ym.split("/").map(Number);return v/new Date(yy,mm,0).getDate()};
   rowsP.forEach(x=>{x.X=fxDay(x.d);x.O=x.P==null||x.X==null?null:x.P-x.X});
+  // 日別の表で使うため、月の率と日割り関数を渡す
+  window.PCTX={RM,fr,fxDay};
   let h=`<thead><tr><th class="l">日付</th><th>売上（全社）</th><th>人件費</th><th>食材費</th><th>利益<div class="note">固定費前</div></th><th>利益率</th><th>固定費<div class="note">日割</div></th><th class="rt">営業利益</th></tr></thead><tbody>`;
   rowsP.forEach(x=>{const dw=DOW[new Date(x.d).getDay()],hol=HOLIDAYS[x.d];
     h+=`<tr${x.closed?' class="closed"':""}><td class="l">${x.d.slice(5)} <span class="dow-${hol?"日":dw}">${dw}</span>${x.prov?'<span class="chip w" title="この月の食材費が未入力のため、入力済みの月の率で仮計算">仮</span>':""}</td>
@@ -891,7 +932,7 @@ function renderProfit(res,shown,todayOpen){
   if(ok.length){const S=sum(ok,"S"),L=sum(ok,"L"),F=sum(ok,"F"),P=S-L-F,X=sum(ok,"X");
     h+=`<tr class="tot"><td class="l">計（${ok.length}日）</td><td class="sl">${yen(S)}</td><td>${yen(L)}</td><td>${yen(F)}</td><td>${pv(P)}</td><td>${pc(P,S)}</td><td>${yen(X)}</td><td class="rt">${pv(P-X)}</td></tr>`;
     h+=grp("平日 1日平均",ok.filter(x=>dayKind(x.d)==="平"&&!x.closed))+grp("土日祝 1日平均",ok.filter(x=>dayKind(x.d)!=="平"&&!x.closed));}
-  el.innerHTML=h+"</tbody>";
+  if(el)el.innerHTML=h+"</tbody>";
   const notes=yms.map(ym=>{const r=RM[ym];const mm=+ym.slice(5)+"月";
     if(!r)return `${mm}：食材費が未入力（入力すると計算します）`;
     if(r.prov)return `${mm}：未入力のため ${+r.from.slice(5)}月の率（店の食材費率 ${(r.rate*100).toFixed(1)}%）で仮計算`;
