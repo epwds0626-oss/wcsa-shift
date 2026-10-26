@@ -421,13 +421,8 @@ nav{display:flex;gap:2px}
       </div>
     </div>
 
-    <div class="ch-section" id="prep-section" style="display:none">
-      <div class="ch-section-title">🔪 仕込み目安</div>
-      <div class="ch-card" id="prep-card"><div id="prep-body"></div></div>
-    </div>
-
     <div class="ch-section">
-      <div class="ch-section-title">🔴 MONTHLY BIG CHALLENGE</div>
+      <div class="ch-section-title">🔴 売上 ｜ MONTHLY BIG CHALLENGE</div>
       <div class="ch-card" id="ch-big-card">
         <div class="ch-glow" id="ch-big-glow" style="background:var(--accent)"></div>
         <div class="ch-top">
@@ -482,32 +477,8 @@ nav{display:flex;gap:2px}
       </div>
     </div>
 
-    <div class="ch-section" id="ch-drink-section" style="display:none">
-      <div class="ch-section-title">🥤 DRINK</div>
-      <div class="ch-card">
-        <div class="ch-top">
-          <div>
-            <div class="ch-card-label">ドリンク出数率</div>
-            <div class="ch-card-title">ドリンクは客単価の一杯目</div>
-          </div>
-          <div style="text-align:right">
-            <div id="ch-drink-rate" style="font-size:30px;font-weight:800;color:var(--accent)">—%</div>
-            <div style="font-size:10px;color:var(--text2)">出数率</div>
-          </div>
-        </div>
-        <div id="ch-drink-sub" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
-        <div style="height:8px;border-radius:4px;background:#e3e7ee;margin-top:8px;overflow:hidden">
-          <div id="ch-drink-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#3b6fb5,#2b8a5e);border-radius:4px"></div>
-        </div>
-        <div id="ch-drink-mix" style="margin-top:12px"></div>
-        <div style="margin-top:12px;font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1px">上位5アイテム</div>
-        <div id="ch-drink-top5" style="margin-top:6px"></div>
-        <div id="ch-drink-insights" style="margin-top:10px"></div>
-      </div>
-    </div>
-
     <div class="ch-section">
-      <div class="ch-section-title">🟡 MONTHLY MISSION</div>
+      <div class="ch-section-title">🟡 デザート ｜ MONTHLY MISSION</div>
       <div class="ch-card" id="ch-mission-card">
         <div class="ch-glow" style="background:var(--accent2)"></div>
         <div class="ch-top">
@@ -552,7 +523,7 @@ nav{display:flex;gap:2px}
     </div>
 
     <div class="ch-section">
-      <div class="ch-section-title">🟢 SPOT CHALLENGE</div>
+      <div class="ch-section-title">🟢 客単価 ｜ SPOT CHALLENGE</div>
       <div class="ch-card" id="ch-spot-card">
         <div class="ch-glow" style="background:var(--accent3)"></div>
         <div class="ch-top">
@@ -589,6 +560,35 @@ nav{display:flex;gap:2px}
           <div><div class="ch-update-label" id="ch-spot-base-label">比較基準（前年同月）</div><input class="ch-inp" type="number" id="ch-spot-inp-base" placeholder="例: 1050"></div>
           <button class="btn btn-y" onclick="saveChallengeData('spot')">保存</button>
         </div>
+      </div>
+    </div>
+
+    <div class="ch-section" id="prep-section" style="display:none">
+      <div class="ch-section-title">🔪 明日の仕込み予想</div>
+      <div class="ch-card" id="prep-card"><div id="prep-body"></div></div>
+    </div>
+
+    <div class="ch-section" id="ch-drink-section" style="display:none">
+      <div class="ch-section-title">🥤 DRINK</div>
+      <div class="ch-card">
+        <div class="ch-top">
+          <div>
+            <div class="ch-card-label">ドリンク出数率</div>
+            <div class="ch-card-title">ドリンクは客単価の一杯目</div>
+          </div>
+          <div style="text-align:right">
+            <div id="ch-drink-rate" style="font-size:30px;font-weight:800;color:var(--accent)">—%</div>
+            <div style="font-size:10px;color:var(--text2)">出数率</div>
+          </div>
+        </div>
+        <div id="ch-drink-sub" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
+        <div style="height:8px;border-radius:4px;background:#e3e7ee;margin-top:8px;overflow:hidden">
+          <div id="ch-drink-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#3b6fb5,#2b8a5e);border-radius:4px"></div>
+        </div>
+        <div id="ch-drink-mix" style="margin-top:12px"></div>
+        <div style="margin-top:12px;font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1px">上位5アイテム</div>
+        <div id="ch-drink-top5" style="margin-top:6px"></div>
+        <div id="ch-drink-insights" style="margin-top:10px"></div>
       </div>
     </div>
   </div>
@@ -3862,7 +3862,7 @@ function prepDraw() {
     return;
   }
   var now = new Date();
-  var target = _prepState.target || (now.getHours() < 15 ? 'today' : 'tomorrow');
+  var target = _prepState.target || 'tomorrow';   // 既定は明日（今日ボタンで切替可）
   var base = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (target === 'tomorrow' ? 1 : 0));
   // 曜日ごとの営業日（データのある日）
   var byWd = [[],[],[],[],[],[],[]];
