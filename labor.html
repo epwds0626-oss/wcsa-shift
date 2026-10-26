@@ -93,6 +93,24 @@ tr.sep td{background:var(--bg);color:var(--sub);font-size:12px;font-weight:700;p
 .emptyb{max-width:640px;margin:40px auto;padding-inline:16px}
 #homeBtn{background:transparent;color:#f3efe3;border-color:rgba(255,255,255,.3);padding:6px 10px}
 .tile.f .v{color:var(--fish)} th.gf{color:var(--fish)}
+/* 一番上の要約：全社の5指標＋売上の内訳バー＋店別 */
+#sum{display:grid;gap:10px;grid-template-columns:1fr}
+.khead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--sub)} .khead b{color:var(--ink);font-size:15px}
+.kpi{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.kpi{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi .ks-o{grid-column:1/-1}}
+.kc{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;border-top:4px solid var(--line);min-width:0}
+.kc .kl{font-size:12.5px;color:var(--sub);font-weight:700;letter-spacing:.06em}
+.kc .kv{font-family:var(--display);font-weight:900;font-size:clamp(20px,2.2vw,28px);font-variant-numeric:tabular-nums;line-height:1.3;white-space:nowrap}
+.kc .ks{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums;line-height:1.6}
+.kc .ks b{color:var(--ink)}
+.kc.ks-s{border-top-color:var(--ink)} .kc.ks-l{border-top-color:var(--honten)} .kc.ks-f{border-top-color:var(--marco)} .kc.ks-x{border-top-color:var(--sub)}
+.kc.ks-o{border-top-color:var(--ok);background:color-mix(in srgb,var(--ok) 7%,var(--panel))} .kc.ks-o .kv{color:var(--ok)}
+.kc.ks-o.neg{border-top-color:var(--crit);background:color-mix(in srgb,var(--crit) 7%,var(--panel))} .kc.ks-o.neg .kv{color:var(--crit)}
+.kbar{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--line)}
+.kbar i{display:flex;align-items:center;justify-content:center;min-width:0;overflow:hidden;font-style:normal}
+.kbar i span{font-size:11px;color:#fff;font-weight:700;white-space:nowrap;padding:0 4px}
+.ktbl table td,.ktbl table th{padding:6px 10px;font-size:13px}
+b.gh{color:var(--honten)} b.gm{color:var(--marco)} b.gf{color:var(--fish)}
 .btn.sm{font-size:12px;padding:3px 10px;margin-top:6px}
 .pnav{display:inline-flex;align-items:center;gap:6px;margin-right:8px}
 .pnav button{font:inherit;background:transparent;color:#f3efe3;border:1px solid rgba(255,255,255,.35);border-radius:6px;width:28px;height:26px;cursor:pointer}
@@ -178,20 +196,6 @@ tr.avg td{font-size:12.5px}
     <p class="note"><span id="tcStatus"></span> <button class="btn sm" id="tcReload" type="button">打刻を再取得</button></p>
   </section>
   <section>
-    <h2>曜日区分の平均</h2>
-    <div class="wrap"><table id="dayType"></table></div>
-    <p class="note" id="dtNote"></p>
-  </section>
-  <section>
-    <h2>人時売上高（売上 ÷ 実働時間）</h2>
-    <div class="toolbar"><span class="note">スタッフ1人が1時間で稼いだ売上。高いほど少ない人数で回せている</span>
-      <label for="prodTarget" class="note">目標 ¥<input id="prodTarget" type="number" min="500" step="100" style="width:80px"> ／h</label></div>
-    <div class="wrap"><table id="prodTable"></table></div>
-    <p class="note" id="prodNote"></p>
-  </section>
-  <section class="alerts" id="alerts"></section>
-
-  <section>
     <h2>日別</h2>
     <div class="toolbar"><span class="note">行をタップ → 人別の内訳と売上の手入力</span>
       <label for="target" class="note">目標人件費率 <input id="target" type="number" min="1" max="100" step="0.5" style="width:70px"> %</label>
@@ -215,6 +219,20 @@ tr.avg td{font-size:12.5px}
     <div class="wrap stick" id="dailyWrap"><table id="daily"></table></div>
     <p class="note" id="profitNote"></p>
   </section>
+  <section>
+    <h2>曜日区分の平均</h2>
+    <div class="wrap"><table id="dayType"></table></div>
+    <p class="note" id="dtNote"></p>
+  </section>
+  <section>
+    <h2>人時売上高（売上 ÷ 実働時間）</h2>
+    <div class="toolbar"><span class="note">スタッフ1人が1時間で稼いだ売上。高いほど少ない人数で回せている</span>
+      <label for="prodTarget" class="note">目標 ¥<input id="prodTarget" type="number" min="500" step="100" style="width:80px"> ／h</label></div>
+    <div class="wrap"><table id="prodTable"></table></div>
+    <p class="note" id="prodNote"></p>
+  </section>
+  <section class="alerts" id="alerts"></section>
+
 
   <section class="grid2">
     <div class="panel" style="grid-column:1/-1">
@@ -756,15 +774,40 @@ function renderDaily(){
   shown.forEach(d=>{STORES.forEach(s=>{const v=salesOf(d,s);if(v!=null&&res[d][s].h>0){ph[s].s+=v;ph[s].h+=res[d][s].h}});
     const hb=res[d].本店.h+res[d].マルコ.h, sv=(salesOf(d,"本店")||0)+(salesOf(d,"マルコ")||0)+fhSales(d); if(hb>0&&sv>0){ph.全社.s+=sv;ph.全社.h+=hb}});
   const pl=k=>ph[k].h>0?`<div class="d">人時売上高 <b class="rtv">${prodPill(ph[k].s/ph[k].h)}</b></div>`:"";
+  // ── 一番上：全社の 売上・人件費・食材費・固定費・営業利益（日別の表と同じ計算） ──
+  renderProfit(res,shown,issuesToday(issues));
+  const PCk=window.PCTX||{RM:{},fr:0.55,fxDay:()=>null}, tdK=dstr(new Date()), inPg=issuesToday(issues);
+  const K={S:0,L:0,F:0,X:0,n:0,prov:false,miss:0};
+  shown.forEach(d=>{if(inPg&&d===tdK)return;
+    const sb=salesOf(d,"本店")||0, sm=salesOf(d,"マルコ")||0, sf=fhSales(d), R=PCk.RM[d.slice(0,7)], X=PCk.fxDay(d);
+    if(!R||X==null){K.miss++;return}
+    K.S+=sb+sm+sf;K.L+=res[d].本店.cost+res[d].マルコ.cost;K.F+=(sb+sm)*R.rate+sf*PCk.fr;K.X+=X;K.n++;
+    if(R.prov||fixedProv(d.slice(0,7)))K.prov=true});
+  const K_O=K.S-K.L-K.F-K.X, kp=v=>K.S>0?(v/K.S*100).toFixed(1)+"%":"—";
+  const tgt=num(cfg.target||30), lr=K.S>0?K.L/K.S*100:null;
+  const lastUse=shown.filter(d=>!(inPg&&d===tdK)).pop()||lastPunch;
+  const card=(cls,lb,v,sub,extra)=>`<div class="kc ${cls}"><div class="kl">${lb}</div><div class="kv">${v}</div><div class="ks">${sub}</div>${extra||""}</div>`;
+  const seg=(v,c,lb)=>K.S>0&&v>0?`<i style="flex:${v} 0 0;background:${c}" title="${lb} ${yen(v)}（${kp(v)}）"><span>${lb} ${kp(v)}</span></i>`:"";
+  const yC=yy.本店.c+yy.マルコ.c, yP=yy.本店.p+yy.マルコ.p;
+  const storeRow=(nm,cls,s,c,phk,yk,extra)=>`<tr><td class="l"><b class="${cls}">${nm}</b></td><td>${s!=null?yen(s):"—"}</td><td>${c!=null?yen(c):"—"}</td><td>${c!=null&&s>0?ratioCell(c,s).replace(/^<td class="rt">|<\/td>$/g,""):"—"}</td><td>${phk&&ph[phk].h>0?prodPill(ph[phk].s/ph[phk].h):"—"}</td><td>${yk&&yy[yk].p>0?(yy[yk].c/yy[yk].p*100).toFixed(1)+"%":"—"}</td><td class="l note">${extra||""}</td></tr>`;
   document.getElementById("sum").innerHTML=`
-    <div class="tile"><div class="lb">全社（${shown[0].slice(5)}〜${lastPunch.slice(5)}）</div><div class="v">${yen(all)}</div><div class="d">実働 ${(hrs.本店+hrs.マルコ).toFixed(1)}h</div>${rl(allC,allS,both.length)}${pl("全社")}${yAll}</div>
-    <div class="tile h"><div class="lb">本店</div><div class="v">${yen(tot.本店)}</div><div class="d">営業日平均 ${yen(tot.本店/Math.max(1,openN.本店))} ／ ${openN.本店}日</div>${rl(rs.本店.c,rs.本店.s,rs.本店.n)}${pl("本店")}${yl("本店")}</div>
-    <div class="tile m"><div class="lb">マルコ</div><div class="v">${yen(tot.マルコ)}</div><div class="d">営業日平均 ${yen(tot.マルコ/Math.max(1,openN.マルコ))} ／ ${openN.マルコ}日</div>${rl(rs.マルコ.c,rs.マルコ.s,rs.マルコ.n)}${pl("マルコ")}${yl("マルコ")}</div>
-    <div class="tile f"><div class="lb">FishHack 売上（${cfg.tax||"税抜"}）</div><div class="v">${yen(fhTot)}</div><div class="d">納品 ${fhN}件 ／ 人件費は本店に含む</div>${after.length&&after.some(d=>fhSales(d)>0)?`<div class="d">${after[0].slice(5)}〜の納品 ${yen(after.reduce((a,d)=>a+fhSales(d),0))}は打刻取込後に集計へ反映</div>`:""}<div class="d" id="fhStatus"></div><button class="btn sm" id="fhReload" type="button">再取得</button></div>`;
+    <div class="khead"><b>全社</b> ${shown[0].slice(5)}〜${lastUse.slice(5)}（${K.n}日${K.miss?`・食材費/固定費が出せない ${K.miss}日を除く`:""}）${K.prov?'<span class="chip w" title="食材費または固定費が未確定の月を含むため仮の率で計算">仮を含む</span>':""}${yP>0?`<span class="note">売上昨対 <b>${(yC/yP*100).toFixed(1)}%</b>（前年のある店のみ）</span>`:""}</div>
+    <div class="kpi">
+      ${card("ks-s","売上",yen(K.S),`本店 ${yen(rs.本店.s)}／マルコ ${yen(rs.マルコ.s)}／FishHack ${yen(fhTot)}`)}
+      ${card("ks-l","人件費",yen(K.L),`売上比 <b>${kp(K.L)}</b>　${lr==null?"":`<span class="pill ${lr<=tgt?"ok":lr<=tgt+5?"w":"c"}">${lr<=tgt?"目標内":"目標超過"}（${tgt}%）</span>`}`)}
+      ${card("ks-f","食材費",yen(K.F),`売上比 <b>${kp(K.F)}</b>　FL比率 <b>${kp(K.L+K.F)}</b>`)}
+      ${card("ks-x","固定費",yen(K.X),`売上比 <b>${kp(K.X)}</b>　月の固定費を日割り`)}
+      ${card("ks-o"+(K_O<0?" neg":""),"営業利益",(K_O<0?"−":"")+yen(Math.abs(K_O)),`利益率 <b>${kp(K_O)}</b>　1日平均 ${K.n?(K_O<0?"−":"")+yen(Math.abs(K_O/K.n)):"—"}`)}
+    </div>
+    ${K.S>0?`<div class="kbar">${seg(K.L,"var(--honten)","人件費")}${seg(K.F,"var(--marco)","食材費")}${seg(K.X,"var(--sub)","固定費")}${seg(Math.max(0,K_O),"var(--ok)","営業利益")}</div>${K_O<0?`<div class="note" style="color:var(--crit)">費用が売上を ${yen(-K_O)} 上回っています</div>`:""}`:""}
+    <div class="wrap ktbl"><table><thead><tr><th class="l">店</th><th>売上</th><th>人件費</th><th>人件費率</th><th>人時売上高</th><th>売上昨対</th><th class="l"></th></tr></thead><tbody>
+      ${storeRow("本店","gh",rs.本店.n?rs.本店.s:null,rs.本店.c,"本店","本店",`営業日 ${openN.本店}日・人件費の1日平均 ${yen(tot.本店/Math.max(1,openN.本店))}`)}
+      ${storeRow("マルコ","gm",rs.マルコ.n?rs.マルコ.s:null,rs.マルコ.c,"マルコ","マルコ",`営業日 ${openN.マルコ}日・人件費の1日平均 ${yen(tot.マルコ/Math.max(1,openN.マルコ))}`)}
+      <tr><td class="l"><b class="gf">FishHack</b></td><td>${yen(fhTot)}</td><td class="note">本店に含む</td><td>—</td><td>—</td><td>—</td><td class="l note">納品 ${fhN}件　<span id="fhStatus"></span> <button class="btn sm" id="fhReload" type="button">再取得</button>${after.length&&after.some(d=>fhSales(d)>0)?`<br>${after[0].slice(5)}〜の納品 ${yen(after.reduce((a,d)=>a+fhSales(d),0))}は打刻取込後に反映`:""}</td></tr>
+    </tbody></table></div>`;
   renderFhStatus(); document.getElementById("fhReload").onclick=loadFishHack;
   renderDayType(res,shown,issuesToday(issues));
   renderProd(res,shown,issuesToday(issues));
-  renderProfit(res,shown,issuesToday(issues));
   const missingM=people.filter(p=>cfg.staff[p.name].type==="月給"&&cfg.staff[p.name].include!==false&&!num(cfg.staff[p.name].rate)).map(p=>p.name);
   const notM=people.filter(p=>cfg.staff[p.name].notInMaster).map(p=>p.name);
   const prov=people.filter(p=>cfg.staff[p.name].prov).length;
@@ -817,7 +860,7 @@ function renderDaily(){
     <td>${yen(all)}</td><td class="sl">${allS?yen(allS):"—"}</td><td class="rt">${ratioTxt(allC,allS)}</td>
     <td>${PT.n?yen(PT.F):"—"}</td><td>${PT.n?yen(PT.X):"—"}</td><td>${PT.n?ov(PT.O):"—"}</td><td class="rt">${PT.n?orc(PT.O,PT.S):"—"}</td><td>${(hrs.本店+hrs.マルコ).toFixed(1)}</td></tr>`;
   [["平","平日 1日平均"],["休","土日祝 1日平均"]].forEach(([k,lb])=>{const g=PG[k];if(!g.n)return;const O=g.S-g.L-g.F-g.X;
-    h+=`<tr class="subrow avg"><td class="l">${lb}</td><td colspan="7"></td><td></td><td>${yen(g.L/g.n)}</td><td class="sl">${yen(g.S/g.n)}</td><td class="rt">${ratioTxt(g.L,g.S)}</td><td>${yen(g.F/g.n)}</td><td>${yen(g.X/g.n)}</td><td>${ov(O/g.n)}</td><td class="rt">${orc(O,g.S)}</td><td></td></tr>`});
+    h+=`<tr class="subrow avg"><td class="l">${lb}</td><td colspan="7"></td><td>${yen(g.L/g.n)}</td><td class="sl">${yen(g.S/g.n)}</td><td class="rt">${ratioTxt(g.L,g.S)}</td><td>${yen(g.F/g.n)}</td><td>${yen(g.X/g.n)}</td><td>${ov(O/g.n)}</td><td class="rt">${orc(O,g.S)}</td><td></td></tr>`});
   if(after.length){
     h+=`<tr class="sep"><td class="l" colspan="16">打刻CSV未取込の日（売上のみ・人件費率は計算しません）</td></tr>`;
     after.forEach(d=>{
