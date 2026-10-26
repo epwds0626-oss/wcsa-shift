@@ -271,6 +271,11 @@ nav{display:flex;gap:2px}
   <div id="home-greet" style="animation:hgreet-in 0.6s ease forwards;margin-bottom:28px;text-align:center;">
     <div id="home-greet-text" style="font-size:20px;font-weight:700;color:#1a1a2e;margin-bottom:6px;"></div>
     <div id="home-date-text" style="font-size:13px;color:#555577;"></div>
+    <div id="home-quote" style="margin:16px auto 0;max-width:420px;padding:12px 16px;border-top:1px solid #e2e2ec;border-bottom:1px solid #e2e2ec;">
+      <div style="font-size:10px;letter-spacing:3px;color:#9a9ab0;margin-bottom:6px;">今日の言葉</div>
+      <div id="home-quote-text" style="font-size:14.5px;line-height:1.75;color:#1a1a2e;font-weight:600;"></div>
+      <div id="home-quote-by" style="font-size:11.5px;color:#6a6a88;margin-top:6px;"></div>
+    </div>
   </div>
   <!-- 4カード -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;">
@@ -450,25 +455,6 @@ nav{display:flex;gap:2px}
         <div class="ch-bar-wrap"><div class="ch-bar" id="ch-big-bar" style="width:0%;background:var(--accent)"></div></div>
         <div class="ch-remain" id="ch-big-remain">目標まで <strong>¥—</strong></div>
         <div class="ch-lastupdate" id="ch-big-lastupdate"></div>
-        <details id="ch-big-weekday-wrap" open style="display:none;margin-top:8px">
-          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 曜日別 人気メニュー TOP5（デザート以外）</summary>
-          <div id="ch-big-weekday" style="margin-top:6px;overflow-x:auto"></div>
-        </details>
-        <details id="ch-fooddaily-wrap" open style="display:none;margin-top:8px">
-          <summary style="cursor:pointer;font-size:11px;color:var(--accent2);user-select:none;font-weight:700">📅 料理別 出数（日別・曜日平均）</summary>
-          <div id="ch-fooddaily" style="margin-top:6px;overflow-x:auto"></div>
-        </details>
-        <details id="ch-limited-wrap" open style="display:none;margin-top:8px">
-          <summary style="cursor:pointer;font-size:11px;color:var(--accent3);user-select:none;font-weight:700">🍱 数量限定 出数の推移（曜日別）</summary>
-          <div id="ch-limited-weekday" style="margin-top:6px;overflow-x:auto"></div>
-          <div class="ch-update-row" id="ch-limited-edit" style="display:none">
-            <div style="flex:1;min-width:220px">
-              <div class="ch-update-label">対象商品（1行に1つ・部分一致で集計）</div>
-              <textarea class="ch-inp" id="ch-limited-inp" rows="3" placeholder="恵比寿御膳&#10;吉祥膳" style="width:100%;resize:vertical;font-size:13px;line-height:1.5"></textarea>
-            </div>
-            <button class="btn btn-y" onclick="saveLimitedItems()">保存して再集計</button>
-          </div>
-        </details>
         <div class="ch-update-row" id="ch-big-edit" style="display:none">
           <div><div class="ch-update-label">今月実績（税込）</div><input class="ch-inp" type="number" id="ch-big-inp-current" placeholder="例: 2500000"></div>
           <div><div class="ch-update-label" id="ch-big-base-label">比較基準（前年同月）</div><input class="ch-inp" type="number" id="ch-big-inp-base" placeholder="例: 2200000"></div>
@@ -506,14 +492,6 @@ nav{display:flex;gap:2px}
         <div class="ch-bar-wrap"><div class="ch-bar" id="ch-mission-bar" style="width:0%;background:var(--accent2)"></div></div>
         <div class="ch-remain" id="ch-mission-remain">目標 <strong>30%</strong> まで <strong id="ch-mission-gap">—%</strong></div>
         <div class="ch-lastupdate" id="ch-mission-lastupdate"></div>
-        <details id="ch-mission-items-wrap" open style="display:none;margin-top:8px">
-          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 品目別内訳を見る</summary>
-          <div id="ch-mission-items" style="margin-top:6px"></div>
-        </details>
-        <details id="ch-mission-weekday-wrap" open style="display:none;margin-top:6px">
-          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 曜日別内訳（仕込み用）</summary>
-          <div id="ch-mission-weekday" style="margin-top:6px;overflow-x:auto"></div>
-        </details>
         <div class="ch-update-row" id="ch-mission-edit" style="display:none">
           <div><div class="ch-update-label">デザート注文数（今月）</div><input class="ch-inp" type="number" id="ch-mission-inp-dessert" placeholder="例: 180"></div>
           <div><div class="ch-update-label">総客数（今月）</div><input class="ch-inp" type="number" id="ch-mission-inp-total" placeholder="例: 520"></div>
@@ -551,10 +529,6 @@ nav{display:flex;gap:2px}
         <div class="ch-bar-wrap"><div class="ch-bar" id="ch-spot-bar" style="width:0%;background:var(--accent3)"></div></div>
         <div class="ch-remain" id="ch-spot-remain"></div>
         <div class="ch-lastupdate" id="ch-spot-lastupdate"></div>
-        <details id="ch-spot-high-wrap" open style="display:none;margin-top:8px">
-          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 高単価アイテムの出数（提案の狙いどころ）</summary>
-          <div id="ch-spot-high" style="margin-top:6px"></div>
-        </details>
         <div class="ch-update-row" id="ch-spot-edit" style="display:none">
           <div><div class="ch-update-label">今月平均客単価（税込）</div><input class="ch-inp" type="number" id="ch-spot-inp-current" placeholder="例: 1150"></div>
           <div><div class="ch-update-label" id="ch-spot-base-label">比較基準（前年同月）</div><input class="ch-inp" type="number" id="ch-spot-inp-base" placeholder="例: 1050"></div>
@@ -566,6 +540,57 @@ nav{display:flex;gap:2px}
     <div class="ch-section" id="prep-section" style="display:none">
       <div class="ch-section-title">🔪 明日の仕込み予想</div>
       <div class="ch-card" id="prep-card"><div id="prep-body"></div></div>
+    </div>
+
+    <!-- ===== 内訳（サマリー3枚と仕込み予想の下） ===== -->
+
+    <div class="ch-section ch-detail-sec" id="ch-big-detail" style="display:none">
+      <div class="ch-section-title">🔴 売上の内訳</div>
+      <div class="ch-card">
+        <details id="ch-big-weekday-wrap" open style="display:none;margin-top:0">
+          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 曜日別 人気メニュー TOP5（デザート以外）</summary>
+          <div id="ch-big-weekday" style="margin-top:6px;overflow-x:auto"></div>
+        </details>
+        <details id="ch-fooddaily-wrap" open style="display:none;margin-top:8px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--accent2);user-select:none;font-weight:700">📅 料理別 出数（日別・曜日平均）</summary>
+          <div id="ch-fooddaily" style="margin-top:6px;overflow-x:auto"></div>
+        </details>
+        <details id="ch-limited-wrap" open style="display:none;margin-top:8px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--accent3);user-select:none;font-weight:700">🍱 数量限定 出数の推移（曜日別）</summary>
+          <div id="ch-limited-weekday" style="margin-top:6px;overflow-x:auto"></div>
+          <div class="ch-update-row" id="ch-limited-edit" style="display:none">
+            <div style="flex:1;min-width:220px">
+              <div class="ch-update-label">対象商品（1行に1つ・部分一致で集計）</div>
+              <textarea class="ch-inp" id="ch-limited-inp" rows="3" placeholder="恵比寿御膳&#10;吉祥膳" style="width:100%;resize:vertical;font-size:13px;line-height:1.5"></textarea>
+            </div>
+            <button class="btn btn-y" onclick="saveLimitedItems()">保存して再集計</button>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="ch-section ch-detail-sec" id="ch-mission-detail" style="display:none">
+      <div class="ch-section-title">🟡 デザートの内訳</div>
+      <div class="ch-card">
+        <details id="ch-mission-items-wrap" open style="display:none;margin-top:0">
+          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 品目別内訳を見る</summary>
+          <div id="ch-mission-items" style="margin-top:6px"></div>
+        </details>
+        <details id="ch-mission-weekday-wrap" open style="display:none;margin-top:6px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 曜日別内訳（仕込み用）</summary>
+          <div id="ch-mission-weekday" style="margin-top:6px;overflow-x:auto"></div>
+        </details>
+      </div>
+    </div>
+
+    <div class="ch-section ch-detail-sec" id="ch-spot-detail" style="display:none">
+      <div class="ch-section-title">🟢 客単価の内訳</div>
+      <div class="ch-card">
+        <details id="ch-spot-high-wrap" open style="display:none;margin-top:0">
+          <summary style="cursor:pointer;font-size:11px;color:var(--text2);user-select:none">▼ 高単価アイテムの出数（提案の狙いどころ）</summary>
+          <div id="ch-spot-high" style="margin-top:6px"></div>
+        </details>
+      </div>
     </div>
 
     <div class="ch-section" id="ch-drink-section" style="display:none">
@@ -3828,6 +3853,25 @@ function renderFoodDaily() {
   el.innerHTML = h;
 }
 
+
+// ===== 内訳セクション：中の表が1つも出ていなければ枠ごと隠す =====
+(function(){
+  var ids=['ch-big-detail','ch-mission-detail','ch-spot-detail'];
+  function upd(){
+    ids.forEach(function(id){
+      var sec=document.getElementById(id); if(!sec) return;
+      var any=[].some.call(sec.querySelectorAll(':scope > .ch-card > details'),function(d){return d.style.display!=='none';});
+      sec.style.display=any?'block':'none';
+    });
+  }
+  var mo=new MutationObserver(upd);
+  ids.forEach(function(id){
+    var sec=document.getElementById(id); if(!sec) return;
+    sec.querySelectorAll(':scope > .ch-card > details').forEach(function(d){mo.observe(d,{attributes:true,attributeFilter:['style']});});
+  });
+  upd();
+})();
+
 // ===== 仕込み目安【追加 R8.10.17】 =====
 // 直近8週（food_daily_hist）の「同じ曜日」の出数から、料理ごとの仕込み目安を出す。
 // 目安＝80%タイル（8日分なら多い方から2番目）。平均だと2回に1回は足りなくなるため。
@@ -5779,6 +5823,13 @@ function showHomeScreen() {
   var d = new Date();
   var dow = ['日','月','火','水','木','金','土'];
   document.getElementById('home-greet-text').textContent = greet;
+  // 今日の言葉（日替わり：日付で決まるので全員同じ言葉が出る）
+  var HQ = [["失敗したところでやめてしまうから失敗になる。成功するところまで続ければ、それは成功になる。", "松下幸之助"], ["雨が降れば傘をさす。当たり前のことを当たり前にやる。", "松下幸之助"], ["好況よし、不況さらによし。", "松下幸之助"], ["企業は社会の公器である。", "松下幸之助"], ["人生・仕事の結果＝考え方×熱意×能力", "稲盛和夫"], ["値決めは経営である。", "稲盛和夫"], ["売上を最大に、経費を最小に。", "稲盛和夫"], ["楽観的に構想し、悲観的に計画し、楽観的に実行する。", "稲盛和夫"], ["チャレンジして失敗を恐れるよりも、何もしないことを恐れろ。", "本田宗一郎"], ["得手に帆あげて。", "本田宗一郎"], ["障子を開けてみよ、外は広いぞ。", "豊田佐吉"], ["積小為大 ― 小を積んで大と為す。", "二宮尊徳"], ["遠きをはかる者は富み、近くをはかる者は貧す。", "二宮尊徳"], ["売り手よし、買い手よし、世間よし。", "近江商人「三方よし」"], ["為せば成る、為さねば成らぬ何事も。成らぬは人の為さぬなりけり。", "上杉鷹山"], ["やってみせ、言って聞かせて、させてみせ、ほめてやらねば、人は動かじ。", "山本五十六"], ["初心忘るべからず。", "世阿弥『花鏡』"], ["秘すれば花なり。", "世阿弥『風姿花伝』"], ["千日の稽古を鍛とし、万日の稽古を錬とす。", "宮本武蔵『五輪書』"], ["我、事において後悔せず。", "宮本武蔵『独行道』"], ["稽古とは一より習い十を知り、十よりかえるもとのその一。", "千利休（利休道歌）"], ["夏は涼しく、冬暖かに。", "千利休（利休七則）"], ["一期一会 ― この一席は二度とない。", "茶の湯の心得"], ["喜心・老心・大心 ― 喜んで、親のように、大らかに作る。", "道元『典座教訓』"], ["他は是れ吾にあらず。更に何れの時をか待たん。", "道元『典座教訓』"], ["あやまちは、やすき所になりて、必ず仕る事に候ふ。", "吉田兼好『徒然草』"], ["己の欲せざる所は人に施すこと勿れ。", "孔子『論語』"], ["過ちて改めざる、是を過ちと謂う。", "孔子『論語』"], ["之を知る者は之を好む者に如かず。之を好む者は之を楽しむ者に如かず。", "孔子『論語』"], ["速やかならんと欲すれば則ち達せず。", "孔子『論語』"], ["三人行えば、必ず我が師あり。", "孔子『論語』"], ["君子は義に喩り、小人は利に喩る。", "孔子『論語』"], ["天の時は地の利に如かず、地の利は人の和に如かず。", "孟子"], ["至誠にして動かざる者は、未だ之れ有らざるなり。", "孟子"], ["千里の行も足下に始まる。", "老子"], ["彼を知り己を知れば、百戦殆うからず。", "孫子"], ["木を買わず、山を買え。", "法隆寺宮大工の口伝"], ["段取り八分、仕事二分。", "職人の言葉"], ["企業の目的として有効な定義は一つしかない。顧客の創造である。", "P.F.ドラッカー"], ["成果をあげる者は、仕事からスタートしない。時間からスタートする。", "P.F.ドラッカー『経営者の条件』"], ["Stay hungry, stay foolish.", "スティーブ・ジョブズ"], ["先を見て点をつなぐことはできない。振り返ってつなぐことしかできない。", "スティーブ・ジョブズ"]];
+  var dayNo = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+  var hq = HQ[((dayNo * 7) % HQ.length + HQ.length) % HQ.length];
+  var qt = document.getElementById('home-quote-text'), qb = document.getElementById('home-quote-by');
+  if (qt) qt.textContent = '「' + hq[0] + '」';
+  if (qb) qb.textContent = '― ' + hq[1];
   document.getElementById('home-date-text').textContent = d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日（' + dow[d.getDay()] + '）';
   // メタ情報更新
   updateHomeCardMeta();
