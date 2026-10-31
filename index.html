@@ -2615,7 +2615,7 @@ var chMonthOffset = 0; // 0=今月, -1=先月, -2=2ヶ月前
 
 function getMonthKey(offset) {
   var now = new Date();
-  var d = new Date(now.getFullYear(), now.getMonth() + (offset || chMonthOffset), 1);
+  var d = new Date(now.getFullYear(), now.getMonth() + (offset !== undefined ? offset : chMonthOffset), 1);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 }
 
@@ -2666,9 +2666,9 @@ function renderChallenge(fixedShopKey) {
     nextBtn.style.opacity = isCurrentMonth ? '0.3' : '1';
     nextBtn.style.pointerEvents = isCurrentMonth ? 'none' : 'auto';
   }
-  // 過去月は CSV更新ボタンを非表示
+  // 【変更 R8.11.1】過去の月でもCSV取込できる（月替わり後に前月分を取り込み忘れたとき用）。表示中の月のチャレンジに反映される
   var csvBtn = document.getElementById('ch-csv-import-btn');
-  if (csvBtn) csvBtn.style.display = (adminUnlocked && isCurrentMonth) ? 'block' : 'none';
+  if (csvBtn) csvBtn.style.display = adminUnlocked ? 'block' : 'none';
 
   // 本店は前年比、マルコは前月比
   var isEnya = shopKey === 'enya';
@@ -4065,7 +4065,7 @@ function handleCsvImport(event) {
             }
             // 今月1日の累計CSV（1日〜1日）は通常の差分取込（初回スナップショット）として扱う
             var nowD1 = new Date();
-            var thisMonth1 = nowD1.getFullYear() + '-' + String(nowD1.getMonth() + 1).padStart(2, '0') + '-01';
+            var thisMonth1 = getMonthKey() + '-01';   // 表示中の月の1日
             if (oneDay === thisMonth1) oneDay = null;
             if (shopKey === 'marco' && oneDay) {
               (results.marcoOneDayFiles = results.marcoOneDayFiles || []).push({ date: oneDay, rows: rows2 });
@@ -4255,12 +4255,24 @@ function marcoCustOf(header, row) {
 function processCsvResults(results, shopKey) {
   var isMarco = shopKey === 'marco';
   var dailySaved = saveDailySales(results);
-  // 過去の月のCSVは日別売上の保存だけ行い、今月のチャレンジ数値は更新しない
-  var nowYm = (function(){ var d = new Date(); return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0'); })();
+  // 【変更 R8.11.1】基準は「表示中の月」。表示中の月より古いCSVは日別売上の保存だけ、新しいCSVは取込を止めて月の切替を促す
+  var nowYm = getMonthKey().replace('-', '');
+  var tgtLabel = (+nowYm.slice(4)) + '月';
+  var newerMsg = function(kind, ym){ alert(kind + 'が' + (+ym.slice(4)) + '月分です。表示中は' + tgtLabel + 'のチャレンジです。\n上の「›」で' + (+ym.slice(4)) + '月に切り替えてから取り込んでください。'); };
+  if (chMonthOffset !== 0 && !confirm('【' + nowYm.slice(0,4) + '年' + tgtLabel + '】のチャレンジとして取り込みます。\n（前月分の取り込み忘れ用。今月分は「›」で今月に戻してから取り込んでください）')) { showToast('取込を中止しました'); return; }
   // ファイル内でいちばん新しい日付の年月（本店の売上実績は9/21〜10/31のように月をまたぐため最新日で判定）
   var firstYm = function(rows, re){ var best = null; for (var i = 0; i < rows.length; i++) { var m = String(rows[i][0] || '').match(re); if (m) { var k = m[1] + m[2].padStart(2,'0'); if (!best || k > best) best = k; } } return best; };
-  if (results.salesFile) { var ym1 = firstYm(results.salesFile, /^(\d{4})(\d{2})\d{2}$/); if (ym1 && ym1 < nowYm) { results.salesFile = null; showToast('過去の月の売上実績CSVです。日別売上だけ保存し、チャレンジは更新しません'); } }
-  if (results.marcoPeriodFile) { var ym2 = firstYm(results.marcoPeriodFile, /^(\d{4})年(\d{1,2})月/); if (ym2 && ym2 < nowYm) { results.marcoPeriodFile = null; showToast('過去の月の月間売上CSVです。日別売上だけ保存し、チャレンジは更新しません'); } }
+  if (results.salesFile) { var ym1 = firstYm(results.salesFile, /^(\d{4})(\d{2})\d{2}$/); if (ym1 && ym1 < nowYm) { results.salesFile = null; alert((+ym1.slice(4)) + '月分の売上実績CSVです。日別売上だけ保存しました（' + tgtLabel + 'のチャレンジは変えていません）。\n' + (+ym1.slice(4)) + '月のチャレンジに入れるには、上の「‹」で' + (+ym1.slice(4)) + '月に切り替えてから取り込んでください。'); } else if (ym1 && ym1 > nowYm) { newerMsg('売上実績CSV', ym1); return; } }
+  if (results.marcoPeriodFile) { var ym2 = firstYm(results.marcoPeriodFile, /^(\d{4})年(\d{1,2})月/); if (ym2 && ym2 < nowYm) { results.marcoPeriodFile = null; alert((+ym2.slice(4)) + '月分の月間売上CSVです。日別売上だけ保存しました（' + tgtLabel + 'のチャレンジは変えていません）。\n' + (+ym2.slice(4)) + '月のチャレンジに入れるには、上の「‹」で' + (+ym2.slice(4)) + '月に切り替えてから取り込んでください。'); } else if (ym2 && ym2 > nowYm) { newerMsg('月間売上CSV', ym2); return; } }
+  // マルコの累計CSV（差分取込）：抽出期間の終わりの月が表示中の月と違うときは止める（別の月のスナップショットを壊さないため）
+  if (results.marcoSnapshotFile) {
+    var snEnd = null;
+    for (var si = 0; si < Math.min(results.marcoSnapshotFile.length, 10) && !snEnd; si++) { var smm = String(results.marcoSnapshotFile[si][1] || '').match(/(\d{4})-(\d{2})-\d{2}\s*[〜～~]\s*(\d{4})-(\d{2})-\d{2}/); if (smm) snEnd = smm[3] + smm[4]; }
+    if (snEnd && snEnd !== nowYm) {
+      if (snEnd > nowYm) { newerMsg('累計CSV', snEnd); return; }
+      alert('累計CSVが' + (+snEnd.slice(4)) + '月分です。表示中は' + tgtLabel + 'のチャレンジです。\n上の「‹」で' + (+snEnd.slice(4)) + '月に切り替えてから取り込んでください。'); return;
+    }
+  }
   // 【追加 R8.10.16】本店の日別CSVは、料理別の日別出数を月をまたいで蓄積（直近8週平均用）。
   // 過去の月の日別CSVは蓄積だけ行い、今月のチャレンジ（デザート・TOP5等）は上書きしない。
   var fdHistSaved = false;
@@ -4276,7 +4288,7 @@ function processCsvResults(results, shopKey) {
       var lastK = fdAll.days[fdAll.days.length - 1].k;
       histMonths.push(String(lastK).slice(4, 6).replace(/^0/, '') + '月');
       saveFoodDailyHist(shopKey, fdAll).catch(function(e){ console.warn('food_daily_hist', e); });
-      if (String(lastK).slice(0, 6) >= nowYm && lastK > curLastK) { curDaily = rows; curLastK = lastK; }
+      if (String(lastK).slice(0, 6) === nowYm && lastK > curLastK) { curDaily = rows; curLastK = lastK; }
     });
     results.dailyFile = curDaily;
     if (fdHistSaved) {
@@ -4303,7 +4315,7 @@ function processCsvResults(results, shopKey) {
   // マルコ月間売上CSVのみのとき、前月基準用に sales_daily の前月分を先読み
   var prefetch = Promise.resolve();
   if (results.marcoPeriodFile && !results.marcoSalesFile && db) {
-    var nd = new Date(); var pm = new Date(nd.getFullYear(), nd.getMonth() - 1, 1);
+    var pm = new Date(+nowYm.slice(0,4), +nowYm.slice(4) - 2, 1);   // 表示中の月の前月
     var pPre = pm.getFullYear() + String(pm.getMonth()+1).padStart(2,'0');
     prefetch = db.ref('sales_daily/marco').once('value').then(function(sn){
       var v = sn.val() || {}, sSum = 0, cSum = 0;
@@ -4603,8 +4615,13 @@ function processCsvResultsCore(results, shopKey, existingCh) {
         if (r[0] && r[0] !== '合計' && r[0].indexOf('年') !== -1) dataRows.push(r);
       }
       if (dataRows.length >= 1) {
-        var curRow  = dataRows[dataRows.length - 1];
-        var prevRow = dataRows.length >= 2 ? dataRows[dataRows.length - 2] : null;
+        // 表示中の月の行（無ければ最新月）と、その前の行
+        var tgY = +getMonthKey().slice(0,4), tgM = +getMonthKey().slice(5);
+        var ci = -1;
+        for (var dr = 0; dr < dataRows.length; dr++) { var mt = String(dataRows[dr][0]).match(/(\d{4})年\s*(\d{1,2})月/); if (mt && +mt[1] === tgY && +mt[2] === tgM) ci = dr; }
+        if (ci === -1) ci = dataRows.length - 1;
+        var curRow  = dataRows[ci];
+        var prevRow = ci >= 1 ? dataRows[ci - 1] : null;
 
         var curSales = idxPureSales !== -1 ? parseInt(curRow[idxPureSales].replace(/,/g,''))  || 0 : 0;
         var curCust  = marcoCustOf(mHeader, curRow);
