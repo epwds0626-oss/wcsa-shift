@@ -24,7 +24,7 @@ html,body{margin:0}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.6}
 header{background:var(--navy);color:#f3efe3;border-bottom:3px solid var(--gold);padding:14px 16px}
-header .in{max-width:1060px;margin:0 auto;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+header .in{max-width:min(1680px,100%);margin:0 auto;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 header h1{font-family:var(--display);font-weight:900;font-size:20px;margin:0;color:var(--gold);letter-spacing:.04em}
 header .sub{font-size:12px;opacity:.8}
 .btn{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 12px;cursor:pointer}
@@ -165,7 +165,7 @@ tr.avg td{font-size:12.5px}
   <button class="btn" type="button" onclick="(function(){try{if(parent&&parent!==window&&parent.switchMode){parent.switchMode('shift');return}}catch(e){}location.href='./'})()">WCSAに戻る</button>
 </div></div>
 <header><div class="in">
-  <div style="display:flex;gap:10px;align-items:center"><button class="btn" id="homeBtn" type="button" aria-label="WCSAに戻る">🏠</button><div><h1>日別人件費</h1><div class="sub"><span class="pnav"><button type="button" id="pPrev" aria-label="前の期間">‹</button><b id="pLabel"></b><button type="button" id="pNext" aria-label="次の期間">›</button></span> <span id="period">CSVを読み込んでください</span></div></div></div>
+  <div style="display:flex;gap:10px;align-items:center"><button class="btn" id="homeBtn" type="button" aria-label="WCSAに戻る">🏠</button><div><h1>日別人件費</h1><div class="sub"><span class="pnav"><button type="button" id="pPrev" aria-label="前の期間">‹</button><b id="pLabel"></b><button type="button" id="pNext" aria-label="次の期間">›</button></span> <select id="viewMode" aria-label="集計期間の区切り" style="width:auto;font-size:12px;padding:3px 6px;border-radius:6px"><option value="pay">給与期間（21〜20日）</option><option value="cal">暦月（1日〜末日）</option></select> <span id="period">CSVを読み込んでください</span></div></div></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn" id="anOpen" type="button">年間まとめ</button>
     <label class="btn" for="csvIn" style="display:inline-block">打刻・マスタCSV</label>
@@ -459,6 +459,7 @@ function punchesToCSV(rs){
   return [head,...lines].join("\n");
 }
 async function loadPunchesAndRender(){
+  CAL=null;
   tcStatus="打刻：給与システムから取得中…";renderTcStatus();renderPeriodNav();
   const r=await loadPunchesLive();
   if(r.ok&&r.rows&&r.rows.length){
@@ -472,9 +473,56 @@ async function loadPunchesAndRender(){
     em.hidden=false;document.getElementById("app").hidden=true;renderTcStatus();toast(tcStatus,"w");return false}
   tcStatus=`打刻：給与システムから取得できませんでした（${r.err||"データなし"}）。打刻管理CSVで代用できます`;renderTcStatus();return false;
 }
-function renderPeriodNav(){const [y,m]=viewYM();const el=document.getElementById("pLabel");if(el)el.textContent=`${y}年${m}月度`;
+function renderPeriodNav(){
+  if(isCalMode()){const [y,m]=viewCal();const el=document.getElementById("pLabel");if(el)el.textContent=`${y}年${m}月`;
+    const t=new Date(),nx=document.getElementById("pNext");if(nx)nx.disabled=(y===t.getFullYear()&&m===t.getMonth()+1);return}
+  const [y,m]=viewYM();const el=document.getElementById("pLabel");if(el)el.textContent=`${y}年${m}月度`;
   const nx=document.getElementById("pNext");if(nx)nx.disabled=isCurrentPeriod()}
-function shiftPeriod(d){let [y,m]=viewYM();m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}selYM=[y,m];if(isCurrentPeriod())selYM=null;loadPunchesAndRender()}
+function shiftPeriod(d){
+  if(isCalMode()){let [y,m]=viewCal();m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}const t=new Date();selCal=(y===t.getFullYear()&&m===t.getMonth()+1)?null:[y,m];loadByMode();return}
+  let [y,m]=viewYM();m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}selYM=[y,m];if(isCurrentPeriod())selYM=null;loadPunchesAndRender()}
+// ===== 暦月（1日〜末日）表示【追加 R8.10.31】 =====
+// 給与期間（21日〜翌20日）の打刻を2期間ぶん取り、それぞれで人件費を計算してから、暦月の日だけを合わせて表示する。
+// 月給者の配分は従来どおり各給与期間の営業日で按分（暦月で区切っても1日あたりの額は変わらない）。
+let CAL=null, selCal=null;
+function isCalMode(){return (cfg.viewMode||"pay")==="cal"}
+function viewCal(){if(selCal)return selCal;const t=new Date();return [t.getFullYear(),t.getMonth()+1]}
+function loadByMode(){return isCalMode()?loadCalAndRender():(CAL=null,loadPunchesAndRender())}
+function computeCal(){
+  const keep={rows,dates,periodTG},res={},issues=[],inMonth=new Set(CAL.monthDates);
+  CAL.parts.forEach(p=>{rows=p.rows;dates=p.dates;periodTG=p.tg;const c=compute();
+    p.dates.forEach(d=>{if(inMonth.has(d))res[d]=c.res[d]});
+    c.issues.forEach(i=>{if(!issues.some(x=>x.t===i.t))issues.push(i)})});
+  rows=keep.rows;dates=keep.dates;periodTG=keep.periodTG;
+  CAL.monthDates.forEach(d=>{if(!res[d])res[d]={本店:{cost:0,h:0,items:[]},マルコ:{cost:0,h:0,items:[]}}});
+  return {res,issues};
+}
+async function loadCalAndRender(){
+  const [y,m]=viewCal();renderPeriodNav();
+  tcStatus=`打刻：${y}年${m}月分を給与システムから取得中…`;renderTcStatus();
+  const cur=curPayYM(), nm=m===12?[y+1,1]:[y,m+1];
+  const periods=[[y,m]];if(nm[0]*12+nm[1]<=cur[0]*12+cur[1])periods.push(nm);   // m月度（前月21日〜20日）＋翌月度（21日〜翌20日）
+  const r=await loadPunchesLive(periods);
+  if(!r.ok||!r.byPeriod){tcStatus=`打刻：給与システムから取得できませんでした（${r.err||"データなし"}）`;renderTcStatus();return false}
+  const parts=[];
+  for(const [Y,M] of periods){const P=r.byPeriod[Y+"-"+M];if(!P||!P.rows||!P.rows.length)continue;
+    const tg={};Object.entries(P.tg||{}).forEach(([n,v])=>tg[norm(n)]=num(v));
+    periodTG=tg;setupRows(parseCSV(punchesToCSV(P.rows)));parts.push({rows:rows.slice(),dates:dates.slice(),tg})}
+  const last=new Date(y,m,0).getDate(), monthDates=[];
+  for(let d=1;d<=last;d++)monthDates.push(dstr(new Date(y,m-1,d)));
+  const inMonth=new Set(monthDates), mrows=[].concat(...parts.map(p=>p.rows)).filter(x=>inMonth.has(x.date));
+  if(!mrows.length){CAL=null;tcStatus=`打刻：${y}年${m}月の打刻はありません`;renderTcStatus();
+    const em=document.getElementById("empty");em.querySelector("h2").textContent=`${y}年${m}月は給与システムに打刻がありません`;
+    em.hidden=false;document.getElementById("app").hidden=true;toast(tcStatus,"w");return false}
+  CAL={ym:[y,m],parts,monthDates};
+  rows=mrows;dates=monthDates;buildPeople();
+  const t=new Date();tcStatus=`打刻：給与システムから取得（${y}年${m}月・${mrows.length}件・${t.getHours()}:${String(t.getMinutes()).padStart(2,"0")}）`;
+  document.getElementById("period").textContent=`${dates[0]} 〜 ${dates[dates.length-1]}（${dates.length}日・暦月）`;
+  openOpen.clear();
+  const rs=rawGet().sales||{};STORES.forEach(st=>{if(rs[st])importSales(rs[st],st,true)});
+  applyFbSales();saveCfg();renderAll();renderTcStatus();loadFishHack();loadDailySalesFB();
+  return true;
+}
 function renderTcStatus(){const el=document.getElementById("tcStatus");if(el)el.textContent=tcStatus}
 
 // ===== 年間まとめ（会計年度：10月〜翌9月。例：2026年度＝2025/10〜2026/09） =====
@@ -647,7 +695,10 @@ function buildPeople(){
   });
 }
 
-function closedSet(s){return new Set((cfg.closed[dates[0]]||{})[s]||[])}
+function closedSet(s){
+  // 暦月表示中は、その月にかかる給与期間ごとの定休日設定を合わせて使う
+  if(CAL&&dates===CAL.monthDates){const u=new Set();CAL.parts.forEach(p=>((cfg.closed[p.dates[0]]||{})[s]||[]).forEach(d=>u.add(d)));return u}
+  return new Set((cfg.closed[dates[0]]||{})[s]||[])}
 function openDays(s){const c=closedSet(s);return dates.filter(d=>!c.has(d))}
 
 function compute(){
@@ -754,7 +805,7 @@ function ratioCell(cost,sales){
 function ratioTxt(cost,sales){return sales>0?(cost/sales*100).toFixed(1)+"%":"—"}
 function renderDaily(){
   if(!rows.length)return;
-  const {res,issues}=compute();
+  const {res,issues}=CAL?computeCal():compute();
   const lastPunch=rows.map(r=>r.date).sort().pop();
   const shown=dates.filter(d=>d<=lastPunch);
   // 打刻CSVより後でも、今日までに売上・納品がある日は「売上のみ」として下に表示（率の計算には入れない）
@@ -1230,7 +1281,9 @@ function renderCals(){
     dates.forEach(d=>g+=`<button data-s="${s}" data-d="${d}" class="${c.has(d)?"off":""}" aria-pressed="${!c.has(d)}">${+d.slice(8)}</button>`);
     return g+"</div></div>"}).join("");
   el.querySelectorAll("button").forEach(b=>b.onclick=()=>{
-    const arr=cfg.closed[dates[0]][b.dataset.s], i=arr.indexOf(b.dataset.d);
+    const key=CAL&&dates===CAL.monthDates?(CAL.parts.find(p=>p.dates.includes(b.dataset.d))||{dates:[dates[0]]}).dates[0]:dates[0];
+    cfg.closed[key]=cfg.closed[key]||{};cfg.closed[key][b.dataset.s]=cfg.closed[key][b.dataset.s]||[];
+    const arr=cfg.closed[key][b.dataset.s], i=arr.indexOf(b.dataset.d);
     i>=0?arr.splice(i,1):arr.push(b.dataset.d); saveCfg(); renderCals(); renderDaily()});
 }
 
@@ -1365,8 +1418,8 @@ async function boot(){
   const r=rawGet();
   const ok=await loadPayrollMaster();
   if(!ok&&r.master)applyMaster(r.master);
-  if(r.tc)ingest(r.tc);   // 前回分をすぐ表示
-  const live=await loadPunchesAndRender();   // 給与システムの最新打刻で置き換え
+  if(r.tc&&!isCalMode())ingest(r.tc);   // 前回分をすぐ表示
+  const live=await loadByMode();   // 給与システムの最新打刻で置き換え（給与期間／暦月）
   if(!live&&!r.tc){document.getElementById("empty").hidden=false;document.getElementById("app").hidden=true}
 }
 async function tryUnlock(){
@@ -1381,7 +1434,9 @@ document.getElementById("anPrev").onclick=()=>openAnnual((annualFY||fyOf())-1);
 document.getElementById("anNext").onclick=()=>{const f=(annualFY||fyOf())+1;if(f<=fyOf())openAnnual(f)};
 document.getElementById("pPrev").onclick=()=>shiftPeriod(-1);
 document.getElementById("pNext").onclick=()=>shiftPeriod(1);
-document.getElementById("tcReload").onclick=()=>loadPunchesAndRender();
+document.getElementById("tcReload").onclick=()=>loadByMode();
+(()=>{const vm=document.getElementById("viewMode");vm.value=cfg.viewMode||"pay";
+  vm.onchange=()=>{cfg.viewMode=vm.value;saveCfg();selCal=null;selYM=null;loadByMode()}})();
 document.getElementById("masterReload").onclick=async()=>{if(await loadPayrollMaster()&&rows.length){buildPeople();renderAll()}};
 document.getElementById("pw").onkeydown=e=>{if(e.key==="Enter")tryUnlock()};
 document.getElementById("lockNow").onclick=()=>{try{sessionStorage.removeItem("jinkenhi-ok")}catch(e){}location.reload()};
