@@ -217,6 +217,11 @@ tr.avg td{font-size:12.5px}
         <label class="note" for="marcoFood">マルコ食材費（別口座分）¥<input id="marcoFood" type="number" min="0" step="1000" style="width:96px">/月</label>
         <label class="note" for="marcoFixed">マルコ固定費（家賃込み）¥<input id="marcoFixed" type="number" min="0" step="1000" style="width:96px">/月</label>
       </div>
+      <div class="toolbar">
+        <label class="note" for="execPay">役員報酬（会社負担の社保込み）¥<input id="execPay" type="number" min="0" step="1000" style="width:104px">/月 → 人件費</label>
+        <label class="note" for="execHonten">うち本店 <input id="execHonten" type="number" min="0" max="100" step="1" style="width:58px"> %（残りはマルコ）</label>
+        <label class="note" for="bonusYear">賞与（年間合計・会社負担込み）¥<input id="bonusYear" type="number" min="0" step="1000" style="width:110px">/年 → ÷12で毎月の固定費</label>
+      </div>
       <div id="ledgerList"></div>
       <p class="note">毎月、前月分の預金台帳（と現金出納帳）を取り込んでください。同じ月を取り込み直すと置き換わります。ある月の食材費は、翌月の台帳（その月の「問屋支払」）まで取り込むと確定します。取り込んだデータはこの端末に保存されます。</p>
     </details>
@@ -744,6 +749,15 @@ function compute(){
     od.forEach(d=>{const r=rows.find(x=>x.name===p.name&&x.date===d&&x.store===s);
       res[d][s].cost+=g+er; res[d][s].items.push({name:p.name,type:"月給",work:r?r.work:0,ot:r?r.ot:0,night:r?r.night:0,gross:g,er,off:!r&&!p.nopunch});});
   });
+  // 役員報酬：設定の月額を本店／マルコの割合で分け、各店の営業日に均等配分（月給者と同じ考え方）【追加 R8.11.07】
+  const ex=num(cfg.execPay);
+  if(ex>0){const hp=Math.min(100,Math.max(0,num(cfg.execHonten!=null?cfg.execHonten:73)))/100;
+    [["本店",hp],["マルコ",1-hp]].forEach(([s,share])=>{
+      const amt=ex*share; if(!(amt>0)||!rows.some(r=>r.store===s))return;   // 開店前などその店の打刻がない期間は計上しない
+      const od=openDays(s); if(!od.length)return; const g=amt/od.length;
+      od.forEach(d=>{res[d][s].cost+=g; res[d][s].items.push({name:"役員報酬",type:"役員",work:0,ot:0,night:0,gross:g,er:0})});
+    });
+  }
   if(inprog) issues.unshift({lv:"w",t:`今日は ${inprog}名が勤務中（退勤前）のため、今日の時給分は未計上。退勤後にCSVを再読込すると確定します`});
   return {res,issues};
 }
@@ -996,6 +1010,8 @@ function prodPill(v){if(v==null||!isFinite(v))return "—";const t=num(cfg.prodT
 //   ・年払い（保険料・租税公課（消費税を除く）・修繕費・車輌費・支払報酬）は年度の12か月に均等割
 //   ・クレジットカード手数料（設定の料率。カード入金額÷(1−料率)×料率。非課税のため税抜換算で目減りしないよう×1.1）
 //   ・マルコの家賃・その他固定費（設定値・月額）
+//   ・賞与（設定値・年間合計÷12。消費税がかからないので税抜換算しない）【追加 R8.11.07】
+//   ・役員報酬は固定費ではなく人件費（設定値・月額を本店／マルコの割合で営業日に配分）
 //   ・含まない：人件費（打刻から別計算）、派遣・業務委託（打刻で人件費に入る）、消費税、借入金返済、車両購入、口座間振替、立替金
 // 台帳の取込：日別の表の上「台帳Excelを取込」（預金台帳・現金出納帳。同じ月を取り込み直すと置き換え）
 // ===== 台帳Excel（預金台帳・現金出納帳）→ 食材費・固定費の月別データ【追加 R8.10.24】 =====
@@ -1117,7 +1133,7 @@ function ledgerCalc(){
 function fixedProv(ym){return !num((cfg.fixed||{})[ym])&&ledgerCalc().fixed[ym]==null}
 function fixedOf(ym){const v=num((cfg.fixed||{})[ym]);const F=ledgerCalc().fixed;let P=v||F[ym];
   if(!P){const ks=Object.keys(F).sort().filter(k=>k<ym).slice(-3);if(!ks.length)return null;P=ks.reduce((a,k)=>a+F[k],0)/ks.length}
-  return (cfg.tax||"税抜")==="税抜"?P/1.1:P}
+  return ((cfg.tax||"税抜")==="税抜"?P/1.1:P)+num(cfg.bonusYear)/12}   // 賞与は消費税がかからないので÷1.1しない
 function foodLedgerVal(ym){return ledgerCalc().food[ym]}
 function foodOf(ym){const v=num((cfg.food||{})[ym]);const F=ledgerCalc().food;return v?{P:v,src:"入力"}:F[ym]?{P:F[ym],src:"台帳"}:null}
 // ── 台帳Excelの取込（SheetJSは使うときだけ読み込む） ──
@@ -1413,6 +1429,8 @@ document.getElementById("prodTarget").value=cfg.prodTarget||4000;
 document.getElementById("ledgerFile").onchange=e=>{const fs=[...e.target.files];e.target.value="";if(fs.length)importLedgerFiles(fs)};
 [["cardFee",3.24],["marcoFood",400000],["marcoFixed",288000]].forEach(([id,def])=>{const el=document.getElementById(id);el.value=cfg[id]!=null?cfg[id]:def;
   el.onchange=()=>{cfg[id]=el.value===""?def:num(el.value);ledgerCalc._c=null;saveCfg();renderDaily()}});
+[["execPay",0],["execHonten",73],["bonusYear",0]].forEach(([id,def])=>{const el=document.getElementById(id);el.value=cfg[id]!=null?cfg[id]:def;
+  el.onchange=()=>{cfg[id]=el.value===""?def:num(el.value);saveCfg();renderDaily()}});
 document.getElementById("ledgerBox").addEventListener("toggle",renderLedgerList);
 // FishHack原価率は55%に統一（R8.10.24）。以前の既定値・保存値は一度だけ55%に置き換える
 if(cfg.fhRateVer!==2){cfg.fhRate=55;cfg.fhRateVer=2;saveCfg()}
