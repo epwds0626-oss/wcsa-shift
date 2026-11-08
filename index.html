@@ -3517,6 +3517,7 @@ function resetDessertMission() {
     mission_dessert: 0,
     mission_dessert_items: null,
     mission_dessert_wd: null,
+    wd_dates: null,
     mission_dessert_weekday: null,
     snapshot: null,
     mission_updated: Date.now()
@@ -3538,6 +3539,64 @@ function resetDessertMission() {
 // 曜日平均 = その曜日の出数合計 ÷ その曜日の営業日数（CSVに載っている日付を営業日とみなす）
 var _fdState = { date: -1, dish: -1, mode: 'month' };   // mode: 'month'＝表示中の月 / '8w'＝直近8週
 var _fdMonthData = null;   // 表示中の月の food_daily（モード切替で戻すため保持）
+
+// ===== マルコ：曜日別（仕込み用）デザート・料理の1日分を加算【追加 R8.11.8】 =====
+// 差分取込（1営業日）・月初の初回スナップショット（1日分）・1日分CSV のどれからでも、その日の出数を曜日の列に足す。
+// 同じ日を二重に足さないよう、challenge/marco/{月}/wd_dates/{yyyymmdd} に計上済みの印を残す。
+var MWD_DES = ['ティラミス','チーズケーキ','デザート','バニラアイス','フレンチトースト','ドルチェ','アイス','ショコラ','プリン','パフェ','ケーキ','ジェラート','ソルベ','パンナコッタ'];
+var MWD_DES_EX = ['自家製ティラミス','自家製チーズケーキ'];   // ドルチェセット内の選択（重複計上になるため除外）
+var MWD_FOOD_EX = ['お通し','サラダバー','ドリンクバー','大盛り','特盛'];
+function marcoWdSplit(items) {
+  var des = {}, food = {};
+  (items || []).forEach(function(it){
+    if (!it || !it.name || !(it.qty > 0)) return;
+    if (it.name.indexOf('無し') !== -1) return;
+    var isD = MWD_DES_EX.indexOf(it.name) === -1 && MWD_DES.some(function(t){ return it.name.indexOf(t) !== -1; });
+    if (isD) { des[it.name] = (des[it.name] || 0) + it.qty; return; }
+    if ((it.price || 0) > 0 && !MWD_FOOD_EX.some(function(t){ return it.name.indexOf(t) !== -1; })) {
+      if (!food[it.name]) food[it.name] = { qty: 0, price: 0 };
+      food[it.name].qty += it.qty; if (it.price > food[it.name].price) food[it.name].price = it.price;
+    }
+  });
+  return {
+    des: Object.keys(des).map(function(n){ return { name: n, qty: des[n] }; }),
+    food: Object.keys(food).map(function(n){ return { name: n, qty: food[n].qty, price: food[n].price }; })
+  };
+}
+function marcoWdMerge(colArr, add, withPrice) {
+  var mm = {};
+  (colArr || []).forEach(function(it){ if (it && it.name) mm[it.name] = { qty: it.qty || 0, price: it.price || 0 }; });
+  add.forEach(function(it){
+    if (!mm[it.name]) mm[it.name] = { qty: 0, price: it.price || 0 };
+    mm[it.name].qty += it.qty;
+    if ((it.price || 0) > mm[it.name].price) mm[it.name].price = it.price || 0;
+  });
+  return Object.keys(mm).map(function(n){ var o = { name: n, qty: mm[n].qty }; if (withPrice && mm[n].price) o.price = mm[n].price; return o; });
+}
+// cur＝その月のchallengeノード, upd＝書き込み先（キーはノード相対）, ymdKey＝20261108 形式。足したら true
+function marcoWdAddInto(cur, upd, ymdKey, items) {
+  if ((cur.wd_dates || {})[ymdKey] || upd['wd_dates/' + ymdKey]) return false;
+  var y = Math.floor(ymdKey / 10000), m = Math.floor(ymdKey / 100) % 100, d = ymdKey % 100;
+  var wd = ['日','月','火','水','木','金','土'][new Date(y, m - 1, d).getDay()];
+  var sp = marcoWdSplit(items);
+  var dKey = 'mission_dessert_wd/' + wd, fKey = 'big_item_wd/' + wd;
+  upd[dKey] = marcoWdMerge(upd[dKey] !== undefined ? upd[dKey] : (cur.mission_dessert_wd || {})[wd], sp.des, false);
+  upd[fKey] = marcoWdMerge(upd[fKey] !== undefined ? upd[fKey] : (cur.big_item_wd || {})[wd], sp.food, true);
+  upd['wd_dates/' + ymdKey] = wd;
+  return { wd: wd, des: sp.des.reduce(function(a, x){ return a + x.qty; }, 0) };
+}
+function marcoMenuItems(rows) {
+  var hi = -1;
+  for (var i = 0; i < rows.length; i++) if (rows[i][0] === 'ABC') { hi = i; break; }
+  if (hi === -1) return [];
+  var hd = rows[hi], iN = hd.indexOf('商品名'), iQ = hd.indexOf('出数'), iP = hd.indexOf('平均単価'), out = [];
+  for (var r = hi + 1; r < rows.length; r++) {
+    if (!rows[r][iN]) continue;
+    var nm = rows[r][iN].replace(/\u3000/g, ' ').trim(); if (nm === '合計') continue;
+    out.push({ name: nm, qty: parseInt(String(rows[r][iQ] || '0').replace(/,/g, '')) || 0, price: parseInt(String(rows[r][iP] || '').replace(/[¥,]/g, '')) || 0 });
+  }
+  return out;
+}
 
 // ===== マルコ用：品目リスト → 1日分の food_daily =====
 // マルコのPOSには日付つき品目CSVもカテゴリ列も無いため、品名キーワードで判定する。
@@ -4297,13 +4356,28 @@ function processCsvResults(results, shopKey) {
   }
   if (results.marcoOneDayFiles && results.marcoOneDayFiles.length && isMarco) {
     var odDays = 0;
+    var odWd = [], odSkip = [];
+    var odChain = Promise.resolve();
     results.marcoOneDayFiles.forEach(function(f){
       var fd1 = marcoDayFromMenuCsv(f.rows, f.date);
       if (fd1) { odDays++; saveFoodDailyHist('marco', fd1).catch(function(e){ console.warn('food_daily_hist', e); }); }
+      // 曜日別（仕込み用）にも、その日の月のチャレンジへ加算（計上済みの日は飛ばす）
+      if (db) odChain = odChain.then(function(){
+        var ref = db.ref('challenge/marco/' + f.date.slice(0, 7));
+        return ref.once('value').then(function(sn){
+          var cur = sn.val() || {}, up = {};
+          var r = marcoWdAddInto(cur, up, +f.date.replace(/-/g, ''), marcoMenuItems(f.rows));
+          if (!r) { odSkip.push(f.date.slice(5)); return; }
+          odWd.push(f.date.slice(5) + '(' + r.wd + ')');
+          return ref.update(up);
+        });
+      });
     });
     fdHistSaved = fdHistSaved || odDays > 0;
-    if (odDays) showToast('マルコの料理別出数を保存しました（1日分CSV ' + odDays + '日）');
-    setTimeout(function(){ renderChallenge(shopKey); }, 800);
+    odChain.then(function(){
+      showToast('1日分CSV ' + odDays + '日：料理別出数を保存' + (odWd.length ? '／曜日別に加算 ' + odWd.join('・') : '') + (odSkip.length ? '／計上済みのため飛ばした日 ' + odSkip.join('・') : ''));
+      renderChallenge(shopKey);
+    }).catch(function(e){ alert('1日分CSVの曜日別加算でエラー: ' + e.message); });
   }
   var hasData = results.salesFile || results.itemFile || results.dailyFile || results.marcoSalesFile || results.marcoPeriodFile || results.marcoSnapshotFile || results.marcoItemFiles.length > 0;
   if (!hasData && dailySaved) return; // 日報一覧だけのときは日別売上の保存のみ
@@ -4718,12 +4792,15 @@ function processCsvResultsCore(results, shopKey, existingCh) {
       var updS = { snapshot: { end: sEnd, items: snapItems, at: ts }, mission_drink: snapDrink, mission_drink_items: snapDrinkItems, mission_dessert: snapDes, mission_dessert_items: snapDesItems, mission_updated: ts };
 
       if (!prev || !prev.end) {
+        var firstWd = null;
         if (sStart && sStart === sEnd) {
           var fdF = marcoDayFromMenuCsv(sRows, sEnd);
           if (fdF) saveFoodDailyHist('marco', fdF).catch(function(){});
+          // 【追加 R8.11.8】月初1日分の初回スナップショットは、その日の曜日列にも計上（従来は曜日別から漏れていた）
+          firstWd = marcoWdAddInto(cur, updS, +sEnd.replace(/-/g, ''), snapItems);
         }
         return getChRef(shopKey).update(updS).then(function() {
-          showToast('📸 初回スナップショット（〜' + sEnd + '）を保存しました。次回取込から差分を計上します');
+          showToast('📸 初回スナップショット（〜' + sEnd + '）を保存しました' + (firstWd ? '（' + firstWd.wd + '曜に計上：デザート' + firstWd.des + '食）' : '') + '。次回取込から差分を計上します');
           renderChallenge(shopKey);
         });
       }
@@ -4747,8 +4824,13 @@ function processCsvResultsCore(results, shopKey, existingCh) {
         });
       }
       if (bizDays.length > 1) {
-        alert('前回（〜' + prev.end + '）から営業日が' + bizDays.length + '日（' + bizDays.join('・') + '）経過しています。\n差分を1つの曜日に割り当てられないため中止しました。\nこの期間は曜日別CSVで取り込み直すか、次回から毎営業日ごとに取り込んでください');
-        return;
+        // 【変更 R8.11.8】数日分たまっていても、月の合計（デザート・ドリンク・品目内訳）とスナップショットは更新する。
+        // 曜日別（仕込み用）だけは曜日に割り振れないため計上せず、1日分CSVで埋めてもらう。
+        var gapDates = bizKeys.map(function(k){ return (Math.floor(k / 100) % 100) + '/' + (k % 100); });
+        return getChRef(shopKey).update(updS).then(function() {
+          alert('前回（〜' + prev.end + '）から営業日が' + bizDays.length + '日（' + gapDates.map(function(x, i){ return x + bizDays[i]; }).join('・') + '）たまっていました。\n\n✅ 月の合計（デザート・ドリンク・品目内訳）は〜' + sEnd + 'まで更新しました。\n⚠ 曜日別内訳（仕込み用）にはこの' + bizDays.length + '日分が入っていません。\n\n埋めるには、POSで抽出期間を1日だけ（例 ' + gapDates[0] + '〜' + gapDates[0] + '）にしたaggregateMenu CSVを、日ごとに書き出して取り込んでください（まとめて選択可）。');
+          renderChallenge(shopKey);
+        });
       }
       var wdChar = bizDays[0];
       var prevMap = {};
@@ -4777,8 +4859,13 @@ function processCsvResultsCore(results, shopKey, existingCh) {
           return o;
         });
       }
-      updS['mission_dessert_wd/' + wdChar] = addToCol((cur.mission_dessert_wd || {})[wdChar], deltaDes, false);
-      updS['big_item_wd/' + wdChar] = addToCol((cur.big_item_wd || {})[wdChar], deltaFood, true);
+      // その日がすでに（1日分CSV等で）計上済みなら曜日別には足さない
+      var dayKey = bizKeys[0], already = (cur.wd_dates || {})[dayKey];
+      if (!already) {
+        updS['mission_dessert_wd/' + wdChar] = addToCol((cur.mission_dessert_wd || {})[wdChar], deltaDes, false);
+        updS['big_item_wd/' + wdChar] = addToCol((cur.big_item_wd || {})[wdChar], deltaFood, true);
+        updS['wd_dates/' + dayKey] = wdChar;
+      }
       // 【修正 R8.7.26】合計・品目内訳は累計CSVから直接計上済み（updS定義時）。
       // 曜日別（仕込み用）のみ差分ベースで更新する。
       var desSum = 0;
