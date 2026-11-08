@@ -4379,6 +4379,14 @@ function processCsvResults(results, shopKey) {
       if (String(lastK).slice(0, 6) === nowYm && lastK > curLastK) { curDaily = rows; curLastK = lastK; }
     });
     results.dailyFile = curDaily;
+    // 【追加 R8.11.8】チャレンジに使う日別CSVは、表示中の月の日付の行だけに絞る（前月の日付が混ざったCSVでも当月分だけを集計）
+    if (curDaily) {
+      var iDt = curDaily[0].indexOf('営業日');
+      if (iDt !== -1) results.dailyFile = [curDaily[0]].concat(curDaily.slice(1).filter(function(r){
+        var mm = String(r[iDt] || '').match(/(\d{4})[\/\-.年](\d{1,2})[\/\-.月]/);
+        return !mm || (mm[1] + mm[2].padStart(2, '0')) === nowYm;
+      }));
+    }
     if (fdHistSaved) {
       showToast('料理別出数を保存しました（' + histMonths.join('・') + '／' + histDays + '日分）' + (curDaily ? '' : '。今月分が無いのでチャレンジは更新しません'));
     }
