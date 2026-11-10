@@ -21,7 +21,8 @@ body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Yu Goth
 #app{display:flex;flex-direction:column;height:100%}
 button{font-family:inherit}
 .mhead{position:sticky;top:0;z-index:30;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 6px rgba(20,25,40,.05)}
-.row{display:flex;align-items:center;gap:8px;padding:9px 12px}
+.row{display:flex;align-items:center;gap:8px;padding:9px 12px;flex-wrap:wrap}
+@media(max-width:480px){.row .title,.hl{display:none}.seg button{padding:7px 9px}}
 .row2{display:flex;gap:8px;padding:0 12px 10px;align-items:center;flex-wrap:wrap}
 .title{font-size:15px;font-weight:800;white-space:nowrap}
 .spacer{flex:1}
@@ -131,17 +132,28 @@ table.hist th:first-child,table.hist td:first-child{text-align:left}
 table.hist td{padding:8px 6px;border-bottom:1px solid var(--surface3);text-align:right;font-variant-numeric:tabular-nums}
 .conn{background:#fff4e5;border:1px solid #f5d199;color:#8a5a00;font-size:12px;font-weight:700;padding:8px 12px;border-radius:10px;margin-bottom:12px;display:none}
 @media print{.mhead,.fab,.tools,.who,.chips,.rules{display:none!important}.body{overflow:visible}}
+.nb{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:9px;background:var(--A);color:#fff;font-size:11px;font-weight:900;text-align:center;padding:0 5px;margin-left:4px}
+.ord{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin-bottom:8px;border-left:5px solid var(--border)}
+.ord.u0{border-left-color:var(--A)}.ord.u1{border-left-color:var(--B)}.ord.u2{border-left-color:var(--C)}
+.ord.fin{opacity:.6;border-left-color:var(--ok)}
+.ord .on1{font-size:16px;font-weight:900}.ord .on2{font-size:12.5px;color:var(--text2);margin-top:3px;line-height:1.5}
+.ord .acts{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.ord .acts button{font-size:12.5px;padding:7px 10px}
+.ub{font-size:11.5px;font-weight:900;color:#fff;border-radius:6px;padding:1px 7px;margin-right:4px}
+.ub.u0{background:var(--A)}.ub.u1{background:var(--B)}.ub.u2{background:var(--C)}
+.obanner{display:flex;align-items:center;gap:8px;cursor:pointer}
 </style>
 </head>
 <body>
 <div id="app">
   <div class="mhead">
     <div class="row">
-      <button class="hbtn" onclick="goHome()">&#8592; ホーム</button>
+      <button class="hbtn" onclick="goHome()">&#8592;<span class="hl"> ホーム</span></button>
       <div class="title">&#128221; 今日の仕込み</div>
       <div class="spacer"></div>
       <div class="seg" id="viewSeg">
         <button data-v="board" class="active" onclick="setView('board')">ボード</button>
+        <button data-v="order" onclick="setView('order')">発注依頼<span id="ordBadge"></span></button>
         <button data-v="hist" onclick="setView('hist')">記録</button>
       </div>
       <button class="hbtn" id="lockBtn" onclick="toggleLock()" title="管理者">&#128274;</button>
@@ -165,7 +177,7 @@ table.hist td{padding:8px 6px;border-bottom:1px solid var(--surface3);text-align
     <div id="view"></div>
   </div></div>
 </div>
-<button class="fab" id="fab" onclick="openTask()">＋ 作業を追加</button>
+<button class="fab" id="fab" onclick="fabClick()">＋ 作業を追加</button>
 <div class="overlay" id="ov" onclick="if(event.target===this)closeSheet()"><div class="sheet" id="sheet"></div></div>
 <div class="toast" id="toast"></div>
 <script>
@@ -191,7 +203,7 @@ var state={
   me:'', pos:'', staff:[], positions:[],
   tasks:{}, notes:{}, lib:{}, edit:null, form:null,
   shiftNames:[], fixedNames:[], settings:{notify:true}, admin:false,
-  fd:null, fdShop:null, prepOpen:(localStorage.getItem('shk_prep')!=='0'), prepAll:false
+  orders:{}, orderLib:{}, ofilter:'open', fd:null, fdShop:null, prepOpen:(localStorage.getItem('shk_prep')!=='0'), prepAll:false
 };
 var ADMIN_PASS="0626";
 var refs=[];
@@ -215,7 +227,7 @@ function detach(){refs.forEach(function(r){try{r.off();}catch(e){}});refs=[];}
 function listen(path,cb){if(!db)return;var r=db.ref(path);r.on('value',function(s){cb(s.val());});refs.push(r);}
 function load(){
   detach();
-  state.tasks={};state.notes={};state.lib={};state.shiftNames=[];state.fixedNames=[];
+  state.tasks={};state.notes={};state.lib={};state.orders={};state.orderLib={};state.shiftNames=[];state.fixedNames=[];
   document.documentElement.style.setProperty('--accent',SHOP_COLOR[state.shop]);
   document.documentElement.style.setProperty('--accent-soft',state.shop==='enya'?'rgba(176,125,0,.12)':'rgba(26,127,191,.12)');
   state.me=localStorage.getItem('shk_me_'+state.shop)||'';
@@ -239,6 +251,9 @@ function load(){
     var n=[];v=v||{};['before','lunch','dinner'].forEach(function(k){(v[k]||[]).forEach(function(e){var nm=e&&(e.name||e);if(nm&&typeof nm==='string'&&n.indexOf(nm)<0)n.push(nm);});});
     state.shiftNames=n;render();});
   listen(SHOP_KEY[state.shop]+'/fixed',function(v){var a=Array.isArray(v)?v:(v?Object.values(v):[]);state.fixedNames=a.map(function(f){return f&&f.name;}).filter(Boolean);render();});
+  // 発注依頼（日付に関係なく、店ごとに残る）
+  (function(){var q=db.ref(base()+'/orders').orderByKey().limitToLast(300);q.on('value',function(sn){state.orders=sn.val()||{};ordBadge();render();});refs.push(q);})();
+  listen(base()+'/orderLib',function(v){state.orderLib=v||{};});
   loadFd();
   render();
 }
@@ -341,7 +356,9 @@ function render(){
   var d=parseKey(state.date);
   var tag=state.date===todayKey()?'今日':(state.date===addDays(todayKey(),1)?'明日':(state.date<todayKey()?'過去':''));
   document.getElementById('dateLabel').innerHTML=(d.getMonth()+1)+'/'+d.getDate()+'（'+DOW[d.getDay()]+'）'+(tag?'<small>'+tag+'</small>':'');
-  document.getElementById('fab').style.display=state.view==='board'?'':'none';
+  var fab=document.getElementById('fab');fab.style.display=(state.view==='board'||state.view==='order')?'':'none';
+  fab.textContent=state.view==='order'?'＋ 発注を依頼':'＋ 作業を追加';
+  if(state.view==='order'){renderOrders();return;}
   if(state.view==='hist'){renderHist();return;}
   if(state.view==='lib'){renderLib();return;}
   checkOverdue();
@@ -365,6 +382,9 @@ function render(){
   if(lc&&lc.miss.length) h+='<div class="warn red">&#9888; '+esc(state.me)+'さんの残り作業は合計'+lc.total+'分。このままだと「'+esc(lc.miss[0].name)+'」など'+lc.miss.length+'件が〆切に間に合いません。→ 補助に振る／Cを後回しにする</div>';
   else if(lc) h+='<div class="warn blue">'+esc(state.me)+'さんの残り作業：'+lc.count+'件・合計'+lc.total+'分（〆切に間に合うペースです）</div>';
   if(!state.me) h+='<div class="warn yel">まず「名前」を選んでください。完了チェックに名前が残ります。</div>';
+  var oo=openOrders();
+  if(oo.length){var o0=oo.filter(function(o){return o.urg==='today';}).length;
+    h+='<div class="warn '+(o0?'red':'yel')+' obanner" onclick="setView(\'order\')">&#128722; 発注依頼 未対応 '+oo.length+'件'+(o0?'（今日中 '+o0+'件）':'')+'<span style="margin-left:auto">見る &#8250;</span></div>';}
   h+=prepHTML();
   // 絞り込み
   var poss=[];all.forEach(function(t){if(t.pos&&poss.indexOf(t.pos)<0)poss.push(t.pos);});
@@ -374,7 +394,7 @@ function render(){
      poss.map(function(p){return '<button class="chip'+(state.filter==='p:'+p?' on':'')+'" onclick="setFilter(\'p:'+esc(p).replace(/'/g,"\\'")+'\')">'+esc(p)+'</button>';}).join('')+'</div>';
   // 道具
   h+='<div class="tools"><button class="hbtn" onclick="copyFrom(-1)">前日からコピー</button><button class="hbtn" onclick="copyFrom(-7)">先週の同じ曜日からコピー</button><button class="hbtn" onclick="carryOver()">未完了を翌日へ引継ぎ</button><button class="hbtn" onclick="toggleRules()">使い方ルール</button>'+
-     (state.admin?'<button class="hbtn on" onclick="setView(\'lib\')">&#128295; 作業リスト管理</button>':'')+'</div>';
+     (state.admin?'<button class="hbtn on" onclick="setView(\'lib\')">&#128295; 作業リスト・設定</button>':'')+'</div>';
   if(state.showRules) h+=rulesHTML();
   // グループ表示
   var shown=all.filter(function(t){
@@ -572,6 +592,96 @@ function checkOverdue(){
   });
 }
 
+/* ===== 発注依頼：スタッフ → 店長・社員 ===== */
+var URG={today:{l:'今日中',c:'u0'},tomorrow:{l:'明日まで',c:'u1'},week:{l:'今週中',c:'u2'}};
+function fabClick(){if(state.view==='order')openOrder();else openTask();}
+function ordList(){var a=[];for(var id in state.orders){var o=state.orders[id];if(o&&o.item){o.id=id;a.push(o);}}return a;}
+function openOrders(){return ordList().filter(function(o){return o.status==='open';});}
+function ordBadge(){var n=openOrders().length;var el=document.getElementById('ordBadge');if(el)el.innerHTML=n?'<span class="nb">'+n+'</span>':'';}
+function orderTo(){var t=state.settings.orderTo;return Array.isArray(t)?t.filter(Boolean):(t?Object.values(t).filter(Boolean):[]);}
+function ago(ts){var m=Math.round((Date.now()-ts)/60000);if(m<60)return m+'分前';var h=Math.round(m/60);if(h<24)return h+'時間前';return Math.round(h/24)+'日前';}
+function fmtTs(ts){var d=new Date(ts);return (d.getMonth()+1)+'/'+d.getDate()+' '+hhmm(ts);}
+function renderOrders(){
+  var v=document.getElementById('view');var all=ordList();var me=state.me;
+  var h='<div class="card who"><div class="f"><label>名前</label><select class="sel" onchange="setMe(this.value)"><option value="">選んでください</option>'+nameOptions(me)+'</select></div></div>';
+  h+='<div class="warn blue">足りない・なくなりそうな物を見つけたら、ここから<b>店長・社員に発注を依頼</b>してください。依頼はMusubuにも届きます。<br>受けた人は「発注した」か「在庫あり・不要」を押して返事をします。</div>';
+  var open=all.filter(function(o){return o.status==='open';});
+  var mine=open.filter(function(o){return me&&(o.to===me);});
+  var ord={today:0,tomorrow:1,week:2};
+  var tabs=[['open','未対応 '+open.length],['mine','自分あて '+mine.length],['done','対応済み']];
+  h+='<div class="chips">'+tabs.map(function(t){return '<button class="chip'+(state.ofilter===t[0]?' on':'')+'" onclick="state.ofilter=\''+t[0]+'\';render()">'+t[1]+'</button>';}).join('')+'</div>';
+  var shown;
+  if(state.ofilter==='done'){var lim=Date.now()-14*864e5;shown=all.filter(function(o){return o.status!=='open'&&(o.doneAt||o.at)>lim;}).sort(function(a,b){return (b.doneAt||0)-(a.doneAt||0);});}
+  else {shown=(state.ofilter==='mine'?mine:open).sort(function(a,b){return (ord[a.urg]-ord[b.urg])||(a.at-b.at);});}
+  if(!shown.length)h+='<div class="card empty">'+(state.ofilter==='done'?'直近2週間の対応済みはありません':'未対応の発注依頼はありません')+'</div>';
+  shown.forEach(function(o){var u=URG[o.urg]||URG.week;var fin=o.status!=='open';
+    h+='<div class="card ord '+(fin?'fin':u.c)+'"><div style="flex:1;min-width:0">'+
+      '<div class="on1">'+(fin?'':'<span class="ub '+u.c+'">'+u.l+'</span>')+esc(o.item)+(o.qty?' <span class="tq">'+esc(o.qty)+'</span>':'')+'</div>'+
+      '<div class="on2">依頼：'+esc(o.by||'')+'（'+fmtTs(o.at)+'・'+ago(o.at)+'）→ '+esc(o.to||'店長・社員')+
+      (o.left?'<br>今の残り：'+esc(o.left):'')+(o.memo?'<br>メモ：'+esc(o.memo):'')+
+      (fin?'<br><b style="color:'+(o.status==='ordered'?'var(--ok)':'var(--text2)')+'">'+(o.status==='ordered'?'&#10003; 発注済み':'在庫あり・不要')+'</b>（'+esc(o.doneBy||'')+' '+(o.doneAt?fmtTs(o.doneAt):'')+'）'+(o.reply?'：'+esc(o.reply):''):'')+'</div></div>'+
+      '<div class="acts">'+(fin?'<button class="hbtn" onclick="reopenOrder(\''+o.id+'\')">戻す</button>':
+        '<button class="hbtn on" onclick="answerOrder(\''+o.id+'\',\'ordered\')">発注した</button><button class="hbtn" onclick="answerOrder(\''+o.id+'\',\'skip\')">在庫あり</button>'+
+        (o.by===me?'<button class="hbtn" style="color:var(--A)" onclick="delOrder(\''+o.id+'\')">取消</button>':''))+'</div></div>';});
+  v.innerHTML=h;
+}
+function openOrder(){
+  if(!state.me){toast('先に名前を選んでください');return;}
+  state.oform={item:'',qty:'',left:'',urg:'tomorrow',to:'',memo:''};drawOrder();document.getElementById('ov').classList.add('show');
+}
+function keepOrder(){var f=state.oform;['item','qty','left','memo'].forEach(function(k){var e=document.getElementById('o_'+k);if(e)f[k]=e.value;});var t=document.getElementById('o_to');if(t)f.to=t.value;}
+function drawOrder(){
+  var f=state.oform;var lib=state.orderLib||{};
+  var sug=Object.keys(lib).map(function(k){return lib[k];}).filter(function(x){return x&&x.item;}).sort(function(a,b){return (b.count||0)-(a.count||0);}).slice(0,24);
+  var q=(f.item||'').trim();if(q)sug=sug.filter(function(x){return x.item.indexOf(q)>=0&&x.item!==q;});
+  var to=orderTo();var others=state.staff.filter(function(n){return to.indexOf(n)<0;});
+  var h='<div class="sh"><h3>&#128722; 発注を依頼</h3><button class="x" onclick="closeSheet()">&#10005;</button></div><div class="sb">'+
+  '<div class="field"><label>品名<span class="req">*</span><span class="hint">一度入れた品名は次から選べます</span></label><input class="inp" id="o_item" value="'+esc(f.item)+'" placeholder="例）サラダ油、卵、わさび" oninput="keepOrder();drawOrderSug()" autocomplete="off"><div class="sugg" id="oSug">'+
+   sug.map(function(x){return '<button onclick="useOrderSug(\''+esc(x.item).replace(/'/g,"\\'")+'\')">'+esc(x.item)+'</button>';}).join('')+'</div></div>'+
+  '<div class="two"><div class="field"><label>今の残り</label><input class="inp" id="o_left" value="'+esc(f.left)+'" placeholder="例）あと1本、半分"></div>'+
+  '<div class="field"><label>欲しい量</label><input class="inp" id="o_qty" value="'+esc(f.qty)+'" placeholder="例）1ケース"></div></div>'+
+  '<div class="field"><label>いつまでに<span class="req">*</span></label><div class="qchips">'+Object.keys(URG).map(function(k){return '<button class="'+(f.urg===k?'on':'')+'" onclick="keepOrder();state.oform.urg=\''+k+'\';drawOrder()">'+URG[k].l+'</button>';}).join('')+'</div></div>'+
+  '<div class="field"><label>だれに</label><select class="sel" id="o_to"><option value="">店長・社員（全員）</option>'+
+   (to.length?'<optgroup label="店長・社員">'+to.map(function(n){return '<option'+(n===f.to?' selected':'')+'>'+esc(n)+'</option>';}).join('')+'</optgroup>':'')+
+   '<optgroup label="'+(to.length?'その他':'スタッフ')+'">'+others.map(function(n){return '<option'+(n===f.to?' selected':'')+'>'+esc(n)+'</option>';}).join('')+'</optgroup></select></div>'+
+  '<div class="field"><label>メモ<span class="hint">メーカー・置き場所など</span></label><textarea class="ta" id="o_memo" placeholder="例）いつもの業務用1kg">'+esc(f.memo)+'</textarea></div>'+
+  '<div class="err" id="oErr">品名を入れてください</div>'+
+  '<div class="btns"><button class="btn sec" onclick="closeSheet()">やめる</button><button class="btn pri" onclick="saveOrder()">依頼する</button></div></div>';
+  document.getElementById('sheet').innerHTML=h;
+}
+function drawOrderSug(){var lib=state.orderLib||{};var q=(state.oform.item||'').trim();var box=document.getElementById('oSug');if(!box)return;
+  var sug=Object.keys(lib).map(function(k){return lib[k];}).filter(function(x){return x&&x.item&&(!q||(x.item.indexOf(q)>=0&&x.item!==q));}).sort(function(a,b){return (b.count||0)-(a.count||0);}).slice(0,24);
+  box.innerHTML=sug.map(function(x){return '<button onclick="useOrderSug(\''+esc(x.item).replace(/'/g,"\\'")+'\')">'+esc(x.item)+'</button>';}).join('');}
+function useOrderSug(item){keepOrder();var x=state.orderLib[safeKey(item)]||{};state.oform.item=item;if(!state.oform.qty&&x.qty)state.oform.qty=x.qty;if(!state.oform.to&&x.to)state.oform.to=x.to;drawOrder();}
+function saveOrder(){
+  keepOrder();var f=state.oform;var item=(f.item||'').trim();
+  if(!item){document.getElementById('oErr').style.display='block';return;}
+  if(!db){toast('接続できません');return;}
+  var dup=openOrders().filter(function(o){return o.item===item;})[0];
+  if(dup&&!confirm('「'+item+'」はすでに依頼が出ています（'+esc(dup.by||'')+'・'+ago(dup.at)+'）。\nそれでも依頼しますか？'))return;
+  var o={item:item,qty:(f.qty||'').trim(),left:(f.left||'').trim(),urg:f.urg,to:f.to||'',memo:(f.memo||'').trim(),by:state.me,at:Date.now(),status:'open'};
+  db.ref(base()+'/orders').push(o);
+  db.ref(base()+'/orderLib/'+safeKey(item)).transaction(function(c){c=c||{item:item,count:0};c.count=(c.count||0)+1;c.last=Date.now();if(o.qty)c.qty=o.qty;if(o.to)c.to=o.to;return c;});
+  var d=new Date();var key=db.ref('stock/'+state.shop+'/chat').push().key;
+  db.ref('stock/'+state.shop+'/chat/'+key).set({id:key,user:'🛒 発注依頼',ts:Date.now(),time:d.getHours()+':'+pad(d.getMinutes()),_r:false,pinned:false,
+    text:'🛒 発注依頼【'+URG[o.urg].l+'】\n'+item+(o.qty?'（'+o.qty+'）':'')+(o.left?'\n今の残り：'+o.left:'')+(o.memo?'\nメモ：'+o.memo:'')+'\n依頼：'+o.by+' → '+(o.to||'店長・社員')+'\n仕込みボードの「発注依頼」で返事をしてください。'});
+  closeSheet();toast('依頼しました');
+}
+function answerOrder(id,st){
+  if(!state.me){toast('先に名前を選んでください');return;}
+  var o=state.orders[id];if(!o||!db)return;
+  var reply=prompt(st==='ordered'?'発注しました。ひとこと（入荷予定など・空でもOK）':'在庫あり・不要の理由（例：倉庫に2本あり）','');
+  if(reply===null)return;
+  db.ref(base()+'/orders/'+id).update({status:st,doneBy:state.me,doneAt:Date.now(),reply:reply.trim()});
+  if(st==='skip'||reply.trim()){var d=new Date();var key=db.ref('stock/'+state.shop+'/chat').push().key;
+    db.ref('stock/'+state.shop+'/chat/'+key).set({id:key,user:'🛒 発注依頼',ts:Date.now(),time:d.getHours()+':'+pad(d.getMinutes()),_r:false,pinned:false,
+      text:(st==='ordered'?'✅ 発注しました':'↩ 在庫あり・不要')+'：'+o.item+'（'+o.by+'さんの依頼）'+(reply.trim()?'\n'+reply.trim():'')+'\n対応：'+state.me});}
+  toast(st==='ordered'?'発注済みにしました':'不要にしました');
+}
+function reopenOrder(id){if(!db)return;db.ref(base()+'/orders/'+id).update({status:'open',doneBy:null,doneAt:null,reply:null});toast('未対応に戻しました');}
+function delOrder(id){if(!db)return;if(!confirm('この依頼を取り消しますか？'))return;db.ref(base()+'/orders/'+id).remove();toast('取り消しました');}
+function setOrderTo(name,on){var t=orderTo();var i=t.indexOf(name);if(on&&i<0)t.push(name);if(!on&&i>=0)t.splice(i,1);db.ref(base()+'/settings/orderTo').set(t);state.settings.orderTo=t;render();}
+
 /* ===== 管理者 ===== */
 function toggleLock(){
   if(state.admin){state.admin=false;lockUI();if(state.view==='lib')setView('board');else render();return;}
@@ -590,7 +700,9 @@ function renderLib(){
   var v=document.getElementById('view');
   var h='<div class="tools"><button class="hbtn" onclick="setView(\'board\')">&#8592; ボードに戻る</button></div>'+
     '<div class="card" style="padding:12px 14px;margin-bottom:12px"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1"><b>Musubuへの〆切超過通知</b><div style="font-size:12px;color:var(--text2)">Aの作業が〆切を過ぎたら、Musubuのチャットに1回だけ知らせます</div></div>'+
-    '<button class="hbtn'+(state.settings.notify?' on':'')+'" onclick="setNotify(!state.settings.notify)">'+(state.settings.notify?'ON':'OFF')+'</button></div></div>';
+    '<button class="hbtn'+(state.settings.notify?' on':'')+'" onclick="setNotify(!state.settings.notify)">'+(state.settings.notify?'ON':'OFF')+'</button></div></div>'+
+    '<div class="card" style="padding:12px 14px;margin-bottom:12px"><b>発注依頼を受ける人（店長・社員）</b><div style="font-size:12px;color:var(--text2);margin-bottom:8px">チェックした人が依頼の「だれに」の上に出ます</div><div class="qchips">'+
+    state.staff.map(function(n){var on=orderTo().indexOf(n)>=0;return '<button class="'+(on?'on':'')+'" onclick="setOrderTo(\''+esc(n).replace(/'/g,"\\'")+'\','+(!on)+')">'+(on?'&#10003; ':'')+esc(n)+'</button>';}).join('')+'</div></div>';
   var any=false;
   state.positions.forEach(function(p){
     var lib=state.lib[safeKey(p)]||{};var keys=Object.keys(lib).filter(function(k){return lib[k]&&lib[k].name;}).sort(function(a,b){return (lib[b].count||0)-(lib[a].count||0);});
