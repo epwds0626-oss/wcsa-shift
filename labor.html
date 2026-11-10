@@ -826,35 +826,39 @@ function renderDaily(){
   // 打刻CSVより後でも、今日までに売上・納品がある日は「売上のみ」として下に表示（率の計算には入れない）
   const todayS=dstr(new Date());
   const after=dates.filter(d=>d>lastPunch&&d<=todayS&&(fhSales(d)>0||salesOf(d,"本店")!=null||salesOf(d,"マルコ")!=null));
+  // 【修正 R8.11.10】上の要約（カード・店別の表）は、全社の合計と同じ日だけで集計する
+  //  （今日の勤務中の日や、食材費/固定費が出せない日を合計から外しているのに、内訳には入っていて数字が合わなかった）
+  const PCk=window.PCTX||{RM:{},fr:0.55,fxDay:()=>null}, tdK=dstr(new Date()), inPg=issuesToday(issues);
+  const K={S:0,L:0,F:0,X:0,n:0,prov:false,miss:0,missD:[],days:[]};
+  shown.forEach(d=>{if(inPg&&d===tdK)return;
+    const sb=salesOf(d,"本店")||0, sm=salesOf(d,"マルコ")||0, sf=fhSales(d), ym=d.slice(0,7), F=PCk.foodDay?PCk.foodDay(sb,sm,sf,ym):null, X=PCk.fxDay(d);
+    if(F==null||X==null){K.miss++;K.missD.push(d);return}
+    K.S+=sb+sm+sf;K.L+=res[d].本店.cost+res[d].マルコ.cost;K.F+=F;K.X+=X;K.n++;K.days.push(d);
+    if(PCk.provFood(ym)||fixedProv(ym))K.prov=true});
+  const base=K.days.length?K.days:shown.filter(d=>!(inPg&&d===tdK));
+  const exNote=[(inPg&&shown.indexOf(tdK)>=0)?`今日（${tdK.slice(5)}）は勤務中のため除く`:"",K.missD.length&&K.days.length?`${K.missD.map(d=>d.slice(5)).join("・")}は食材費/固定費が出せないため除く`:""].filter(Boolean).join("／");
   const tot={本店:0,マルコ:0}, hrs={本店:0,マルコ:0};
-  shown.forEach(d=>STORES.forEach(s=>{tot[s]+=res[d][s].cost;hrs[s]+=res[d][s].h}));
-  const openN={本店:shown.filter(d=>!closedSet("本店").has(d)).length, マルコ:shown.filter(d=>!closedSet("マルコ").has(d)).length};
+  base.forEach(d=>STORES.forEach(s=>{tot[s]+=res[d][s].cost;hrs[s]+=res[d][s].h}));
+  const openN={本店:base.filter(d=>!closedSet("本店").has(d)).length, マルコ:base.filter(d=>!closedSet("マルコ").has(d)).length};
   const all=tot.本店+tot.マルコ;
   // 売上がある日だけで比率
   const rs={本店:{c:0,s:0,n:0},マルコ:{c:0,s:0,n:0}};
-  shown.forEach(d=>STORES.forEach(s=>{const v=salesOf(d,s);rs[s].c+=res[d][s].cost;if(v!=null){rs[s].s+=v;rs[s].n++}}));
-  const fhTot=shown.reduce((a,d)=>a+fhSales(d),0), fhN=shown.reduce((a,d)=>a+((fh.by[d]||{}).n||0),0);
+  base.forEach(d=>STORES.forEach(s=>{const v=salesOf(d,s);rs[s].c+=res[d][s].cost;if(v!=null){rs[s].s+=v;rs[s].n++}}));
+  const fhTot=base.reduce((a,d)=>a+fhSales(d),0), fhN=base.reduce((a,d)=>a+((fh.by[d]||{}).n||0),0);
   const allC=rs.本店.c+rs.マルコ.c, allS=rs.本店.s+rs.マルコ.s+fhTot;
   const both={length:shown.filter(d=>salesOf(d,"本店")!=null||salesOf(d,"マルコ")!=null||fhSales(d)).length};
   const yy={本店:{c:0,p:0},マルコ:{c:0,p:0}};
-  shown.forEach(d=>STORES.forEach(st=>{const c=salesOf(d,st),p=salesOf(prevDay(d),st);if(c>0&&p>0){yy[st].c+=c;yy[st].p+=p}}));
+  base.forEach(d=>STORES.forEach(st=>{const c=salesOf(d,st),p=salesOf(prevDay(d),st);if(c>0&&p>0){yy[st].c+=c;yy[st].p+=p}}));
   const yl=st=>yy[st].p>0?`<div class="d">売上昨対 <b class="rtv">${(yy[st].c/yy[st].p*100).toFixed(1)}%</b>（前年同曜日と比較）</div>`:"";
   const yAll=yy.本店.p+yy.マルコ.p>0?`<div class="d">売上昨対 <b class="rtv">${((yy.本店.c+yy.マルコ.c)/(yy.本店.p+yy.マルコ.p)*100).toFixed(1)}%</b>（前年のある店のみ）</div>`:"";
   const rl=(c,s,n)=>n?`<div class="d">人件費率 <b class="rtv">${ratioTxt(c,s)}</b>（売上 ${yen(s)}）</div>`:`<div class="d">売上未入力</div>`;
   // 人時売上高：売上のある日だけの売上÷その日の実働時間
   const ph={本店:{s:0,h:0},マルコ:{s:0,h:0},全社:{s:0,h:0}};
-  shown.forEach(d=>{STORES.forEach(s=>{const v=salesOf(d,s);if(v!=null&&res[d][s].h>0){ph[s].s+=v;ph[s].h+=res[d][s].h}});
+  base.forEach(d=>{STORES.forEach(s=>{const v=salesOf(d,s);if(v!=null&&res[d][s].h>0){ph[s].s+=v;ph[s].h+=res[d][s].h}});
     const hb=res[d].本店.h+res[d].マルコ.h, sv=(salesOf(d,"本店")||0)+(salesOf(d,"マルコ")||0)+fhSales(d); if(hb>0&&sv>0){ph.全社.s+=sv;ph.全社.h+=hb}});
   const pl=k=>ph[k].h>0?`<div class="d">人時売上高 <b class="rtv">${prodPill(ph[k].s/ph[k].h)}</b></div>`:"";
   // ── 一番上：全社の 売上・人件費・食材費・固定費・営業利益（日別の表と同じ計算） ──
   renderProfit(res,shown,issuesToday(issues));
-  const PCk=window.PCTX||{RM:{},fr:0.55,fxDay:()=>null}, tdK=dstr(new Date()), inPg=issuesToday(issues);
-  const K={S:0,L:0,F:0,X:0,n:0,prov:false,miss:0};
-  shown.forEach(d=>{if(inPg&&d===tdK)return;
-    const sb=salesOf(d,"本店")||0, sm=salesOf(d,"マルコ")||0, sf=fhSales(d), ym=d.slice(0,7), F=PCk.foodDay?PCk.foodDay(sb,sm,sf,ym):null, X=PCk.fxDay(d);
-    if(F==null||X==null){K.miss++;return}
-    K.S+=sb+sm+sf;K.L+=res[d].本店.cost+res[d].マルコ.cost;K.F+=F;K.X+=X;K.n++;
-    if(PCk.provFood(ym)||fixedProv(ym))K.prov=true});
   const K_O=K.S-K.L-K.F-K.X, kp=v=>K.S>0?(v/K.S*100).toFixed(1)+"%":"—";
   const tgt=num(cfg.target||30), lr=K.S>0?K.L/K.S*100:null;
   const lastUse=shown.filter(d=>!(inPg&&d===tdK)).pop()||lastPunch;
@@ -863,7 +867,7 @@ function renderDaily(){
   const yC=yy.本店.c+yy.マルコ.c, yP=yy.本店.p+yy.マルコ.p;
   const storeRow=(nm,cls,s,c,phk,yk,extra)=>`<tr><td class="l"><b class="${cls}">${nm}</b></td><td>${s!=null?yen(s):"—"}</td><td>${c!=null?yen(c):"—"}</td><td>${c!=null&&s>0?ratioCell(c,s).replace(/^<td class="rt">|<\/td>$/g,""):"—"}</td><td>${phk&&ph[phk].h>0?prodPill(ph[phk].s/ph[phk].h):"—"}</td><td>${yk&&yy[yk].p>0?(yy[yk].c/yy[yk].p*100).toFixed(1)+"%":"—"}</td><td class="l note">${extra||""}</td></tr>`;
   document.getElementById("sum").innerHTML=`
-    <div class="khead"><b>全社</b> ${shown[0].slice(5)}〜${lastUse.slice(5)}（${K.n}日${K.miss?`・食材費/固定費が出せない ${K.miss}日を除く`:""}）${K.prov?'<span class="chip w" title="食材費または固定費が未確定の月を含むため仮の率で計算">仮を含む</span>':""}${yP>0?`<span class="note">売上昨対 <b>${(yC/yP*100).toFixed(1)}%</b>（前年のある店のみ）</span>`:""}</div>
+    <div class="khead"><b>全社</b> ${shown[0].slice(5)}〜${lastUse.slice(5)}（${K.n}日）${exNote?`<span class="note">${exNote}</span>`:""}${K.prov?'<span class="chip w" title="食材費または固定費が未確定の月を含むため仮の率で計算">仮を含む</span>':""}${yP>0?`<span class="note">売上昨対 <b>${(yC/yP*100).toFixed(1)}%</b>（前年のある店のみ）</span>`:""}</div>
     <div class="kpi">
       ${card("ks-s","売上",yen(K.S),`本店 ${yen(rs.本店.s)}／マルコ ${yen(rs.マルコ.s)}／FishHack ${yen(fhTot)}`)}
       ${card("ks-l","人件費",yen(K.L),`売上比 <b>${kp(K.L)}</b>　${lr==null?"":`<span class="pill ${lr<=tgt?"ok":lr<=tgt+5?"w":"c"}">${lr<=tgt?"目標内":"目標超過"}（${tgt}%）</span>`}`)}
@@ -912,12 +916,12 @@ function renderDaily(){
     const sb=salesOf(d,"本店"), sm=salesOf(d,"マルコ"), sf=fhSales(d), st=(sb||0)+(sm||0)+sf;
     const pdy=prevDay(d), pb=salesOf(pdy,"本店"), pm=salesOf(pdy,"マルコ");
     const rc=(pb>0&&sb>0?sb:0)+(pm>0&&sm>0?sm:0), rp=(pb>0&&sb>0?pb:0)+(pm>0&&sm>0?pm:0);
-    sumS.本店+=sb||0; sumS.マルコ+=sm||0;
     const cl=closedSet("本店").has(d)&&closedSet("マルコ").has(d);
     const hol=HOLIDAYS[d], ym=d.slice(0,7);
     const FS=PC.foodSplit?PC.foodSplit(sb||0,sm||0,sf,ym):null, F=FS?FS.h+FS.m+FS.f:null, X=PC.fxDay(d);
     const live=inProg&&d===todayK;  // 勤務中の今日は人件費が未確定のため利益は出さない
     const O=F==null||X==null||live?null:st-t-F-X;
+    if(!live&&(O!=null||!K.days.length)){sumS.本店+=sb||0; sumS.マルコ+=sm||0;}  // 計は上の要約と同じ日だけで合計
     if(O!=null){PT.F+=F;PT.X+=X;PT.O+=O;PT.S+=st;PT.L+=t;PT.n++;PT.FH+=FS.h;PT.FM+=FS.m;PT.FF+=FS.f;PT.SH+=sb||0;PT.SM+=sm||0;
       if(!cl){const g=PG[dayKind(d)==="平"?"平":"休"];g.S+=st;g.L+=t;g.F+=F;g.X+=X;g.n++}}
     const pv=(PC.provFood&&PC.provFood(ym))||fixedProv(ym);
@@ -937,7 +941,7 @@ function renderDaily(){
       ${detail(res[d])}</div></td></tr>`;
   });
   const yS=(c,p)=>p>0&&c>0?`<div class="yoy ${c>=p?"up":"down"}">昨対 ${(c/p*100).toFixed(1)}%</div>`:"";
-  h+=`<tr class="tot"><td class="l">計</td>
+  h+=`<tr class="tot"><td class="l">計${exNote?`<div class="sub2" style="font-weight:400">${exNote}</div>`:""}</td>
     <td class="sl">${sumS.本店?yen(sumS.本店):"—"}${yS(yy.本店.c,yy.本店.p)}</td><td>${yen(tot.本店)}${lsub(rs.本店.c,rs.本店.s)}</td><td class="rt">${PT.n?yen(PT.FH):"—"}${PT.n?sub(PT.FH,PT.SH):""}</td>
     <td class="sl">${sumS.マルコ?yen(sumS.マルコ):"—"}${yS(yy.マルコ.c,yy.マルコ.p)}</td><td>${yen(tot.マルコ)}${lsub(rs.マルコ.c,rs.マルコ.s)}</td><td class="rt">${PT.n?yen(PT.FM):"—"}${PT.n?sub(PT.FM,PT.SM):""}</td>
     <td class="sl rt">${fhTot?yen(fhTot):"—"}${PT.n&&PT.FF?`<div class="sub2">原価 ${yen(PT.FF)}</div>`:""}</td>
