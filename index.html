@@ -241,6 +241,7 @@ nav{display:flex;gap:2px}
       <button class="shop-btn" id="modeCooking" onclick="switchMode('cooking')">🍳</button>
       <button class="shop-btn" id="modeOtoshi" onclick="switchMode('otoshi')">🍱</button>
       <button class="shop-btn" id="modeManual" onclick="switchMode('manual')">📋</button>
+      <button class="shop-btn" id="modeShikomi" onclick="switchMode('shikomi')">📝</button>
     </div>
     <nav style="margin-left:auto;flex-shrink:0;">
       <button class="nav-btn active" id="nav0" onclick="showPage('calendar')">カレンダー</button>
@@ -327,6 +328,26 @@ nav{display:flex;gap:2px}
       <div class="hcard-meta" id="hmeta-musubu-marco">
         <span>読み込み中...</span>
       </div>
+    </div>
+  </div>
+
+  <!-- 今日の仕込み -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:-10px 0 24px;">
+    <div class="hcard" id="hcard-shikomi-enya" onclick="homeOpenShikomi(0)"
+      style="background:linear-gradient(135deg,#2a1d10 0%,#3a2410 100%);">
+      <div class="hcard-glow" style="background:#f0a04a;"></div>
+      <span class="hcard-icon">📝</span>
+      <div class="hcard-title" style="color:#f0a04a;">本店 今日の仕込み</div>
+      <div class="hcard-sub">作業・優先順位・引継ぎ</div>
+      <div class="hcard-meta" id="hmeta-shikomi-enya"><span>読み込み中...</span></div>
+    </div>
+    <div class="hcard" id="hcard-shikomi-marco" onclick="homeOpenShikomi(1)"
+      style="background:linear-gradient(135deg,#10252a 0%,#10303a 100%);">
+      <div class="hcard-glow" style="background:#4ad0e8;"></div>
+      <span class="hcard-icon">📝</span>
+      <div class="hcard-title" style="color:#4ad0e8;">マルコ 今日の仕込み</div>
+      <div class="hcard-sub">作業・優先順位・引継ぎ</div>
+      <div class="hcard-meta" id="hmeta-shikomi-marco"><span>読み込み中...</span></div>
     </div>
   </div>
 
@@ -863,6 +884,11 @@ nav{display:flex;gap:2px}
   <iframe id="manual-frame" src="manual.html" style="width:100%;height:100%;border:none;background:#eef1f3" loading="lazy"></iframe>
 </div>
 <!-- ===== /マニュアルノート ===== -->
+<!-- ===== 今日の仕込み ===== -->
+<div id="shikomi-wrapper" style="display:none;position:fixed;top:82px;left:0;right:0;bottom:0;z-index:50;overflow:hidden;background:#eef1f3;">
+  <iframe id="shikomi-frame" style="width:100%;height:100%;border:none;background:#eef1f3"></iframe>
+</div>
+<!-- ===== /今日の仕込み ===== -->
 
 <div id="musubu-wrapper" style="display:none;position:fixed;top:82px;left:0;right:0;bottom:0;z-index:50;overflow:hidden;">
 <style>
@@ -2125,7 +2151,7 @@ var SHOPS = [
 var currentShop = 0;
 
 window.addEventListener('resize', function(){
-  ['fish-wrapper','study-wrapper','cooking-wrapper','otoshi-wrapper','manual-wrapper','labor-wrapper'].forEach(function(id){
+  ['fish-wrapper','study-wrapper','cooking-wrapper','otoshi-wrapper','manual-wrapper','labor-wrapper','shikomi-wrapper'].forEach(function(id){
     var fw = document.getElementById(id);
     if (fw && fw.style.display === 'block') {
       fw.style.top = '0';
@@ -2140,7 +2166,7 @@ function switchMode(mode, shopIdx) {
   var pdfBtn = document.querySelector('.pdf-btn');
 
   // 全モードボタンをリセット
-  ['modeShift','modeMusubu','modeChallenge','modeFish','modeStudy','modeCooking','modeOtoshi','modeManual'].forEach(function(id) {
+  ['modeShift','modeMusubu','modeChallenge','modeFish','modeStudy','modeCooking','modeOtoshi','modeManual','modeShikomi'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.className = 'shop-btn'; el.style.cssText = ''; }
   });
@@ -2158,6 +2184,36 @@ function switchMode(mode, shopIdx) {
   if (manualWrapper) manualWrapper.style.display = 'none';
   var laborWrapper = document.getElementById('labor-wrapper');
   if (laborWrapper) laborWrapper.style.display = 'none';
+  var shikomiWrapper = document.getElementById('shikomi-wrapper');
+  if (shikomiWrapper) shikomiWrapper.style.display = 'none';
+
+  if (mode === 'shikomi') {
+    if (musubuWrapper) musubuWrapper.style.display = 'none';
+    var mainHeaderSk = document.getElementById('main-header');
+    if (mainHeaderSk) mainHeaderSk.style.display = 'none';
+    var skf = document.getElementById('shikomi-frame');
+    var skShop = (shopIdx !== undefined ? shopIdx : currentShop) === 1 ? 'marco' : 'enya';
+    if (skf && skf.getAttribute('data-shop') !== skShop) { skf.setAttribute('data-shop', skShop); skf.setAttribute('src', 'shikomi.html?shop=' + skShop + '&v=' + Date.now()); } // 最新版を読む（GitHub Pagesのキャッシュ対策）
+    if (shikomiWrapper) {
+      shikomiWrapper.style.position = 'fixed';
+      shikomiWrapper.style.top = '0';
+      shikomiWrapper.style.left = '0';
+      shikomiWrapper.style.right = '0';
+      shikomiWrapper.style.bottom = '0';
+      shikomiWrapper.style.height = window.innerHeight + 'px';
+      shikomiWrapper.style.zIndex = '200';
+      shikomiWrapper.style.display = 'block';
+      shikomiWrapper.style.webkitTransform = 'translateZ(0)';
+    }
+    ['page-calendar','page-wish','page-admin','page-admin-lock','page-challenge'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    if (headerNav) headerNav.style.display = 'none';
+    if (pdfBtn) pdfBtn.style.display = 'none';
+    var msk = document.getElementById('modeShikomi');
+    if (msk) { msk.className = 'shop-btn active'; msk.style.cssText = 'background:var(--accent);color:#0a0a0f'; }
+    return;
+  }
   // ヘッダーは一旦表示に戻す（全画面帳を開く分岐内で改めて隠す）
   var mainHeaderReset = document.getElementById('main-header');
   if (mainHeaderReset) mainHeaderReset.style.display = '';
@@ -6008,6 +6064,18 @@ function updateHomeCardMeta() {
       var el = document.getElementById('hmeta-shift-marco');
       if (el) el.innerHTML = '<span>今日のシフト: <strong style="color:#4a9ee8;">' + total + '名</strong></span>' + getLastAccess('shift-marco');
     });
+    // 今日の仕込み 進捗
+    ['enya','marco'].forEach(function(st) {
+      db.ref('shikomi/' + st + '/days/' + todayKey + '/tasks').once('value', function(snap) {
+        var v = snap.val() || {};
+        var arr = Object.keys(v).map(function(k){ return v[k]; }).filter(function(t){ return t && t.name; });
+        var dn = arr.filter(function(t){ return t.done; }).length;
+        var aLeft = arr.filter(function(t){ return !t.done && t.prio === 'A'; }).length;
+        var color = st === 'enya' ? '#f0a04a' : '#4ad0e8';
+        var el = document.getElementById('hmeta-shikomi-' + st);
+        if (el) el.innerHTML = (arr.length ? '<span>完了: <strong style="color:' + color + ';">' + dn + '/' + arr.length + '</strong></span>' + (aLeft ? '<span>A残り: <strong style="color:#e84a6a;">' + aLeft + '件</strong></span>' : '<span style="color:#4ae8a0;">✓ A完了</span>') : '<span>まだ作業がありません</span>') + getLastAccess('shikomi-' + st);
+      });
+    });
     // Musubu未読バッジ
     ['enya','marco'].forEach(function(st) {
       db.ref('stock/' + st + '/chat').limitToLast(50).once('value', function(snap) {
@@ -6055,6 +6123,13 @@ function homeOpenShift(shopIdx) {
   switchShop(shopIdx);
   switchMode('shift');
   showPage('calendar');
+}
+
+function homeOpenShikomi(shopIdx) {
+  setLastAccess('shikomi-' + (shopIdx === 0 ? 'enya' : 'marco'));
+  hideHomeScreen();
+  switchShop(shopIdx);
+  switchMode('shikomi', shopIdx);
 }
 
 function homeOpenMusubu(store) {
