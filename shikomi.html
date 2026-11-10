@@ -176,8 +176,8 @@ try{ if(!firebase.apps.length)firebase.initializeApp(firebaseConfig); db=firebas
 var SHOP_KEY={enya:'wcsa',marco:'marco'};          // WCSA本体のスタッフ・ポジション置き場
 var SHOP_COLOR={enya:'#b07d00',marco:'#1a7fbf'};
 // 本店の仕込みポジションは固定（WCSAのシフト用ポジションとは別管理）
-var FIXED_POS={enya:['刺し場','刺し場補助','煮焼場','揚場']};
-var DEF_POS={enya:['刺し場','刺し場補助','煮焼場','揚場'],
+var FIXED_POS={enya:['刺し場','刺し場補助','煮焼場','揚場','ホール']};
+var DEF_POS={enya:['刺し場','刺し場補助','煮焼場','揚場','ホール'],
              marco:['パスタ','ピザ','前菜・サラダ','デザート','洗い場','ホール']};
 var PR={A:'営業に直結・最優先',B:'遅れるとバタつく',C:'スキマ時間でOK'};
 var DL_CHIPS=['9:30','10:00','10:30','10:45','11:00','14:30','15:30','16:30','17:00','17:15'];
@@ -227,6 +227,7 @@ function load(){
     var list=Array.isArray(v)?v:(v?Object.values(v):[]);
     var out=[];list.forEach(function(p){p=String(p||'').replace(/補助$/,'');if(p&&out.indexOf(p)<0)out.push(p);});
     DEF_POS[state.shop].forEach(function(p){if(out.indexOf(p)<0&&!list.length)out.push(p);});
+    if(out.indexOf('ホール')<0)out.push('ホール');
     state.positions=out.length?out:DEF_POS[state.shop];render();
   });
   listen(base()+'/days/'+state.date+'/tasks',function(v){state.tasks=v||{};render();});
