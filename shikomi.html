@@ -192,7 +192,7 @@ var FIXED_POS={enya:['刺し場','刺し場補助','煮焼場','揚場','ホー�
 var DEF_POS={enya:['刺し場','刺し場補助','煮焼場','揚場','ホール','運営'],
              marco:['パスタ','ピザ','前菜・サラダ','デザート','洗い場','ホール','運営']};
 var PR={A:'営業に直結・最優先',B:'遅れるとバタつく',C:'スキマ時間でOK'};
-var DL_CHIPS=['9:30','10:00','10:30','10:45','11:00','14:30','15:30','16:30','17:00','17:15'];
+var DL_CHIPS=['9:30','10:00','10:30','10:45','11:00','14:30','15:30','16:30','17:00','17:15','17:30','18:00','18:30','19:00','19:30','20:00'];
 var MIN_CHIPS=[5,10,15,20,30,45,60,90];
 var DOW=['日','月','火','水','木','金','土'];
 
@@ -203,7 +203,7 @@ var state={
   me:'', pos:'', staff:[], positions:[],
   tasks:{}, notes:{}, lib:{}, edit:null, form:null,
   shiftNames:[], fixedNames:[], settings:{notify:true}, admin:false,
-  orders:{}, orderLib:{}, ofilter:'open', fd:null, fdShop:null, prepOpen:(localStorage.getItem('shk_prep')!=='0'), prepAll:false
+  orders:{}, orderLib:{}, longs:{}, ofilter:'open', fd:null, fdShop:null, prepOpen:(localStorage.getItem('shk_prep')!=='0'), prepAll:false
 };
 var ADMIN_PASS="0626";
 var refs=[];
@@ -227,7 +227,7 @@ function detach(){refs.forEach(function(r){try{r.off();}catch(e){}});refs=[];}
 function listen(path,cb){if(!db)return;var r=db.ref(path);r.on('value',function(s){cb(s.val());});refs.push(r);}
 function load(){
   detach();
-  state.tasks={};state.notes={};state.lib={};state.orders={};state.orderLib={};state.shiftNames=[];state.fixedNames=[];
+  state.tasks={};state.notes={};state.lib={};state.orders={};state.orderLib={};state.longs={};state.shiftNames=[];state.fixedNames=[];
   document.documentElement.style.setProperty('--accent',SHOP_COLOR[state.shop]);
   document.documentElement.style.setProperty('--accent-soft',state.shop==='enya'?'rgba(176,125,0,.12)':'rgba(26,127,191,.12)');
   state.me=localStorage.getItem('shk_me_'+state.shop)||'';
@@ -243,6 +243,7 @@ function load(){
     state.positions=out.length?out:DEF_POS[state.shop];render();
   });
   listen(base()+'/days/'+state.date+'/tasks',function(v){state.tasks=v||{};render();});
+  listen(base()+'/long',function(v){state.longs=v||{};render();}); // 期限日つきの作業（複数日にまたがる）
   listen(base()+'/days/'+state.date+'/notes',function(v){state.notes=v||{};render();});
   listen(base()+'/lib',function(v){state.lib=v||{};if(state.view==='lib')render();});
   listen(base()+'/settings',function(v){state.settings=Object.assign({notify:true},v||{});});
@@ -331,19 +332,34 @@ function nameOptions(sel){
 }
 
 /* ===== 計算 ===== */
-function list(){var a=[];for(var id in state.tasks){var t=state.tasks[id];if(t&&t.name){t.id=id;a.push(t);}}return a;}
+function list(){var a=[];for(var id in state.tasks){var t=state.tasks[id];if(t&&t.name){t.id=id;a.push(t);}}
+  for(var lid in state.longs){var x=state.longs[lid];if(!x||!x.name||(x.start||'')>state.date)continue;
+    if(x.done&&x.doneAt&&keyOf(new Date(x.doneAt))<state.date)continue;x.id=lid;x.long=true;a.push(x);}
+  return a;}
+function isLong(id){return !state.tasks[id]&&!!state.longs[id];}
+function getT(id){return state.tasks[id]||state.longs[id];}
+function tPath(id){return isLong(id)?base()+'/long/'+id:base()+'/days/'+state.date+'/tasks/'+id;}
+function md(k){var a=k.split('-');return (+a[1])+'/'+(+a[2]);}
+function dayDiff(a,b){return Math.round((parseKey(b)-parseKey(a))/864e5);}
+function dueToday(t){return !t.long||t.due<=state.date;} // その日中にやるべきか
 function isToday(){return state.date===todayKey();}
-function isLate(t){if(t.done){var dm=toMin(t.deadline);if(dm==null||!t.doneAt)return false;var d=new Date(t.doneAt);return keyOf(d)===state.date&&d.getHours()*60+d.getMinutes()>dm;}
+function isLate(t){
+  if(t.long){var due=t.due||state.date;
+    if(t.done){if(!t.doneAt)return false;var dd=keyOf(new Date(t.doneAt));if(dd>due)return true;if(dd<due)return false;var m0=toMin(t.deadline);var d0=new Date(t.doneAt);return m0!=null&&d0.getHours()*60+d0.getMinutes()>m0;}
+    if(!isToday())return state.date>due;
+    if(state.date>due)return true;if(state.date<due)return false;var m1=toMin(t.deadline);return m1!=null&&nowMin()>m1;}
+  if(t.done){var dm=toMin(t.deadline);if(dm==null||!t.doneAt)return false;var d=new Date(t.doneAt);return keyOf(d)===state.date&&d.getHours()*60+d.getMinutes()>dm;}
   if(!isToday())return state.date<todayKey();var m=toMin(t.deadline);return m!=null&&nowMin()>m;}
 function sortTasks(a){var po={A:0,B:1,C:2};return a.sort(function(x,y){
   if(!!x.done!==!!y.done)return x.done?1:-1;
   if(po[x.prio]!==po[y.prio])return po[x.prio]-po[y.prio];
-  var a1=toMin(x.deadline),b1=toMin(y.deadline);a1=a1==null?9999:a1;b1=b1==null?9999:b1;
+  var a1=dk(x),b1=dk(y);
   if(a1!==b1)return a1-b1;return (x.createdAt||0)-(y.createdAt||0);});}
+function dk(t){if(t.long&&t.due>state.date)return 5000+dayDiff(state.date,t.due);var m=toMin(t.deadline);return m==null?(t.long?1440:9999):m;}
 function whoOf(t){return t.assign==='help'&&t.helper?t.helper:t.owner;}
 function loadCheck(){ // ムリ判定：自分の未完了作業を〆切順に積み上げて間に合うか
   if(!state.me||!isToday())return null;
-  var mine=list().filter(function(t){return !t.done&&whoOf(t)===state.me;});
+  var mine=list().filter(function(t){return !t.done&&whoOf(t)===state.me&&dueToday(t);});
   if(!mine.length)return null;
   mine.sort(function(x,y){return (toMin(x.deadline)||9999)-(toMin(y.deadline)||9999);});
   var cur=nowMin(),total=0,miss=[];
@@ -422,12 +438,17 @@ function taskHTML(t){
   var h='<div class="card task'+(t.done?' done':'')+(late&&!t.done?' late':'')+'">'+
     '<button class="ck" onclick="toggleDone(\''+t.id+'\')">'+(t.done?'&#10003;':'&#9711;')+'</button>'+
     '<div class="tb" onclick="openTask(\''+t.id+'\')"><div class="t1"><span class="pr '+t.prio+'">'+t.prio+'</span><span class="tn">'+esc(t.name)+'</span><span class="tq">'+esc(t.qty)+'</span>'+
-    (t.carried?'<span class="badge carry">引継ぎ</span>':'')+(t.assign==='help'?'<span class="badge help">補助</span>':'')+(late?'<span class="badge late">〆切超過</span>':'')+'</div>'+
-    '<div class="t2"><span class="dl'+(late&&!t.done?' late':'')+'">〆 '+esc(t.deadline||'—')+'</span><span>'+(t.mins?t.mins+'分':'')+'</span><span>'+who+'</span>'+
+    (t.long?'<span class="badge help">&#128197; 期限日</span>':'')+(t.carried?'<span class="badge carry">引継ぎ</span>':'')+(t.assign==='help'?'<span class="badge help">補助</span>':'')+(late?'<span class="badge late">〆切超過</span>':'')+'</div>'+
+    '<div class="t2"><span class="dl'+(late&&!t.done?' late':'')+'">〆 '+dlText(t)+'</span><span>'+(t.mins?t.mins+'分':'')+'</span><span>'+who+'</span>'+
     (t.done?'<span style="color:var(--ok)">&#10003; '+esc(t.doneBy||'')+' '+(t.doneAt?hhmm(t.doneAt):'')+'</span>':'')+'</div>'+
     (t.memo?'<div class="tm">'+esc(t.memo)+'</div>':'')+'</div></div>';
   return h;
 }
+function dlText(t){
+  if(!t.long)return esc(t.deadline||'—');
+  var s=md(t.due)+(t.deadline?' '+esc(t.deadline):'')+'まで';
+  if(t.done)return s;var n=dayDiff(state.date,t.due);
+  return s+'（'+(n>0?'あと'+n+'日':(n===0?'今日まで':(-n)+'日超過'))+'）';}
 function rulesHTML(){
   return '<div class="card rules"><h4>使い方ルール</h4><ol>'+
   '<li>優先度　<b style="color:var(--A)">A</b>＝営業に直結・最優先　<b style="color:var(--B)">B</b>＝遅れるとバタつく　<b style="color:var(--C)">C</b>＝スキマ時間</li>'+
@@ -442,20 +463,20 @@ function toggleRules(){state.showRules=!state.showRules;render();}
 
 /* ===== 完了 ===== */
 function toggleDone(id){
-  var t=state.tasks[id];if(!t||!db)return;
+  var t=getT(id);if(!t||!db)return;
   if(!t.done&&!state.me){toast('先に名前を選んでください');return;}
   var upd=t.done?{done:false,doneBy:null,doneAt:null}:{done:true,doneBy:state.me,doneAt:Date.now()};
-  db.ref(base()+'/days/'+state.date+'/tasks/'+id).update(upd);
+  db.ref(tPath(id)).update(upd);
   if(!t.done)toast('完了：'+t.name);
 }
 
 /* ===== 追加・編集 ===== */
 function openTask(id){
   if(!state.me){toast('先に名前を選んでください');return;}
-  var t=id?state.tasks[id]:null;
+  var t=id?getT(id):null;
   state.edit=id||null;
-  state.form=t?{name:t.name,qty:t.qty,prio:t.prio,pos:t.pos,deadline:t.deadline||'',mins:t.mins||15,assign:t.assign||'self',helper:t.helper||'',memo:t.memo||''}
-             :{name:'',qty:'',prio:'A',pos:state.pos||'',deadline:'',mins:15,assign:'self',helper:'',memo:''};
+  state.form=t?{name:t.name,qty:t.qty,prio:t.prio,pos:t.pos,deadline:t.deadline||'',mins:t.mins||15,assign:t.assign||'self',helper:t.helper||'',memo:t.memo||'',due:isLong(id)?(t.due||''):''}
+             :{name:'',qty:'',prio:'A',pos:state.pos||'',deadline:'',mins:15,assign:'self',helper:'',memo:'',due:''};
   drawForm();document.getElementById('ov').classList.add('show');
 }
 function drawForm(){
@@ -468,7 +489,13 @@ function drawForm(){
   '<div class="field"><label>数量<span class="req">*</span><span class="hint">ざっくりでOK・空白NG</span></label><input class="inp" id="fQty" value="'+esc(f.qty)+'" placeholder="例）1尾、5本分"></div>'+
   '<div class="field"><label>優先度<span class="req">*</span></label><div class="pbtns">'+
    ['A','B','C'].map(function(p){return '<button class="'+p+(f.prio===p?' on':'')+'" onclick="keepForm();state.form.prio=\''+p+'\';drawForm()"><b>'+p+'</b><span>'+PR[p]+'</span></button>';}).join('')+'</div></div>'+
-  '<div class="two"><div class="field"><label>〆切<span class="req">*</span><span class="hint">希望ではなく〆切</span></label><input class="inp" type="time" id="fDl" value="'+esc(f.deadline)+'">'+
+  '<div class="field"><label>いつまでに<span class="req">*</span><span class="hint">何日もかかる作業は「日付を指定」</span></label><div class="qchips">'+
+   '<button class="'+(!f.due?'on':'')+'" onclick="keepForm();state.form.due=\'\';drawForm()">この日（'+md(state.date)+'）</button>'+
+   '<button class="'+(f.due?'on':'')+'" onclick="keepForm();state.form.due=state.form.due||addDays(state.date,7);drawForm()">&#128197; 日付を指定</button></div>'+
+   (f.due?'<input class="inp" type="date" id="fDue" style="margin-top:8px" min="'+state.date+'" value="'+esc(f.due)+'" onchange="keepForm();drawForm()">'+
+     '<div class="qchips" style="margin-top:6px">'+[[1,'明日'],[3,'3日後'],[7,'1週間後'],[14,'2週間後'],[30,'1か月後']].map(function(x){var v=addDays(state.date,x[0]);return '<button class="'+(f.due===v?'on':'')+'" onclick="keepForm();state.form.due=\''+v+'\';drawForm()">'+x[1]+'</button>';}).join('')+'</div>'+
+     '<div class="hint" style="font-size:12px;color:var(--text2);margin-top:6px">'+md(f.due)+'まで毎日のボードに出て、完了するまで消えません</div>':'')+'</div>'+
+  '<div class="two"><div class="field"><label>'+(f.due?'時間<span class="hint">任意</span>':'〆切<span class="req">*</span><span class="hint">希望ではなく〆切</span>')+'</label><input class="inp" type="time" id="fDl" value="'+esc(f.deadline)+'">'+
    '<div class="qchips">'+DL_CHIPS.map(function(c){var v=(c.length===4?'0':'')+c;return '<button class="'+(f.deadline===v?'on':'')+'" onclick="keepForm();state.form.deadline=\''+v+'\';drawForm()">'+c+'</button>';}).join('')+'</div></div></div>'+
   '<div class="field"><label>作業時間</label><div class="qchips">'+MIN_CHIPS.map(function(m){return '<button class="'+(+f.mins===m?'on':'')+'" onclick="keepForm();state.form.mins='+m+';drawForm()">'+m+'分</button>';}).join('')+'</div></div>'+
   '<div class="field"><label>担当</label><div class="qchips"><button class="'+(f.assign!=='help'?'on':'')+'" onclick="keepForm();state.form.assign=\'self\';drawForm()">自分（'+esc(state.edit&&state.tasks[state.edit]?state.tasks[state.edit].owner:state.me)+'）</button><button class="'+(f.assign==='help'?'on':'')+'" onclick="keepForm();state.form.assign=\'help\';drawForm()">補助に振る</button></div>'+
@@ -488,26 +515,34 @@ function drawSug(q){var box=document.getElementById('sugBox');if(!box)return;
   if(!all.length){box.innerHTML='<span style="font-size:12px;color:var(--text3)">このポジションの作業リストはまだありません。保存すると自動で登録されます</span>';return;}
   box.innerHTML=hit.slice(0,24).map(function(x){return '<button onclick="useSug(this.getAttribute(\'data-n\'))" data-n="'+esc(x.name)+'">'+esc(x.name)+(x.count>1?' <small style="opacity:.6">×'+x.count+'</small>':'')+'</button>';}).join('')||'<span style="font-size:12px;color:var(--text3)">新しい作業として登録されます</span>';}
 function keepForm(){var f=state.form;var g=function(id){var e=document.getElementById(id);return e?e.value:null;};
-  var v;if((v=g('fName'))!=null)f.name=v;if((v=g('fQty'))!=null)f.qty=v;if((v=g('fDl'))!=null)f.deadline=v;if((v=g('fMemo'))!=null)f.memo=v;if((v=g('fHelper'))!=null)f.helper=v;if((v=g('fPos'))!=null)f.pos=v;}
+  var v;if((v=g('fName'))!=null)f.name=v;if((v=g('fQty'))!=null)f.qty=v;if((v=g('fDl'))!=null)f.deadline=v;if((v=g('fMemo'))!=null)f.memo=v;if((v=g('fHelper'))!=null)f.helper=v;if((v=g('fPos'))!=null)f.pos=v;if((v=g('fDue'))!=null&&v)f.due=v;}
 function useSug(name){keepForm();var s=libList().filter(function(x){return x.name===name;})[0];if(!s)return;
   var f=state.form;f.name=s.name;f.qty=s.qty||f.qty;f.prio=s.prio||f.prio;f.mins=s.mins||f.mins;f.deadline=s.deadline||f.deadline;drawForm();}
 function saveTask(){
   keepForm();var f=state.form;var err=document.getElementById('fErr');
-  var miss=[];if(!f.pos)miss.push('ポジション');if(!String(f.name).trim())miss.push('作業内容');if(!String(f.qty).trim())miss.push('数量');if(!f.deadline)miss.push('〆切');
+  var miss=[];if(!f.pos)miss.push('ポジション');if(!String(f.name).trim())miss.push('作業内容');if(!String(f.qty).trim())miss.push('数量');var long=!!(f.due&&f.due>state.date);if(!long&&!f.deadline)miss.push('〆切');if(f.due&&f.due<state.date)miss.push('今日以降の日付');
   if(f.assign==='help'&&!f.helper)miss.push('補助者');
   if(miss.length){err.textContent=miss.join('・')+' を入れてください';err.style.display='block';return;}
   if(!db){err.textContent='接続できないため保存できません';err.style.display='block';return;}
   var data={name:f.name.trim(),qty:f.qty.trim(),prio:f.prio,pos:f.pos,deadline:f.deadline,mins:+f.mins||0,assign:f.assign,helper:f.assign==='help'?f.helper:'',memo:(f.memo||'').trim()};
   var path=base()+'/days/'+state.date+'/tasks';
-  if(state.edit){db.ref(path+'/'+state.edit).update(data);}
-  else{data.owner=state.me;data.createdAt=Date.now();data.done=false;db.ref(path).push(data);}
+  if(long)data.due=f.due;
+  if(state.edit){
+    var wasLong=isLong(state.edit);
+    if(wasLong===long){db.ref(tPath(state.edit)).update(data);}
+    else{ // 日付指定あり⇔なし を切り替えた → 置き場所を移す
+      var old=getT(state.edit);var nd={};for(var k in old){if(['id','long','due','start'].indexOf(k)<0)nd[k]=old[k];}
+      Object.assign(nd,data);if(long){nd.start=state.date;nd.due=f.due;}
+      db.ref(tPath(state.edit)).remove();db.ref(long?base()+'/long':path).push(nd);}
+  }
+  else{data.owner=state.me;data.createdAt=Date.now();data.done=false;if(long){data.start=state.date;db.ref(base()+'/long').push(data);}else db.ref(path).push(data);}
   // よく使う作業として覚える
   var lk=base()+'/lib/'+safeKey(f.pos)+'/'+safeKey(data.name);
   db.ref(lk).transaction(function(c){c=c||{};return {name:data.name,qty:data.qty,prio:data.prio,mins:data.mins,deadline:data.deadline,count:(c.count||0)+(state.edit?0:1),last:Date.now()};});
   if(f.pos!==state.pos)setPos(f.pos);
-  closeSheet();toast('保存しました');
+  closeSheet();toast(long?md(f.due)+'までの作業として保存しました':'保存しました');
 }
-function delTask(){if(!state.edit||!db)return;if(!confirm('この作業を削除しますか？'))return;db.ref(base()+'/days/'+state.date+'/tasks/'+state.edit).remove();closeSheet();toast('削除しました');}
+function delTask(){if(!state.edit||!db)return;if(!confirm('この作業を削除しますか？'))return;db.ref(tPath(state.edit)).remove();closeSheet();toast('削除しました');}
 function closeSheet(){document.getElementById('ov').classList.remove('show');state.edit=null;}
 
 /* ===== 引継ぎメモ ===== */
@@ -537,7 +572,7 @@ function copyFrom(n){
 }
 function carryOver(){
   if(!db)return;if(!state.me){toast('先に名前を選んでください');return;}
-  var rest=list().filter(function(t){return !t.done&&!t.carriedOut;});
+  var rest=list().filter(function(t){return !t.done&&!t.carriedOut&&!t.long;});
   if(!rest.length){toast('未完了の作業はありません');return;}
   if(!confirm('未完了の'+rest.length+'件を翌日に引き継ぎますか？'))return;
   var next=addDays(state.date,1),ref=db.ref(base()+'/days/'+next+'/tasks');
@@ -579,15 +614,15 @@ function checkOverdue(){
   if(!db||!isToday()||!state.settings.notify)return;
   list().forEach(function(t){
     if(t.done||t.prio!=='A'||t.notified||t.carriedOut)return;
-    var m=toMin(t.deadline);if(m==null||nowMin()<=m)return;
-    var id=t.id,shop=state.shop,date=state.date;
-    db.ref(base()+'/days/'+date+'/tasks/'+id+'/notified').transaction(function(c){return c?undefined:Date.now();},function(err,ok){
+    if(t.long){if(!isLate(t))return;}else{var m=toMin(t.deadline);if(m==null||nowMin()<=m)return;}
+    var id=t.id,shop=state.shop;
+    db.ref(tPath(id)+'/notified').transaction(function(c){return c?undefined:Date.now();},function(err,ok){
       if(err||!ok)return; // 他の端末がすでに通知済み
       var who=t.assign==='help'&&t.helper?t.helper+'（補助）':(t.owner||'');
       var key=db.ref('stock/'+shop+'/chat').push().key;
       var d=new Date();
       db.ref('stock/'+shop+'/chat/'+key).set({id:key,user:'📝 仕込みボード',ts:Date.now(),time:d.getHours()+':'+pad(d.getMinutes()),_r:false,pinned:false,
-        text:'⚠ Aの仕込みが〆切を過ぎています\n【'+(t.pos||'')+'】'+t.name+'（'+t.qty+'）\n〆切 '+t.deadline+'／担当 '+who+'\n手が空いている人はフォローを。'});
+        text:'⚠ Aの仕込みが〆切を過ぎています\n【'+(t.pos||'')+'】'+t.name+'（'+t.qty+'）\n〆切 '+(t.long?md(t.due)+(t.deadline?' '+t.deadline:''):t.deadline)+'／担当 '+who+'\n手が空いている人はフォローを。'});
     });
   });
 }
