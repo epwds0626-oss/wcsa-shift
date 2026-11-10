@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<title>今日の仕込み</title>
+<style>
+:root{
+  --bg:#eef1f3; --surface:#fff; --surface2:#f1f2f6; --surface3:#e7e9ef;
+  --border:#d7dae2; --text:#1a1c22; --text2:#5b6070; --text3:#8c92a4;
+  --accent:#b07d00; --accent-soft:rgba(176,125,0,.12);
+  --A:#c0001a; --A-soft:#fdecec; --B:#c77d0a; --B-soft:#fff3e0; --C:#1a5fa0; --C-soft:#e9f1fb;
+  --ok:#0a7d4f; --ok-soft:#e6f5ee;
+  --shadow:0 1px 3px rgba(20,25,40,.06),0 4px 16px rgba(20,25,40,.06);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Yu Gothic','Noto Sans JP',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#app{display:flex;flex-direction:column;height:100%}
+button{font-family:inherit}
+.mhead{position:sticky;top:0;z-index:30;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 6px rgba(20,25,40,.05)}
+.row{display:flex;align-items:center;gap:8px;padding:9px 12px}
+.row2{display:flex;gap:8px;padding:0 12px 10px;align-items:center;flex-wrap:wrap}
+.title{font-size:15px;font-weight:800;white-space:nowrap}
+.spacer{flex:1}
+.hbtn{border:1px solid var(--border);background:var(--surface2);color:var(--text2);height:34px;padding:0 12px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.hbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.seg{display:flex;background:var(--surface3);border-radius:10px;padding:3px;gap:2px;flex-shrink:0}
+.seg button{border:none;background:transparent;color:var(--text2);font-size:13px;font-weight:700;padding:7px 12px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.seg button.active{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.datenav{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.datenav .arw{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);font-size:16px;cursor:pointer;color:var(--text2)}
+.datenav .dl{font-size:15px;font-weight:900;min-width:118px;text-align:center;font-variant-numeric:tabular-nums}
+.datenav .dl small{display:block;font-size:10.5px;font-weight:700;color:var(--accent);letter-spacing:.05em}
+.body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 110px}
+.wrap{max-width:820px;margin:0 auto}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.who{display:flex;gap:8px;padding:12px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end}
+.who .f{flex:1;min-width:130px}
+.who label{display:block;font-size:11px;font-weight:800;color:var(--text2);margin-bottom:4px;letter-spacing:.05em}
+.sel,.inp,.ta{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;font-family:inherit;color:var(--text);background:var(--surface)}
+.sel:focus,.inp:focus,.ta:focus{outline:none;border-color:var(--accent)}
+.ta{min-height:70px;resize:vertical;line-height:1.5}
+.sum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.sum .s{padding:10px 8px;text-align:center}
+.sum .s b{display:block;font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.2}
+.sum .s span{font-size:11px;color:var(--text2);font-weight:700}
+.bar{height:8px;background:var(--surface3);border-radius:6px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:6px;transition:width .3s}
+.warn{border-radius:12px;padding:10px 12px;font-size:13px;font-weight:700;margin-bottom:12px;line-height:1.55}
+.warn.red{background:var(--A-soft);color:#8a0012;border:1px solid #f3c4c4}
+.warn.yel{background:#fff4e5;color:#8a5a00;border:1px solid #f5d199}
+.warn.blue{background:var(--C-soft);color:#0f3f6e;border:1px solid #c5daf2}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{border:1.5px solid var(--border);background:var(--surface);color:var(--text2);border-radius:20px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--text);color:#fff;border-color:var(--text)}
+.grp{margin-bottom:16px}
+.grp-h{display:flex;align-items:center;gap:8px;margin:4px 2px 8px;font-size:14px;font-weight:900}
+.grp-h::before{content:'';width:4px;height:16px;background:var(--accent);border-radius:2px}
+.grp-h .pg{font-size:12px;color:var(--text2);font-weight:700}
+.grp-h .nbtn{margin-left:auto;font-size:12px;padding:5px 10px;height:auto}
+.task{display:flex;align-items:stretch;gap:0;margin-bottom:8px;overflow:hidden}
+.task .ck{width:62px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:none;background:var(--surface2);border-right:1px solid var(--border);cursor:pointer;font-size:26px;color:var(--text3)}
+.task.done .ck{background:var(--ok);color:#fff}
+.task .tb{flex:1;padding:10px 12px;cursor:pointer;min-width:0}
+.task .t1{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.pr{font-size:12px;font-weight:900;color:#fff;border-radius:6px;padding:1px 8px;flex-shrink:0}
+.pr.A{background:var(--A)}.pr.B{background:var(--B)}.pr.C{background:var(--C)}
+.tn{font-size:16px;font-weight:800;line-height:1.35}
+.tq{font-size:14px;font-weight:700;color:var(--text2)}
+.t2{display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;font-size:12.5px;color:var(--text2);font-weight:600}
+.t2 .dl{font-weight:900;color:var(--text);font-variant-numeric:tabular-nums}
+.t2 .late{color:var(--A)}
+.tm{margin-top:5px;font-size:12.5px;color:var(--text2);background:var(--surface2);border-radius:7px;padding:5px 8px;white-space:pre-wrap}
+.badge{font-size:10.5px;font-weight:800;border-radius:5px;padding:1px 6px}
+.badge.carry{background:#efe4ff;color:#5b2aa0}
+.badge.late{background:var(--A-soft);color:var(--A)}
+.badge.help{background:var(--C-soft);color:var(--C)}
+.task.done .tn,.task.done .tq{color:var(--text3);text-decoration:line-through}
+.task.done .t2,.task.done .tm{opacity:.6}
+.task.late{border-color:#f0a8a8}
+.note{padding:10px 12px;margin-bottom:8px;font-size:13px;white-space:pre-wrap;border-left:4px solid #7a4fd0;cursor:pointer}
+.note .nh{font-size:11px;font-weight:800;color:#5b2aa0;margin-bottom:3px}
+.note.empty{color:var(--text3);border-left-color:var(--border)}
+.empty{text-align:center;color:var(--text3);padding:26px 16px;font-size:13px}
+.fab{position:fixed;right:16px;bottom:18px;z-index:40;background:var(--accent);color:#fff;border:none;border-radius:30px;padding:15px 22px;font-size:16px;font-weight:900;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 14px}
+.tools .hbtn{height:38px}
+.rules{padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.75}
+.rules h4{font-size:13px;font-weight:900;margin-bottom:4px}
+.rules ol{padding-left:20px}
+.overlay{position:fixed;inset:0;background:rgba(15,18,28,.55);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.overlay.show{display:flex}
+@media(min-width:560px){.overlay{align-items:center;padding:20px}}
+.sheet{background:var(--surface);width:100%;max-width:560px;border-radius:18px 18px 0 0;max-height:94vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+@media(min-width:560px){.sheet{border-radius:18px}}
+.sh{position:sticky;top:0;background:var(--surface);padding:14px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;z-index:2}
+.sh h3{font-size:16px;font-weight:900}
+.x{border:none;background:var(--surface3);width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;color:var(--text2)}
+.sb{padding:14px 18px 22px}
+.field{margin-bottom:14px}
+.field>label{display:block;font-size:12px;font-weight:800;color:var(--text2);margin-bottom:6px}
+.field>label .req{color:var(--A);margin-left:3px}
+.field>label .hint{font-weight:500;color:var(--text3);font-size:11px;margin-left:5px}
+.pbtns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pbtns button{border:2px solid var(--border);background:var(--surface);border-radius:12px;padding:9px 6px;cursor:pointer;text-align:center}
+.pbtns button b{display:block;font-size:20px;font-weight:900}
+.pbtns button span{font-size:11px;color:var(--text2);font-weight:700;line-height:1.3;display:block}
+.pbtns button.on.A{border-color:var(--A);background:var(--A-soft)}.pbtns button.on.A b{color:var(--A)}
+.pbtns button.on.B{border-color:var(--B);background:var(--B-soft)}.pbtns button.on.B b{color:var(--B)}
+.pbtns button.on.C{border-color:var(--C);background:var(--C-soft)}.pbtns button.on.C b{color:var(--C)}
+.qchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.qchips button{border:1.5px solid var(--border);background:var(--surface2);border-radius:8px;padding:6px 10px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text2)}
+.qchips button.on{background:var(--text);color:#fff;border-color:var(--text)}
+.sugg{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.sugg button{border:1px dashed var(--accent);background:var(--accent-soft);color:#6b4c00;border-radius:8px;padding:5px 9px;font-size:12.5px;font-weight:700;cursor:pointer}
+.two{display:flex;gap:10px}.two>*{flex:1}
+.btns{display:flex;gap:10px;margin-top:8px}
+.btn{flex:1;border:none;border-radius:11px;padding:13px;font-size:15px;font-weight:900;cursor:pointer}
+.btn.pri{background:var(--accent);color:#fff}
+.btn.sec{background:var(--surface3);color:var(--text2)}
+.btn.del{background:var(--A-soft);color:var(--A);flex:0 0 auto;padding:13px 16px}
+.err{color:var(--A);font-size:12.5px;font-weight:700;margin-top:6px;display:none}
+.toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:#1a1c22;color:#fff;padding:9px 18px;border-radius:22px;font-size:13px;font-weight:700;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+table.hist{width:100%;border-collapse:collapse;font-size:13px}
+table.hist th{font-size:11.5px;color:var(--text2);text-align:right;padding:8px 6px;border-bottom:1px solid var(--border);font-weight:800}
+table.hist th:first-child,table.hist td:first-child{text-align:left}
+table.hist td{padding:8px 6px;border-bottom:1px solid var(--surface3);text-align:right;font-variant-numeric:tabular-nums}
+.conn{background:#fff4e5;border:1px solid #f5d199;color:#8a5a00;font-size:12px;font-weight:700;padding:8px 12px;border-radius:10px;margin-bottom:12px;display:none}
+@media print{.mhead,.fab,.tools,.who,.chips,.rules{display:none!important}.body{overflow:visible}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="mhead">
+    <div class="row">
+      <button class="hbtn" onclick="goHome()">&#8592; ホーム</button>
+      <div class="title">&#128221; 今日の仕込み</div>
+      <div class="spacer"></div>
+      <div class="seg" id="viewSeg">
+        <button data-v="board" class="active" onclick="setView('board')">ボード</button>
+        <button data-v="hist" onclick="setView('hist')">記録</button>
+      </div>
+      <button class="hbtn" id="lockBtn" onclick="toggleLock()" title="管理者">&#128274;</button>
+    </div>
+    <div class="row2">
+      <div class="seg" id="shopSeg">
+        <button data-shop="enya" class="active" onclick="setShop('enya')">本店</button>
+        <button data-shop="marco" onclick="setShop('marco')">マルコ</button>
+      </div>
+      <div class="datenav">
+        <button class="arw" onclick="moveDate(-1)">&#8249;</button>
+        <div class="dl" id="dateLabel"></div>
+        <button class="arw" onclick="moveDate(1)">&#8250;</button>
+      </div>
+      <button class="hbtn" onclick="goToday()">今日</button>
+      <button class="hbtn" onclick="goTomorrow()">明日の分を作る</button>
+    </div>
+  </div>
+  <div class="body"><div class="wrap">
+    <div class="conn" id="conn">&#9888; 接続できません。保存されない状態です。</div>
+    <div id="view"></div>
+  </div></div>
+</div>
+<button class="fab" id="fab" onclick="openTask()">＋ 作業を追加</button>
+<div class="overlay" id="ov" onclick="if(event.target===this)closeSheet()"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+var firebaseConfig={apiKey:"AIzaSyA3YVQwyAudMEZJs_rfEW8IHfxh4Grvlbw",authDomain:"wcsa-shift.firebaseapp.com",databaseURL:"https://wcsa-shift-default-rtdb.firebaseio.com",projectId:"wcsa-shift",storageBucket:"wcsa-shift.firebasestorage.app",messagingSenderId:"521554404721",appId:"1:521554404721:web:f59a570dd7e10f3aed82d0"};
+var db=null;
+try{ if(!firebase.apps.length)firebase.initializeApp(firebaseConfig); db=firebase.database(); }catch(e){ db=null; }
+
+var SHOP_KEY={enya:'wcsa',marco:'marco'};          // WCSA本体のスタッフ・ポジション置き場
+var SHOP_COLOR={enya:'#b07d00',marco:'#1a7fbf'};
+// 本店の仕込みポジションは固定（WCSAのシフト用ポジションとは別管理）
+var FIXED_POS={enya:['刺し場','刺し場補助','煮焼場','揚場']};
+var DEF_POS={enya:['刺し場','刺し場補助','煮焼場','揚場'],
+             marco:['パスタ','ピザ','前菜・サラダ','デザート','洗い場','ホール']};
+var PR={A:'営業に直結・最優先',B:'遅れるとバタつく',C:'スキマ時間でOK'};
+var DL_CHIPS=['9:30','10:00','10:30','10:45','11:00','14:30','15:30','16:30','17:00','17:15'];
+var MIN_CHIPS=[5,10,15,20,30,45,60,90];
+var DOW=['日','月','火','水','木','金','土'];
+
+var qs=new URLSearchParams(location.search);
+var state={
+  shop:(qs.get('shop')==='marco'?'marco':(localStorage.getItem('shk_shop')||'enya')),
+  date:todayKey(), view:'board', filter:'all',
+  me:'', pos:'', staff:[], positions:[],
+  tasks:{}, notes:{}, lib:{}, edit:null, form:null,
+  shiftNames:[], fixedNames:[], settings:{notify:true}, admin:false,
+  fd:null, fdShop:null, prepOpen:(localStorage.getItem('shk_prep')!=='0'), prepAll:false
+};
+var ADMIN_PASS="0626";
+var refs=[];
+
+/* ===== 日付ユーティリティ ===== */
+function pad(n){return (n<10?'0':'')+n;}
+function keyOf(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function todayKey(){return keyOf(new Date());}
+function parseKey(k){var a=k.split('-');return new Date(+a[0],+a[1]-1,+a[2]);}
+function addDays(k,n){var d=parseKey(k);d.setDate(d.getDate()+n);return keyOf(d);}
+function nowMin(){var d=new Date();return d.getHours()*60+d.getMinutes();}
+function toMin(t){if(!t)return null;var m=String(t).match(/^(\d{1,2}):(\d{2})$/);return m?(+m[1])*60+(+m[2]):null;}
+function hhmm(ts){var d=new Date(ts);return d.getHours()+':'+pad(d.getMinutes());}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function safeKey(s){return String(s).replace(/[.#$\[\]\/]/g,'_').slice(0,80)||'_';}
+function toast(t){var el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(function(){el.classList.remove('show');},1600);}
+function base(){return 'shikomi/'+state.shop;}
+
+/* ===== 読み込み ===== */
+function detach(){refs.forEach(function(r){try{r.off();}catch(e){}});refs=[];}
+function listen(path,cb){if(!db)return;var r=db.ref(path);r.on('value',function(s){cb(s.val());});refs.push(r);}
+function load(){
+  detach();
+  state.tasks={};state.notes={};state.lib={};state.shiftNames=[];state.fixedNames=[];
+  document.documentElement.style.setProperty('--accent',SHOP_COLOR[state.shop]);
+  document.documentElement.style.setProperty('--accent-soft',state.shop==='enya'?'rgba(176,125,0,.12)':'rgba(26,127,191,.12)');
+  state.me=localStorage.getItem('shk_me_'+state.shop)||'';
+  state.pos=localStorage.getItem('shk_pos_'+state.shop)||'';
+  if(!db){document.getElementById('conn').style.display='block';state.staff=[];state.positions=DEF_POS[state.shop];render();return;}
+  listen(SHOP_KEY[state.shop]+'/staff',function(v){state.staff=Array.isArray(v)?v.filter(Boolean):(v?Object.values(v):[]);render();});
+  if(FIXED_POS[state.shop]){state.positions=FIXED_POS[state.shop].slice();if(state.positions.indexOf(state.pos)<0)state.pos='';}
+  else listen(SHOP_KEY[state.shop]+'/positions',function(v){
+    var list=Array.isArray(v)?v:(v?Object.values(v):[]);
+    var out=[];list.forEach(function(p){p=String(p||'').replace(/補助$/,'');if(p&&out.indexOf(p)<0)out.push(p);});
+    DEF_POS[state.shop].forEach(function(p){if(out.indexOf(p)<0&&!list.length)out.push(p);});
+    state.positions=out.length?out:DEF_POS[state.shop];render();
+  });
+  listen(base()+'/days/'+state.date+'/tasks',function(v){state.tasks=v||{};render();});
+  listen(base()+'/days/'+state.date+'/notes',function(v){state.notes=v||{};render();});
+  listen(base()+'/lib',function(v){state.lib=v||{};if(state.view==='lib')render();});
+  listen(base()+'/settings',function(v){state.settings=Object.assign({notify:true},v||{});});
+  // シフト連動：その日シフトに入っている人＋固定スタッフを先頭に出す
+  listen(SHOP_KEY[state.shop]+'/shifts/'+state.date,function(v){
+    var n=[];v=v||{};['before','lunch','dinner'].forEach(function(k){(v[k]||[]).forEach(function(e){var nm=e&&(e.name||e);if(nm&&typeof nm==='string'&&n.indexOf(nm)<0)n.push(nm);});});
+    state.shiftNames=n;render();});
+  listen(SHOP_KEY[state.shop]+'/fixed',function(v){var a=Array.isArray(v)?v:(v?Object.values(v):[]);state.fixedNames=a.map(function(f){return f&&f.name;}).filter(Boolean);render();});
+  loadFd();
+  render();
+}
+
+/* ===== 仕込み目安（チャレンジと同じ：直近8週・同じ曜日の80%タイル） ===== */
+function loadFd(){
+  if(!db||state.fdShop===state.shop)return;
+  var shop=state.shop;state.fd=null;
+  db.ref('food_daily_hist/'+shop).orderByKey().limitToLast(70).once('value',function(sn){
+    if(state.shop!==shop)return;
+    var v=sn.val()||{};var keys=Object.keys(v).sort();state.fdShop=shop;
+    if(!keys.length){state.fd={days:[],names:[]};render();return;}
+    var last=keys[keys.length-1];var ld=new Date(+last.slice(0,4),+last.slice(4,6)-1,+last.slice(6,8));
+    var from=new Date(ld.getTime()-55*86400000);var fk=from.getFullYear()*10000+(from.getMonth()+1)*100+from.getDate();
+    keys=keys.filter(function(k){return +k>=fk;});
+    var tot={};keys.forEach(function(k){(v[k].n||[]).forEach(function(nm,i){tot[nm]=(tot[nm]||0)+((v[k].q||[])[i]||0);});});
+    var names=Object.keys(tot).sort(function(a,b){return tot[b]-tot[a];});var idx={};names.forEach(function(n,i){idx[n]=i;});
+    var days=keys.map(function(k){var q=names.map(function(){return 0;});(v[k].n||[]).forEach(function(nm,i){q[idx[nm]]=(v[k].q||[])[i]||0;});
+      var wd=v[k].wd;if(wd==null){var dd=new Date(+k.slice(0,4),+k.slice(4,6)-1,+k.slice(6,8));wd=(dd.getDay()+6)%7;}return {k:+k,wd:wd,q:q};});
+    state.fd={names:names,days:days};render();
+  });
+}
+function pct80(vals){if(!vals.length)return 0;var s=vals.slice().sort(function(a,b){return a-b;});return s[Math.max(0,Math.ceil(.8*s.length)-1)];}
+function prepRows(){
+  var fd=state.fd;if(!fd||!fd.days.length)return null;
+  var d=parseKey(state.date);var wd=(d.getDay()+6)%7;
+  var list=fd.days.filter(function(x){return x.wd===wd;});var n=list.length;if(!n)return {closed:true,wd:wd};
+  var rows=[];fd.names.forEach(function(nm,i){var vals=list.map(function(x){return x.q[i]||0;});var sum=vals.reduce(function(a,b){return a+b;},0);if(!sum)return;
+    rows.push({name:nm,avg:sum/n,p80:pct80(vals),max:Math.max.apply(null,vals)});});
+  rows.sort(function(a,b){return (b.p80-a.p80)||(b.avg-a.avg);});
+  return {n:n,wd:wd,main:rows.filter(function(r){return r.p80>=1&&r.avg>=1;})};
+}
+function prepHTML(){
+  var WD=['月','火','水','木','金','土','日'];
+  var h='<div class="card" style="padding:12px 14px;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="togglePrep()"><b style="font-size:14px">&#128298; この日の仕込み目安</b><span style="font-size:11px;color:var(--text2)">チャレンジと同じデータ</span><span class="spacer"></span><span style="color:var(--text3)">'+(state.prepOpen?'▲':'▼')+'</span></div>';
+  if(!state.prepOpen)return h+'</div>';
+  if(!state.fd)return h+'<div style="font-size:12px;color:var(--text3);margin-top:8px">読み込み中…</div></div>';
+  var r=prepRows();
+  if(!r)return h+'<div style="font-size:12px;color:var(--text3);margin-top:8px">出数データがまだありません（チャレンジで日別CSVを取り込むと出ます）</div></div>';
+  if(r.closed)return h+'<div style="font-size:12px;color:var(--text3);margin-top:8px">'+WD[r.wd]+'曜日の出数データがありません（定休日の可能性）</div></div>';
+  var rows=state.prepAll?r.main:r.main.slice(0,10);
+  h+='<div style="font-size:11.5px;color:var(--text2);margin:6px 0 6px">直近8週の'+WD[r.wd]+'曜 '+r.n+'日分・5日に4日は足りる量（80%タイル）'+(r.n<4?'<span style="color:var(--A)">／データが少なく参考値</span>':'')+'</div>';
+  h+='<table class="hist"><tr><th>料理</th><th>目安</th><th>平均</th><th>最大</th><th></th></tr>';
+  rows.forEach(function(x,i){h+='<tr><td>'+esc(x.name)+'</td><td style="font-size:16px;font-weight:900;color:var(--accent)">'+x.p80+'</td><td>'+(Math.round(x.avg*10)/10)+'</td><td>'+x.max+'</td><td><button class="hbtn" style="height:28px;padding:0 8px;font-size:12px" onclick="addFromPrep('+i+')">＋作業に</button></td></tr>';});
+  h+='</table>';
+  if(r.main.length>10)h+='<div style="margin-top:6px"><a href="javascript:void(0)" onclick="state.prepAll=!state.prepAll;render()" style="font-size:12px;color:var(--C)">'+(state.prepAll?'▲ 上位10品だけ':'▼ 全'+r.main.length+'品を見る')+'</a></div>';
+  return h+'</div>';
+}
+function togglePrep(){state.prepOpen=!state.prepOpen;localStorage.setItem('shk_prep',state.prepOpen?'1':'0');render();}
+function addFromPrep(i){var r=prepRows();if(!r||r.closed)return;var x=(state.prepAll?r.main:r.main.slice(0,10))[i];if(!x)return;
+  if(!state.me){toast("先に名前を選んでください");return;}openTask();state.form.name=x.name+' 仕込み';state.form.qty=x.p80+'食分';drawForm();}
+
+/* ===== 切替 ===== */
+function setShop(s){state.fdShop=null;state.shop=s;localStorage.setItem('shk_shop',s);segActive('shopSeg','shop',s);state.filter='all';load();}
+function setView(v){state.view=v;segActive('viewSeg','v',v);render();}
+function segActive(id,attr,val){Array.prototype.forEach.call(document.getElementById(id).querySelectorAll('button'),function(b){b.classList.toggle('active',b.getAttribute('data-'+attr)===val);});}
+function moveDate(n){state.date=addDays(state.date,n);load();}
+function goToday(){state.date=todayKey();load();}
+function goTomorrow(){state.date=addDays(todayKey(),1);load();toast('明日の仕込み表を作成中');}
+function setMe(v){state.me=v;localStorage.setItem('shk_me_'+state.shop,v);render();}
+function setPos(v){state.pos=v;localStorage.setItem('shk_pos_'+state.shop,v);render();}
+function setFilter(f){state.filter=f;render();}
+function goHome(){
+  try{ if(window.parent&&window.parent!==window&&typeof window.parent.switchMode==='function'){window.parent.switchMode('shift');return;} }catch(e){}
+  try{window.top.location.href='./';}catch(e){location.href='./';}
+}
+
+/* ===== 名前の選択肢（シフト連動） ===== */
+function todayCrew(){var c=[];state.shiftNames.concat(state.fixedNames).forEach(function(n){if(c.indexOf(n)<0)c.push(n);});return c;}
+function nameOptions(sel){
+  var crew=todayCrew();var others=state.staff.filter(function(n){return crew.indexOf(n)<0;});
+  var o=function(n){return '<option'+(n===sel?' selected':'')+'>'+esc(n)+'</option>';};
+  if(!crew.length)return state.staff.map(o).join('');
+  return '<optgroup label="今日のシフト">'+crew.map(o).join('')+'</optgroup>'+(others.length?'<optgroup label="その他のスタッフ">'+others.map(o).join('')+'</optgroup>':'');
+}
+
+/* ===== 計算 ===== */
+function list(){var a=[];for(var id in state.tasks){var t=state.tasks[id];if(t&&t.name){t.id=id;a.push(t);}}return a;}
+function isToday(){return state.date===todayKey();}
+function isLate(t){if(t.done){var dm=toMin(t.deadline);if(dm==null||!t.doneAt)return false;var d=new Date(t.doneAt);return keyOf(d)===state.date&&d.getHours()*60+d.getMinutes()>dm;}
+  if(!isToday())return state.date<todayKey();var m=toMin(t.deadline);return m!=null&&nowMin()>m;}
+function sortTasks(a){var po={A:0,B:1,C:2};return a.sort(function(x,y){
+  if(!!x.done!==!!y.done)return x.done?1:-1;
+  if(po[x.prio]!==po[y.prio])return po[x.prio]-po[y.prio];
+  var a1=toMin(x.deadline),b1=toMin(y.deadline);a1=a1==null?9999:a1;b1=b1==null?9999:b1;
+  if(a1!==b1)return a1-b1;return (x.createdAt||0)-(y.createdAt||0);});}
+function whoOf(t){return t.assign==='help'&&t.helper?t.helper:t.owner;}
+function loadCheck(){ // ムリ判定：自分の未完了作業を〆切順に積み上げて間に合うか
+  if(!state.me||!isToday())return null;
+  var mine=list().filter(function(t){return !t.done&&whoOf(t)===state.me;});
+  if(!mine.length)return null;
+  mine.sort(function(x,y){return (toMin(x.deadline)||9999)-(toMin(y.deadline)||9999);});
+  var cur=nowMin(),total=0,miss=[];
+  mine.forEach(function(t){var m=+t.mins||0;cur+=m;total+=m;var d=toMin(t.deadline);if(d!=null&&cur>d)miss.push(t);});
+  return {total:total,count:mine.length,miss:miss};
+}
+
+/* ===== 描画 ===== */
+function render(){
+  var d=parseKey(state.date);
+  var tag=state.date===todayKey()?'今日':(state.date===addDays(todayKey(),1)?'明日':(state.date<todayKey()?'過去':''));
+  document.getElementById('dateLabel').innerHTML=(d.getMonth()+1)+'/'+d.getDate()+'（'+DOW[d.getDay()]+'）'+(tag?'<small>'+tag+'</small>':'');
+  document.getElementById('fab').style.display=state.view==='board'?'':'none';
+  if(state.view==='hist'){renderHist();return;}
+  if(state.view==='lib'){renderLib();return;}
+  checkOverdue();
+  var v=document.getElementById('view');
+  var h='';
+  // 名前・ポジション
+  h+='<div class="card who"><div class="f"><label>名前</label><select class="sel" onchange="setMe(this.value)"><option value="">選んでください</option>'+nameOptions(state.me)+'</select></div>'+
+     '<div class="f"><label>ポジション</label><select class="sel" onchange="setPos(this.value)"><option value="">選んでください</option>'+
+     state.positions.map(function(p){return '<option'+(p===state.pos?' selected':'')+'>'+esc(p)+'</option>';}).join('')+'</select></div></div>';
+  var all=list();var done=all.filter(function(t){return t.done;}).length;
+  var aLeft=all.filter(function(t){return !t.done&&t.prio==='A';}).length;
+  var late=all.filter(function(t){return !t.done&&isLate(t);}).length;
+  var minsLeft=all.filter(function(t){return !t.done;}).reduce(function(s,t){return s+(+t.mins||0);},0);
+  var pct=all.length?Math.round(done/all.length*100):0;
+  h+='<div class="sum">'+
+     '<div class="card s"><b>'+done+'/'+all.length+'</b><span>完了</span><div class="bar"><i style="width:'+pct+'%"></i></div></div>'+
+     '<div class="card s"><b style="color:var(--A)">'+aLeft+'</b><span>A 残り</span></div>'+
+     '<div class="card s"><b style="color:'+(late?'var(--A)':'var(--ok)')+'">'+late+'</b><span>〆切超過</span></div>'+
+     '<div class="card s"><b>'+minsLeft+'<small style="font-size:12px">分</small></b><span>残り作業</span></div></div>';
+  var lc=loadCheck();
+  if(lc&&lc.miss.length) h+='<div class="warn red">&#9888; '+esc(state.me)+'さんの残り作業は合計'+lc.total+'分。このままだと「'+esc(lc.miss[0].name)+'」など'+lc.miss.length+'件が〆切に間に合いません。→ 補助に振る／Cを後回しにする</div>';
+  else if(lc) h+='<div class="warn blue">'+esc(state.me)+'さんの残り作業：'+lc.count+'件・合計'+lc.total+'分（〆切に間に合うペースです）</div>';
+  if(!state.me) h+='<div class="warn yel">まず「名前」を選んでください。完了チェックに名前が残ります。</div>';
+  h+=prepHTML();
+  // 絞り込み
+  var poss=[];all.forEach(function(t){if(t.pos&&poss.indexOf(t.pos)<0)poss.push(t.pos);});
+  state.positions.forEach(function(p){if(poss.indexOf(p)<0&&state.notes[safeKey(p)])poss.push(p);});
+  h+='<div class="chips"><button class="chip'+(state.filter==='all'?' on':'')+'" onclick="setFilter(\'all\')">全員</button>'+
+     (state.me?'<button class="chip'+(state.filter==='mine'?' on':'')+'" onclick="setFilter(\'mine\')">自分（'+esc(state.me)+'）</button>':'')+
+     poss.map(function(p){return '<button class="chip'+(state.filter==='p:'+p?' on':'')+'" onclick="setFilter(\'p:'+esc(p).replace(/'/g,"\\'")+'\')">'+esc(p)+'</button>';}).join('')+'</div>';
+  // 道具
+  h+='<div class="tools"><button class="hbtn" onclick="copyFrom(-1)">前日からコピー</button><button class="hbtn" onclick="copyFrom(-7)">先週の同じ曜日からコピー</button><button class="hbtn" onclick="carryOver()">未完了を翌日へ引継ぎ</button><button class="hbtn" onclick="toggleRules()">使い方ルール</button>'+
+     (state.admin?'<button class="hbtn on" onclick="setView(\'lib\')">&#128295; 作業リスト管理</button>':'')+'</div>';
+  if(state.showRules) h+=rulesHTML();
+  // グループ表示
+  var shown=all.filter(function(t){
+    if(state.filter==='mine')return whoOf(t)===state.me||t.owner===state.me;
+    if(state.filter.indexOf('p:')===0)return t.pos===state.filter.slice(2);return true;});
+  var groups={};shown.forEach(function(t){var p=t.pos||'未設定';(groups[p]=groups[p]||[]).push(t);});
+  var order=state.positions.concat(Object.keys(groups).filter(function(p){return state.positions.indexOf(p)<0;}));
+  var any=false;
+  order.forEach(function(p){
+    var g=groups[p];var nt=state.notes[safeKey(p)];
+    if(!g&&!(nt&&nt.text&&(state.filter==='all'||state.filter==='p:'+p)))return;
+    any=true;g=sortTasks(g||[]);
+    var gd=g.filter(function(t){return t.done;}).length;
+    h+='<div class="grp"><div class="grp-h">'+esc(p)+' <span class="pg">'+gd+'/'+g.length+' 完了</span><button class="hbtn nbtn" onclick="openNote(\''+esc(p).replace(/'/g,"\\'")+'\')">&#128221; 引継ぎメモ</button></div>';
+    if(nt&&nt.text) h+='<div class="card note" onclick="openNote(\''+esc(p).replace(/'/g,"\\'")+'\')"><div class="nh">引継ぎメモ（'+esc(nt.by||'')+' '+(nt.at?hhmm(nt.at):'')+'）</div>'+esc(nt.text)+'</div>';
+    g.forEach(function(t){h+=taskHTML(t);});
+    h+='</div>';
+  });
+  if(!any) h+='<div class="card empty">この日の作業はまだありません。<br>右下の「＋ 作業を追加」か「前日からコピー」で作れます。<br><br>営業が終わったら「明日の分を作る」で翌日の仕込み表を作っておきましょう。</div>';
+  v.innerHTML=h;
+}
+function taskHTML(t){
+  var late=isLate(t);
+  var who=t.assign==='help'&&t.helper?'補助：'+esc(t.helper):'担当：'+esc(t.owner||'');
+  var h='<div class="card task'+(t.done?' done':'')+(late&&!t.done?' late':'')+'">'+
+    '<button class="ck" onclick="toggleDone(\''+t.id+'\')">'+(t.done?'&#10003;':'&#9711;')+'</button>'+
+    '<div class="tb" onclick="openTask(\''+t.id+'\')"><div class="t1"><span class="pr '+t.prio+'">'+t.prio+'</span><span class="tn">'+esc(t.name)+'</span><span class="tq">'+esc(t.qty)+'</span>'+
+    (t.carried?'<span class="badge carry">引継ぎ</span>':'')+(t.assign==='help'?'<span class="badge help">補助</span>':'')+(late?'<span class="badge late">〆切超過</span>':'')+'</div>'+
+    '<div class="t2"><span class="dl'+(late&&!t.done?' late':'')+'">〆 '+esc(t.deadline||'—')+'</span><span>'+(t.mins?t.mins+'分':'')+'</span><span>'+who+'</span>'+
+    (t.done?'<span style="color:var(--ok)">&#10003; '+esc(t.doneBy||'')+' '+(t.doneAt?hhmm(t.doneAt):'')+'</span>':'')+'</div>'+
+    (t.memo?'<div class="tm">'+esc(t.memo)+'</div>':'')+'</div></div>';
+  return h;
+}
+function rulesHTML(){
+  return '<div class="card rules"><h4>使い方ルール</h4><ol>'+
+  '<li>優先度　<b style="color:var(--A)">A</b>＝営業に直結・最優先　<b style="color:var(--B)">B</b>＝遅れるとバタつく　<b style="color:var(--C)">C</b>＝スキマ時間</li>'+
+  '<li>〆切は「希望」ではなく「〆切」。間に合わない警告が出たら、すぐ補助に振る</li>'+
+  '<li>補助に振るなら、最初から補助者を選んでおく</li>'+
+  '<li>数量はざっくりでOK。空白はNG</li>'+
+  '<li>営業が終わったら「明日の分を作る」で翌日の仕込み表を作る（在庫・発注の管理にもなる）</li>'+
+  '<li>終わったらすぐ ◯ をタップ。名前と時刻が残る</li>'+
+  '<li>交代・上がりの前に、未完了は「引継ぎメモ」に一言。日をまたぐ物は「未完了を翌日へ引継ぎ」</li></ol></div>';
+}
+function toggleRules(){state.showRules=!state.showRules;render();}
+
+/* ===== 完了 ===== */
+function toggleDone(id){
+  var t=state.tasks[id];if(!t||!db)return;
+  if(!t.done&&!state.me){toast('先に名前を選んでください');return;}
+  var upd=t.done?{done:false,doneBy:null,doneAt:null}:{done:true,doneBy:state.me,doneAt:Date.now()};
+  db.ref(base()+'/days/'+state.date+'/tasks/'+id).update(upd);
+  if(!t.done)toast('完了：'+t.name);
+}
+
+/* ===== 追加・編集 ===== */
+function openTask(id){
+  if(!state.me){toast('先に名前を選んでください');return;}
+  var t=id?state.tasks[id]:null;
+  state.edit=id||null;
+  state.form=t?{name:t.name,qty:t.qty,prio:t.prio,pos:t.pos,deadline:t.deadline||'',mins:t.mins||15,assign:t.assign||'self',helper:t.helper||'',memo:t.memo||''}
+             :{name:'',qty:'',prio:'A',pos:state.pos||'',deadline:'',mins:15,assign:'self',helper:'',memo:''};
+  drawForm();document.getElementById('ov').classList.add('show');
+}
+function drawForm(){
+  var f=state.form;
+  var h='<div class="sh"><h3>'+(state.edit?'作業を編集':'作業を追加')+'</h3><button class="x" onclick="closeSheet()">&#10005;</button></div><div class="sb">'+
+  '<div class="field"><label>ポジション<span class="req">*</span></label><select class="sel" id="fPos" onchange="state.form.pos=this.value;keepForm();drawForm()"><option value="">選んでください</option>'+
+   state.positions.map(function(p){return '<option'+(p===f.pos?' selected':'')+'>'+esc(p)+'</option>';}).join('')+'</select></div>'+
+  '<div class="field"><label>作業内容<span class="req">*</span><span class="hint">一度入れた作業は、次からリストで選べます</span></label><input class="inp" id="fName" value="'+esc(f.name)+'" placeholder="例）あんこう下処理（文字を入れると候補をしぼります）" oninput="drawSug(this.value)" autocomplete="off">'+
+   '<div class="sugg" id="sugBox"></div></div>'+
+  '<div class="field"><label>数量<span class="req">*</span><span class="hint">ざっくりでOK・空白NG</span></label><input class="inp" id="fQty" value="'+esc(f.qty)+'" placeholder="例）1尾、5本分"></div>'+
+  '<div class="field"><label>優先度<span class="req">*</span></label><div class="pbtns">'+
+   ['A','B','C'].map(function(p){return '<button class="'+p+(f.prio===p?' on':'')+'" onclick="keepForm();state.form.prio=\''+p+'\';drawForm()"><b>'+p+'</b><span>'+PR[p]+'</span></button>';}).join('')+'</div></div>'+
+  '<div class="two"><div class="field"><label>〆切<span class="req">*</span><span class="hint">希望ではなく〆切</span></label><input class="inp" type="time" id="fDl" value="'+esc(f.deadline)+'">'+
+   '<div class="qchips">'+DL_CHIPS.map(function(c){var v=(c.length===4?'0':'')+c;return '<button class="'+(f.deadline===v?'on':'')+'" onclick="keepForm();state.form.deadline=\''+v+'\';drawForm()">'+c+'</button>';}).join('')+'</div></div></div>'+
+  '<div class="field"><label>作業時間</label><div class="qchips">'+MIN_CHIPS.map(function(m){return '<button class="'+(+f.mins===m?'on':'')+'" onclick="keepForm();state.form.mins='+m+';drawForm()">'+m+'分</button>';}).join('')+'</div></div>'+
+  '<div class="field"><label>担当</label><div class="qchips"><button class="'+(f.assign!=='help'?'on':'')+'" onclick="keepForm();state.form.assign=\'self\';drawForm()">自分（'+esc(state.edit&&state.tasks[state.edit]?state.tasks[state.edit].owner:state.me)+'）</button><button class="'+(f.assign==='help'?'on':'')+'" onclick="keepForm();state.form.assign=\'help\';drawForm()">補助に振る</button></div>'+
+   (f.assign==='help'?'<select class="sel" id="fHelper" style="margin-top:8px"><option value="">補助者を選ぶ</option>'+nameOptions(f.helper)+'</select>':'')+'</div>'+
+  '<div class="field"><label>メモ<span class="hint">段取り・しまう場所など</span></label><textarea class="ta" id="fMemo" placeholder="例）火にかけてから、あんこう下処理">'+esc(f.memo)+'</textarea></div>'+
+  '<div class="err" id="fErr"></div>'+
+  '<div class="btns">'+(state.edit?'<button class="btn del" onclick="delTask()">削除</button>':'')+'<button class="btn sec" onclick="closeSheet()">やめる</button><button class="btn pri" onclick="saveTask()">保存</button></div></div>';
+  document.getElementById('sheet').innerHTML=h;
+  if(!state.edit)drawSug(f.name);
+}
+function libList(){var lib=state.lib[safeKey(state.form.pos||'_')]||{};
+  return Object.keys(lib).map(function(k){return lib[k];}).filter(function(x){return x&&x.name;}).sort(function(a,b){return (b.count||0)-(a.count||0)||(b.last||0)-(a.last||0);});}
+function drawSug(q){var box=document.getElementById('sugBox');if(!box)return;
+  if(!state.form.pos){box.innerHTML='<span style="font-size:12px;color:var(--text3)">ポジションを選ぶと、よく使う作業のリストが出ます</span>';return;}
+  q=String(q||'').trim();var all=libList();
+  var hit=q?all.filter(function(x){return x.name.indexOf(q)>=0;}):all;
+  if(!all.length){box.innerHTML='<span style="font-size:12px;color:var(--text3)">このポジションの作業リストはまだありません。保存すると自動で登録されます</span>';return;}
+  box.innerHTML=hit.slice(0,24).map(function(x){return '<button onclick="useSug(this.getAttribute(\'data-n\'))" data-n="'+esc(x.name)+'">'+esc(x.name)+(x.count>1?' <small style="opacity:.6">×'+x.count+'</small>':'')+'</button>';}).join('')||'<span style="font-size:12px;color:var(--text3)">新しい作業として登録されます</span>';}
+function keepForm(){var f=state.form;var g=function(id){var e=document.getElementById(id);return e?e.value:null;};
+  var v;if((v=g('fName'))!=null)f.name=v;if((v=g('fQty'))!=null)f.qty=v;if((v=g('fDl'))!=null)f.deadline=v;if((v=g('fMemo'))!=null)f.memo=v;if((v=g('fHelper'))!=null)f.helper=v;if((v=g('fPos'))!=null)f.pos=v;}
+function useSug(name){keepForm();var s=libList().filter(function(x){return x.name===name;})[0];if(!s)return;
+  var f=state.form;f.name=s.name;f.qty=s.qty||f.qty;f.prio=s.prio||f.prio;f.mins=s.mins||f.mins;f.deadline=s.deadline||f.deadline;drawForm();}
+function saveTask(){
+  keepForm();var f=state.form;var err=document.getElementById('fErr');
+  var miss=[];if(!f.pos)miss.push('ポジション');if(!String(f.name).trim())miss.push('作業内容');if(!String(f.qty).trim())miss.push('数量');if(!f.deadline)miss.push('〆切');
+  if(f.assign==='help'&&!f.helper)miss.push('補助者');
+  if(miss.length){err.textContent=miss.join('・')+' を入れてください';err.style.display='block';return;}
+  if(!db){err.textContent='接続できないため保存できません';err.style.display='block';return;}
+  var data={name:f.name.trim(),qty:f.qty.trim(),prio:f.prio,pos:f.pos,deadline:f.deadline,mins:+f.mins||0,assign:f.assign,helper:f.assign==='help'?f.helper:'',memo:(f.memo||'').trim()};
+  var path=base()+'/days/'+state.date+'/tasks';
+  if(state.edit){db.ref(path+'/'+state.edit).update(data);}
+  else{data.owner=state.me;data.createdAt=Date.now();data.done=false;db.ref(path).push(data);}
+  // よく使う作業として覚える
+  var lk=base()+'/lib/'+safeKey(f.pos)+'/'+safeKey(data.name);
+  db.ref(lk).transaction(function(c){c=c||{};return {name:data.name,qty:data.qty,prio:data.prio,mins:data.mins,deadline:data.deadline,count:(c.count||0)+(state.edit?0:1),last:Date.now()};});
+  if(f.pos!==state.pos)setPos(f.pos);
+  closeSheet();toast('保存しました');
+}
+function delTask(){if(!state.edit||!db)return;if(!confirm('この作業を削除しますか？'))return;db.ref(base()+'/days/'+state.date+'/tasks/'+state.edit).remove();closeSheet();toast('削除しました');}
+function closeSheet(){document.getElementById('ov').classList.remove('show');state.edit=null;}
+
+/* ===== 引継ぎメモ ===== */
+function openNote(p){
+  if(!state.me){toast('先に名前を選んでください');return;}
+  var n=state.notes[safeKey(p)]||{};
+  document.getElementById('sheet').innerHTML='<div class="sh"><h3>引継ぎメモ：'+esc(p)+'</h3><button class="x" onclick="closeSheet()">&#10005;</button></div><div class="sb">'+
+   '<div class="field"><label>次の人に伝えること<span class="hint">やり残し・在庫・注意点</span></label><textarea class="ta" id="nText" style="min-height:140px" placeholder="例）土佐醤油は火を止めて冷まし中。15時に漉す。&#10;あんこうは冷蔵庫上段・日付付き">'+esc(n.text||'')+'</textarea></div>'+
+   '<div class="btns"><button class="btn sec" onclick="closeSheet()">やめる</button><button class="btn pri" onclick="saveNote(\''+esc(p).replace(/'/g,"\\'")+'\')">保存</button></div></div>';
+  document.getElementById('ov').classList.add('show');
+}
+function saveNote(p){if(!db)return;var t=document.getElementById('nText').value.trim();
+  db.ref(base()+'/days/'+state.date+'/notes/'+safeKey(p)).set(t?{text:t,by:state.me,at:Date.now(),pos:p}:null);closeSheet();toast('メモを保存しました');}
+
+/* ===== コピー・引継ぎ ===== */
+function copyFrom(n){
+  if(!db)return;if(!state.me){toast('先に名前を選んでください');return;}
+  var src=addDays(state.date,n);
+  db.ref(base()+'/days/'+src+'/tasks').once('value',function(s){
+    var v=s.val();if(!v){toast((n===-1?'前日':'先週の同じ曜日')+'の作業がありません');return;}
+    var exist={};list().forEach(function(t){exist[t.pos+'|'+t.name]=1;});
+    var c=0,ref=db.ref(base()+'/days/'+state.date+'/tasks');
+    Object.keys(v).forEach(function(k){var t=v[k];if(!t||!t.name||t.carried||exist[t.pos+'|'+t.name])return;
+      ref.push({name:t.name,qty:t.qty,prio:t.prio,pos:t.pos,deadline:t.deadline||'',mins:t.mins||0,assign:t.assign||'self',helper:t.helper||'',memo:t.memo||'',owner:t.owner||state.me,createdAt:Date.now(),done:false});c++;});
+    toast(c?c+'件コピーしました（数量は見直してください）':'同じ作業はすでに入っています');
+  });
+}
+function carryOver(){
+  if(!db)return;if(!state.me){toast('先に名前を選んでください');return;}
+  var rest=list().filter(function(t){return !t.done&&!t.carriedOut;});
+  if(!rest.length){toast('未完了の作業はありません');return;}
+  if(!confirm('未完了の'+rest.length+'件を翌日に引き継ぎますか？'))return;
+  var next=addDays(state.date,1),ref=db.ref(base()+'/days/'+next+'/tasks');
+  rest.forEach(function(t){
+    ref.push({name:t.name,qty:t.qty,prio:t.prio,pos:t.pos,deadline:t.deadline||'',mins:t.mins||0,assign:t.assign||'self',helper:t.helper||'',memo:(t.memo?t.memo+'\n':'')+'（'+state.date.slice(5).replace('-','/')+'からの引継ぎ）',owner:t.owner,createdAt:Date.now(),done:false,carried:true});
+    db.ref(base()+'/days/'+state.date+'/tasks/'+t.id).update({carriedOut:true});
+  });
+  toast(rest.length+'件を翌日に引き継ぎました');
+}
+
+/* ===== 記録（続けるための見える化） ===== */
+function renderHist(){
+  var v=document.getElementById('view');v.innerHTML='<div class="card empty">読み込み中…</div>';
+  if(!db){v.innerHTML='<div class="card empty">接続できません</div>';return;}
+  var from=addDays(todayKey(),-13);
+  db.ref(base()+'/days').orderByKey().startAt(from).once('value',function(s){
+    var days=s.val()||{};var rows='',tot=0,dn=0,lt=0,streak=0,stop=false;
+    for(var i=0;i<14;i++){
+      var k=addDays(todayKey(),-i);var t=(days[k]&&days[k].tasks)||{};var a=Object.keys(t).map(function(x){return t[x];}).filter(function(x){return x&&x.name;});
+      var d=a.filter(function(x){return x.done;}).length;
+      var l=a.filter(function(x){if(!x.done||!x.doneAt)return false;var m=toMin(x.deadline);var dd=new Date(x.doneAt);return m!=null&&keyOf(dd)===k&&dd.getHours()*60+dd.getMinutes()>m;}).length;
+      var c=a.filter(function(x){return x.carried;}).length;
+      if(!stop){if(a.length)streak++;else if(i>0)stop=true;}
+      tot+=a.length;dn+=d;lt+=l;
+      var dt=parseKey(k);
+      rows+='<tr><td>'+(dt.getMonth()+1)+'/'+dt.getDate()+'（'+DOW[dt.getDay()]+'）</td><td>'+(a.length||'—')+'</td><td>'+(a.length?Math.round(d/a.length*100)+'%':'—')+'</td><td'+(l?' style="color:var(--A);font-weight:800"':'')+'>'+(a.length?l:'—')+'</td><td>'+(a.length?c:'—')+'</td></tr>';
+    }
+    v.innerHTML='<div class="sum" style="grid-template-columns:repeat(3,1fr)">'+
+      '<div class="card s"><b>'+streak+'<small style="font-size:12px">日</small></b><span>連続で記入</span></div>'+
+      '<div class="card s"><b>'+(tot?Math.round(dn/tot*100):0)+'%</b><span>14日の完了率</span></div>'+
+      '<div class="card s"><b style="color:'+(lt?'var(--A)':'var(--ok)')+'">'+lt+'</b><span>〆切を過ぎて完了</span></div></div>'+
+      '<div class="card" style="padding:6px 10px"><table class="hist"><tr><th>日付</th><th>作業数</th><th>完了率</th><th>〆切超過</th><th>引継ぎ</th></tr>'+rows+'</table></div>'+
+      '<div class="warn blue" style="margin-top:12px">〆切超過が多い日は、仕込み量か人の配置に無理がある日です。曜日ごとの傾向を見て、翌週のシフトや仕込み量に反映しましょう。</div>';
+  });
+}
+
+/* ===== Musubu通知：Aの作業が〆切を過ぎたら1回だけ知らせる ===== */
+function checkOverdue(){
+  if(!db||!isToday()||!state.settings.notify)return;
+  list().forEach(function(t){
+    if(t.done||t.prio!=='A'||t.notified||t.carriedOut)return;
+    var m=toMin(t.deadline);if(m==null||nowMin()<=m)return;
+    var id=t.id,shop=state.shop,date=state.date;
+    db.ref(base()+'/days/'+date+'/tasks/'+id+'/notified').transaction(function(c){return c?undefined:Date.now();},function(err,ok){
+      if(err||!ok)return; // 他の端末がすでに通知済み
+      var who=t.assign==='help'&&t.helper?t.helper+'（補助）':(t.owner||'');
+      var key=db.ref('stock/'+shop+'/chat').push().key;
+      var d=new Date();
+      db.ref('stock/'+shop+'/chat/'+key).set({id:key,user:'📝 仕込みボード',ts:Date.now(),time:d.getHours()+':'+pad(d.getMinutes()),_r:false,pinned:false,
+        text:'⚠ Aの仕込みが〆切を過ぎています\n【'+(t.pos||'')+'】'+t.name+'（'+t.qty+'）\n〆切 '+t.deadline+'／担当 '+who+'\n手が空いている人はフォローを。'});
+    });
+  });
+}
+
+/* ===== 管理者 ===== */
+function toggleLock(){
+  if(state.admin){state.admin=false;lockUI();if(state.view==='lib')setView('board');else render();return;}
+  document.getElementById('sheet').innerHTML='<div class="sh"><h3>管理者</h3><button class="x" onclick="closeSheet()">&#10005;</button></div><div class="sb">'+
+   '<div class="field"><label>パスワード</label><input class="inp" type="password" inputmode="numeric" id="pwInp" onkeydown="if(event.key===\'Enter\')checkPw()"></div><div class="err" id="pwErr">パスワードが違います</div>'+
+   '<div class="btns"><button class="btn sec" onclick="closeSheet()">やめる</button><button class="btn pri" onclick="checkPw()">開く</button></div></div>';
+  document.getElementById('ov').classList.add('show');setTimeout(function(){var e=document.getElementById('pwInp');if(e)e.focus();},100);
+}
+function checkPw(){var raw=(document.getElementById('pwInp').value||'').replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);}).trim();
+  if(raw===ADMIN_PASS){state.admin=true;lockUI();closeSheet();render();toast('管理者モード');}else document.getElementById('pwErr').style.display='block';}
+function lockUI(){var b=document.getElementById('lockBtn');b.className='hbtn'+(state.admin?' on':'');b.innerHTML=state.admin?'&#128275;':'&#128274;';}
+
+/* ===== 作業リスト管理（管理者） ===== */
+function renderLib(){
+  if(!state.admin){setView('board');return;}
+  var v=document.getElementById('view');
+  var h='<div class="tools"><button class="hbtn" onclick="setView(\'board\')">&#8592; ボードに戻る</button></div>'+
+    '<div class="card" style="padding:12px 14px;margin-bottom:12px"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1"><b>Musubuへの〆切超過通知</b><div style="font-size:12px;color:var(--text2)">Aの作業が〆切を過ぎたら、Musubuのチャットに1回だけ知らせます</div></div>'+
+    '<button class="hbtn'+(state.settings.notify?' on':'')+'" onclick="setNotify(!state.settings.notify)">'+(state.settings.notify?'ON':'OFF')+'</button></div></div>';
+  var any=false;
+  state.positions.forEach(function(p){
+    var lib=state.lib[safeKey(p)]||{};var keys=Object.keys(lib).filter(function(k){return lib[k]&&lib[k].name;}).sort(function(a,b){return (lib[b].count||0)-(lib[a].count||0);});
+    h+='<div class="grp"><div class="grp-h">'+esc(p)+' <span class="pg">'+keys.length+'件</span></div>';
+    if(!keys.length)h+='<div class="card empty" style="padding:14px">まだ登録された作業はありません</div>';
+    keys.forEach(function(k){any=true;var x=lib[k];
+      h+='<div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px"><span class="pr '+(x.prio||'B')+'">'+(x.prio||'B')+'</span>'+
+       '<div style="flex:1;min-width:0"><div style="font-weight:800">'+esc(x.name)+' <span class="tq">'+esc(x.qty||'')+'</span></div><div style="font-size:12px;color:var(--text2)">〆 '+esc(x.deadline||'—')+'・'+(x.mins||0)+'分・使用 '+(x.count||0)+'回</div></div>'+
+       '<button class="hbtn" style="color:var(--A)" onclick="delLib(\''+safeKey(p)+'\',\''+k+'\',\''+esc(x.name).replace(/'/g,"\\'")+'\')">削除</button></div>';});
+    h+='</div>';
+  });
+  v.innerHTML=h;
+}
+function delLib(pk,k,name){if(!db)return;if(!confirm('「'+name+'」を作業リストから消しますか？\n（今日までの作業記録は消えません）'))return;db.ref(base()+'/lib/'+pk+'/'+k).remove();toast('削除しました');}
+function setNotify(on){if(!db)return;db.ref(base()+'/settings/notify').set(!!on);state.settings.notify=!!on;render();}
+
+/* ===== 起動 ===== */
+segActive('shopSeg','shop',state.shop);
+load();
+setInterval(function(){if(state.view==='board'&&isToday()&&!document.getElementById('ov').classList.contains('show'))render();},60000); // 〆切超過の表示を毎分更新
+</script>
+</body>
+</html>
