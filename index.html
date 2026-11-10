@@ -25,6 +25,16 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,0.98);borde
 .shop-btn{padding:5px 10px;font-size:11px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:transparent;color:var(--text2);font-family:inherit;transition:all .15s;letter-spacing:.02em;white-space:nowrap;}
 .shop-btn:hover{color:var(--text);}
 .shop-btn.active{background:#fff;color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.10);}
+.mode-switch{gap:5px;padding:4px}
+.mode-switch .shop-btn{font-size:12.5px;padding:6px 10px;display:inline-flex;align-items:center;justify-content:center;gap:3px;
+  background:#fff;color:var(--text);font-weight:700;border:1px solid rgba(0,0,0,.14);border-radius:8px;box-shadow:0 2px 0 rgba(0,0,0,.10)}
+.mode-switch .shop-btn:active{transform:translateY(2px);box-shadow:none}
+.mode-switch .shop-btn.active{border-color:transparent;box-shadow:0 2px 0 rgba(0,0,0,.18)}
+@media(max-width:768px){
+  .header-row2{flex-wrap:wrap;overflow-x:visible;row-gap:6px}
+  .mode-switch{order:3;margin-left:0!important;width:100%;display:grid!important;grid-template-columns:repeat(5,1fr);gap:6px;padding:6px}
+  .mode-switch .shop-btn{font-size:13px;padding:10px 2px;letter-spacing:0}
+}
 .home-btn:hover{background:var(--surface2);color:var(--text);}
 .logo{font-size:18px;font-weight:900;letter-spacing:5px;color:var(--text);display:flex;align-items:center;gap:8px;}
 .logo-accent{color:var(--accent);}
@@ -232,16 +242,16 @@ nav{display:flex;gap:2px}
       <button class="shop-btn active" id="shopBtn0" onclick="switchShop(0)">本店</button>
       <button class="shop-btn" id="shopBtn1" onclick="switchShop(1)">マルコ</button>
     </div>
-    <div class="shop-switch" style="margin-left:6px">
+    <div class="shop-switch mode-switch" id="modeSwitch" style="margin-left:6px">
       <button class="shop-btn active" id="modeShift" onclick="switchMode('shift')" style="background:var(--accent);color:#0a0a0f">シフト</button>
       <button class="shop-btn" id="modeMusubu" onclick="switchMode('musubu')">Musubu</button>
-      <button class="shop-btn" id="modeChallenge" onclick="switchMode('challenge', currentShop)">🏆</button>
-      <button class="shop-btn" id="modeFish" onclick="switchMode('fish')">🐟</button>
-      <button class="shop-btn" id="modeStudy" onclick="switchMode('study')">📖</button>
-      <button class="shop-btn" id="modeCooking" onclick="switchMode('cooking')">🍳</button>
-      <button class="shop-btn" id="modeOtoshi" onclick="switchMode('otoshi')">🍱</button>
-      <button class="shop-btn" id="modeManual" onclick="switchMode('manual')">📋</button>
-      <button class="shop-btn" id="modeShikomi" onclick="switchMode('shikomi')">📝</button>
+      <button class="shop-btn" id="modeChallenge" onclick="switchMode('challenge', currentShop)">チャレンジ</button>
+      <button class="shop-btn" id="modeFish" onclick="switchMode('fish')">熟成台帳</button>
+      <button class="shop-btn" id="modeStudy" onclick="switchMode('study')">魚の雑学</button>
+      <button class="shop-btn" id="modeCooking" onclick="switchMode('cooking')">料理のコツ</button>
+      <button class="shop-btn" id="modeOtoshi" onclick="switchMode('otoshi')">お通し</button>
+      <button class="shop-btn" id="modeManual" onclick="switchMode('manual')">マニュアル</button>
+      <button class="shop-btn" id="modeShikomi" onclick="switchMode('shikomi')">仕込み</button>
     </div>
     <nav style="margin-left:auto;flex-shrink:0;">
       <button class="nav-btn active" id="nav0" onclick="showPage('calendar')">カレンダー</button>
@@ -2084,7 +2094,7 @@ function MaddHeaderBadge(){
     const badge=document.createElement('span');
     badge.id='mHeaderBadge';
     badge.style.cssText='display:none;background:#e84a6a;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px;margin-left:4px;';
-    btn.parentNode.insertBefore(badge,btn.nextSibling);
+    btn.appendChild(badge); // ボタンの中に入れる（2段表示でも位置がずれない）
   }
 }
 
