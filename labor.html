@@ -968,6 +968,44 @@ function renderDaily(){
   tb.querySelectorAll("tr.day").forEach(tr=>tr.onclick=()=>{const d=tr.dataset.d;openOpen.has(d)?openOpen.delete(d):openOpen.add(d);renderDaily()});
   tb.querySelectorAll(".sin input").forEach(inp=>{inp.onclick=e=>e.stopPropagation();inp.onchange=e=>{
     const d=inp.dataset.d,s=inp.dataset.s;cfg.sales=cfg.sales||{};cfg.sales[d]=cfg.sales[d]||{};cfg.sales[d][s]=inp.value===""?null:num(inp.value);saveCfg();renderDaily()}});
+  try{publishNippoMetrics(res,shown,inProg)}catch(e){console.error("日報用の数字の保存に失敗",e)}
+}
+// ===== 店長日報（nippo.html）用に、日ごと・店ごとの数字を Firebase nippo_metrics に保存【追加 R8.11.12】 =====
+// 日報は店長の端末で開くため、台帳（この端末にだけある）を使った計算結果をここから共有する。
+//   nippo_metrics/{honten|marco}/{YYYYMMDD} = { s:売上, l:人件費, h:実働時間, f:食材費, x:固定費, fhs:FishHack売上(本店のみ), prov:仮, closed:定休 }
+//   nippo_metrics/rates/{honten|marco}      = { foodRate, fhRate, lph:人件費÷実働時間(直近28日), fixedDay:{YYYYMM:1日あたり固定費}, tax, at }
+// 固定費の店別：マルコ＝設定の「マルコ固定費（家賃込み）」の日割り、本店＝全社の固定費からマルコ分を引いた残り（FishHack・共通費・賞与を含む）
+// FishHackの売上・原価は本店に含める（FishHackの作業は本店の人件費に入っているため）
+let nippoPubSig="";
+function publishNippoMetrics(res,shown,inProg){
+  const PC=window.PCTX; if(!PC||!shown||!shown.length)return;
+  const net=(cfg.tax||"税抜")==="税抜", today=dstr(new Date());
+  const dim=ym=>{const[y,m]=ym.split("/").map(Number);return new Date(y,m,0).getDate()};
+  const mxDay=ym=>ym>=MARCO_FROM?num(cfg.marcoFixed!=null?cfg.marcoFixed:288000)/(net?1.1:1)/dim(ym):0;
+  const k8=d=>d.replace(/\//g,""), r0=v=>v==null?null:Math.round(v);
+  const body={};
+  shown.forEach(d=>{
+    if(inProg&&d===today)return;                      // 勤務中の今日は人件費が未確定（日報側でシフトから見込み計算）
+    const R=res[d]; if(!R)return;
+    const sb=salesOf(d,"本店"), sm=salesOf(d,"マルコ"), sf=fhSales(d), ym=d.slice(0,7);
+    const FS=PC.foodSplit?PC.foodSplit(sb||0,sm||0,sf,ym):null, X=PC.fxDay(d), xm=X==null?null:Math.min(mxDay(ym),X);
+    const prov=!!((PC.provFood&&PC.provFood(ym))||fixedProv(ym));
+    if(R.本店.cost||sb!=null||sf)body["honten/"+k8(d)]={s:r0(sb),fhs:r0(sf),l:r0(R.本店.cost),h:+R.本店.h.toFixed(2),f:FS?r0(FS.h+FS.f):null,x:X==null?null:r0(X-xm),prov,closed:closedSet("本店").has(d)};
+    if(R.マルコ.cost||sm!=null)body["marco/"+k8(d)]={s:r0(sm),l:r0(R.マルコ.cost),h:+R.マルコ.h.toFixed(2),f:FS?r0(FS.m):null,x:xm==null?null:r0(xm),prov,closed:closedSet("マルコ").has(d)};
+  });
+  // 見込み計算用の率（今日・未来の日に使う）
+  const use=shown.filter(d=>!(inProg&&d===today)).slice(-28);
+  const lph=s=>{let c=0,h=0;use.forEach(d=>{const x=res[d]&&res[d][s];if(x&&x.h>0){c+=x.cost;h+=x.h}});return h>0?Math.round(c/h):null};
+  const t=new Date(), yms=[0,1].map(i=>{const x=new Date(t.getFullYear(),t.getMonth()+i,1);return x.getFullYear()+"/"+String(x.getMonth()+1).padStart(2,"0")});
+  const fxH={},fxM={};
+  yms.forEach(ym=>{const v=fixedOf(ym);if(v==null)return;const per=v/dim(ym),m=Math.min(mxDay(ym),per);fxH[ym.replace("/","")]=Math.round(per-m);fxM[ym.replace("/","")]=Math.round(m)});
+  const curYm=yms[0], RMc=PC.RM&&PC.RM[curYm];
+  const frH=PC.rateMode?foodRateH():(RMc?RMc.rate:foodRateH()), frM=PC.rateMode?foodRateM():(RMc?RMc.rate:foodRateM());
+  body["rates/honten"]={foodRate:+frH.toFixed(4),fhRate:+PC.fr.toFixed(4),lph:lph("本店"),fixedDay:fxH,tax:cfg.tax||"税抜"};
+  body["rates/marco"]={foodRate:+frM.toFixed(4),lph:lph("マルコ"),fixedDay:fxM,tax:cfg.tax||"税抜"};
+  const sig=JSON.stringify(body); if(sig===nippoPubSig)return; nippoPubSig=sig;
+  const at=Date.now(); body["rates/honten"].at=at; body["rates/marco"].at=at;
+  fetch(`${PAYROLL_DB}/nippo_metrics.json`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).catch(e=>console.error(e));
 }
 function issuesToday(issues){return issues.some(i=>/勤務中/.test(i.t))}
 function renderDayType(res,shown,todayOpen){
