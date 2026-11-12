@@ -107,6 +107,19 @@ body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Yu Goth
 .saving-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1a1c22;color:#fff;padding:9px 18px;border-radius:22px;font-size:13px;font-weight:700;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,.3)}
 .saving-toast.show{opacity:1}
 .conn-warn{background:#fff4e5;border:1px solid #f5d199;color:#8a5a00;font-size:12px;font-weight:600;padding:8px 12px;border-radius:10px;margin-bottom:12px;display:none}
+/* 現場ルール【追加 R8.11.12】 */
+.rules-imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+@media(max-width:560px){.rules-imgs{grid-template-columns:1fr}}
+.rules-img{display:block;background:#fff;border:1px solid var(--border,#d7dae2);border-radius:10px;overflow:hidden;text-decoration:none;color:inherit}
+.rules-img img{display:block;width:100%;height:auto}
+.rules-img span{display:block;font-size:11.5px;text-align:center;padding:5px;color:#5b6070;font-weight:700}
+.rules-pdf{display:flex;align-items:center;justify-content:center;margin:10px 0 4px;text-decoration:none;height:42px}
+.rules-list{list-style:none;padding:0;margin:4px 0 0}
+.rules-list li{padding:6px 0 6px 22px;border-bottom:1px dashed #e3e5ea;position:relative;font-size:13.5px;line-height:1.5}
+.rules-list li:last-child{border:none}
+.rules-list li::before{content:"";position:absolute;left:2px;top:9px;width:12px;height:12px;border:1.5px solid #1d1f24;border-radius:3px}
+.rules-list li.k{background:#fff4d6;font-weight:800;border-radius:6px;padding-right:6px}
+.rules-top{border:2px solid #c0001a!important}
 </style>
 </head>
 <body>
@@ -127,6 +140,7 @@ body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Yu Goth
         <button data-sec="kitchen" class="active" onclick="setSec('kitchen')">&#127859; キッチン</button>
         <button data-sec="hall" onclick="setSec('hall')">&#128717; ホール</button>
         <button data-sec="ops" onclick="setSec('ops')">&#9881; オペレ</button>
+        <button data-sec="rules" onclick="setSec('rules')">&#9888; ルール</button>
       </div>
     </div>
   </div>
@@ -458,6 +472,7 @@ var state={shop:"enya",sec:"kitchen",admin:false,sel:null,data:{enya:{kitchen:nu
 var listeners={};
 function refPath(shop,sec){return 'manualv2/'+shop+'/'+sec;}
 function attach(shop,sec){
+  if(sec==='rules')return; // 現場ルールは固定ページ（Firebaseに保存しない）
   var key=shop+'/'+sec;
   if(!db){ state.data[shop][sec]=deepcopy(DEFAULTS[shop][sec]); showConn(true); if(current(shop,sec))render(); return; }
   if(listeners[key])return;
@@ -489,6 +504,7 @@ function applyTheme(){document.documentElement.style.setProperty('--accent',SHOP
 function render(){
   applyTheme();
   var v=document.getElementById('view');
+  if(state.sec==='rules'){ v.innerHTML=renderRules(); return; }
   if(state.sel!==null && state.sel<curList().length){ v.innerHTML=renderDetail(curList()[state.sel]); }
   else { state.sel=null; v.innerHTML=renderList(); }
 }
@@ -545,6 +561,57 @@ function renderDetail(p){
   }
   return h;
 }
+// ===== 失敗を防ぐ現場ルール（本店・マルコ共通）【追加 R8.11.12】 =====
+// 画像・PDFは rules/ フォルダ。内容を変えるときは画像を作り直し、下の RULES の文章も合わせて直す。
+var RULES=[
+ {n:'1',t:'食の安全（最重要）',top:true,items:[
+  ['出勤時に体調を確認。下痢・発熱・手の傷がある人は、生ものの調理に入れない',1],
+  ['手洗いと器具の洗浄はセット。生魚の後・作業を切り替えるときは、手と一緒にまな板・包丁・布巾も洗って消毒する',1],
+  ['手洗い：出勤時・トイレの後・生魚を触った後・ゴミを触った後'],
+  ['まな板・包丁は、生魚用とその他用で分ける'],
+  ['冷蔵庫・冷凍庫の温度を、朝と夕方の2回記録する'],
+  ['刺身・鮨ネタは出しっぱなしにしない（常温に置いてよい時間を決める）'],
+  ['仕込み品に日付シールを貼り、古いものから使う'],
+  ['アレルギーは三重確認：注文時に聞く → 伝票に印 → 厨房で声に出す',1]]},
+ {n:'2',t:'けが・火事',items:[
+  ['床の水・油は、気づいた人がすぐ拭く'],['包丁は刃を奥へ。持って歩くときは声をかける'],['揚げ場の周りでは走らない'],
+  ['閉店時に、火の元・ガス元栓・電源・戸締りを指差し確認（「火、よし」）',1],['消火器・救急箱の場所を全員が言える']]},
+ {n:'3',t:'提供ミス・クレーム',items:[
+  ['注文は復唱する（「3番卓、おまかせ2つ」→「はい、おまかせ2つ」）'],['出す前に卓番と品名を確認する'],
+  ['サブメニュー（トッピング）の数量と金額を確認する。本店のレジは、親メニューを4つにするとトッピングも自動で×4になる（例：鮟鱇鍋4つ＋あん肝マシマシ1つのつもりが、レジでは4つ）。お客さまに数を確認 → 入力後に伝票を見て直す → 会計時に明細をもう一度見る',1],
+  ['御膳・丼ものの注文が20以上入っていたら、ご案内の時点で「提供にお時間をいただきます」と伝える',1],
+  ['それでも10分以上遅れそうなら、先に一言お詫びに行く'],['品切れは開店前に全員で共有する'],['予約は前日に日時・人数・アレルギーを確認する']]},
+ {n:'4',t:'ロス・お金',items:[
+  ['仕込み量は「予約数 × 曜日の実績」で決める'],
+  ['翌日の仕込みを決めるとき・清掃と整理整頓のときに、発注も一緒に確認する',1],
+  ['発注は冷蔵庫の在庫を見てから出す'],['調味料・ネタ・盛り付けは量って使う'],
+  ['レジ締めは2人で数える。過不足は合わせず、そのまま記録する',1],['捨てたものは「何を・いくら分・なぜ」を日報に書く']]},
+ {n:'5',t:'人・チーム',items:[
+  ['どんな小さな変更も、Musubuとグループ LINEの両方で全員に共有する（メニュー・価格・手順・置き場所・シフト）',1],
+  ['「その人しかできない作業」を作らない（握り・仕込み・レジ締めは2人以上ができるように）'],
+  ['休憩は必ず取る。打刻はその日のうちに確認する'],['新人には、最初の1週間は決まった担当者を付ける'],['交代時は申し送り（口頭＋メモ）']]},
+ {n:'6',t:'設備',items:[
+  ['冷蔵庫・製氷機・食洗機の「いつもと違う音」は、その日のうちに報告する'],['フィルター・排水口は決まった曜日に掃除する'],['業者の連絡先を壁に貼っておく']]},
+ {n:'7',t:'店の信用',items:[
+  ['トイレは、お客さまが1度でも使ったら、すぐチェックする',1],
+  ['ホールの動きの優先順位：① 料理提供 ＞ ② 会計 ＞ ③ トイレチェック ＞ ④ ご案内 ＞ ⑤ バッシング',1],
+  ['苦情は「謝る → 最後まで聞く → すぐ対処 → お礼」。責任者が対応する'],['悪い知らせほど先に店長へ伝える']]}
+];
+function renderRules(){
+  var h='<div class="sec-label">本店・マルコ共通　失敗を防ぐ現場ルール</div>';
+  h+='<div class="note-box"><div class="nb-label">&#128204; 注意力に頼らず、手順で防ぐ</div><div class="nb-text">黄色の項目は必ず守る。迷ったら、このルールに戻る。気づいたことは日報の改善提案へ。</div></div>';
+  h+='<div class="rules-imgs">';
+  [1,2,3].forEach(function(i){h+='<a class="rules-img" href="rules/rule_'+i+'.png" target="_blank" rel="noopener"><img src="rules/rule_'+i+'.png" alt="失敗を防ぐ現場ルール '+i+'/3" loading="lazy"><span>'+i+'/3　タップで拡大</span></a>';});
+  h+='</div><a class="ebtn pri rules-pdf" href="rules/rules_a4.pdf" target="_blank" rel="noopener">&#128424; 印刷用PDF（A4・3枚）を開く</a>';
+  h+='<div class="block-title">文字で読む</div>';
+  RULES.forEach(function(r){
+    h+='<div class="man-card'+(r.top?' rules-top':'')+'"><div class="mc-h">'+r.n+'. '+esc(r.t)+'</div><ul class="rules-list">';
+    r.items.forEach(function(it){h+='<li'+(it[1]?' class="k"':'')+'>'+esc(it[0])+'</li>';});
+    h+='</ul></div>';
+  });
+  return h;
+}
+
 function setShop(s){state.shop=s;state.sel=null;segActive('shopSeg','shop',s);applyTheme();attach(s,state.sec);render();}
 function setSec(s){state.sec=s;state.sel=null;segActive('secSeg','sec',s);attach(state.shop,s);render();}
 function segActive(segId,attr,val){var seg=document.getElementById(segId);Array.prototype.forEach.call(seg.querySelectorAll('button'),function(b){b.classList.toggle('active',b.getAttribute('data-'+attr)===val);});}
