@@ -138,6 +138,12 @@ details.ch[open]>summary::after{content:"▲"}
 .tip .ic{font-size:20px}
 .tip .tx{flex:1}
 .tip .mo{font-size:11.5px;color:var(--accent);font-weight:800;white-space:nowrap}
+.blist{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.bl{display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:0 0 0 10px}
+.bl:focus-within{border-color:var(--accent);outline:2px solid var(--accent-soft)}
+.bl label{font-size:13px;font-weight:800;white-space:nowrap;color:var(--accent);min-width:7.2em}
+.bl input{border:none!important;outline:none!important;padding:10px 8px 10px 0;background:transparent}
+@media(max-width:480px){.bl{flex-direction:column;align-items:stretch;padding:6px 10px 0}.bl label{min-width:0}.bl input{padding:4px 0 8px}}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -535,21 +541,20 @@ function numsHTML(){
 function propHTML(p,i){
   p=p||{};
   var adm=state.admin&&p.title;
+  var line=function(f,lb,ph,max){return '<div class="bl"><label for="pf-'+i+'-'+f+'">'+lb+'：</label><input id="pf-'+i+'-'+f+'" type="text" data-f="'+f+'" maxlength="'+max+'" placeholder="'+ph+'" value="'+esc(p[f])+'"></div>'};
   return '<div class="prop" data-i="'+i+'">'+
-    '<div class="prop-h"><span class="num">'+(i+1)+'</span><input type="text" data-f="title" placeholder="提案のタイトル（例：団体の日は前菜を先に盛る）" value="'+esc(p.title)+'" aria-label="提案のタイトル">'+
+    '<div class="prop-h"><span class="num">'+(i+1)+'</span><span class="note" style="flex:1">一行ずつ、短く書く（そのままMusubuに流れます）</span>'+
     (i>0?'<button class="btn sm" type="button" onclick="removeProp('+i+')" aria-label="この提案を消す">×</button>':'')+'</div>'+
-    '<div class="steps"><span>① 何が起きた</span><span>② なぜ</span><span>③ どう変える</span><span>④ どうなる</span><span>⑤ 誰が・いつ</span></div>'+
-    '<label class="f">① 何が起きたか（困ったこと・ムダ・お客さまの不満）<span class="q">事実を具体的に</span></label>'+
-    '<textarea data-f="problem" placeholder="例：19時台に団体予約と重なり、一般のお客さまの提供が25分遅れた">'+esc(p.problem)+'</textarea>'+
-    '<label class="f">② なぜ起きたか<span class="q">人ではなく、やり方・仕組みの原因を</span></label>'+
-    '<textarea data-f="cause" placeholder="例：団体の前菜をその場で盛り付けていて、刺し場が15分ふさがった">'+esc(p.cause)+'</textarea>'+
-    '<label class="f">③ どう変えるか（提案）<span class="q">一つだけ、明日から試せる形で</span></label>'+
-    '<textarea data-f="idea" placeholder="例：団体予約の日は、開店前に前菜を盛って冷蔵庫に入れておく">'+esc(p.idea)+'</textarea>'+
-    '<div class="two"><div><label class="f">④ 期待する効果<span class="q">時間・金額・お客さまの変化</span></label>'+
-    '<textarea data-f="effect" placeholder="例：提供の遅れが15分以内に収まる。お詫びのサービスが減る">'+esc(p.effect)+'</textarea></div>'+
-    '<div><label class="f">⑤ 誰が・いつから試すか</label>'+
-    '<textarea data-f="who" placeholder="例：刺し場の〇〇さん、次の団体予約（金曜）から">'+esc(p.who)+'</textarea></div></div>'+
-    '<div class="chk" style="margin-top:8px"><label><input type="checkbox" data-f="needDecision"'+(p.needDecision?' checked':'')+'> 代表の判断が必要（お金がかかる・ルールを変える など）</label></div>'+
+    '<div class="blist">'+
+    line('title','テーマ','例：団体の日は前菜を先に盛る',30)+
+    line('problem','何が起きたか','例：団体と重なり提供が25分遅れた',50)+
+    line('cause','なぜ','例：前菜の盛り付けで刺し場がふさがった',50)+
+    line('idea','どう変えるか','例：団体の日は開店前に前菜を盛っておく',50)+
+    line('effect','期待する効果','例：提供の遅れを15分以内にする',50)+
+    line('who','誰が・いつから','例：刺し場の〇〇さん、金曜の団体から',40)+
+    '</div>'+
+    '<div class="chk" style="margin-top:8px"><label><input type="checkbox" data-f="needDecision"'+(p.needDecision?' checked':'')+'> 代表の判断が必要（お金がかかる・ルールを変える など）</label>'+
+    '<label><input type="checkbox" data-f="share"'+(p.share===false?'':' checked')+'> Musubuチャットでみんなに共有する'+(p.chatKey?' <span class="chip ok">共有済み</span>':'')+'</label></div>'+
     (p.status&&p.status!=='提案'?'<div style="margin-top:6px"><span class="chip a">'+esc(p.status)+'</span>'+(p.decisionNote?' <span class="note">'+esc(p.decisionNote)+'</span>':'')+'</div>':'')+
     (adm?'<div class="fu" style="border-left-color:var(--ok)"><div class="t">代表の判断</div><div class="two"><select data-f="status" aria-label="判断">'+STATUS.map(function(s){return '<option'+((p.status||'提案')===s?' selected':'')+'>'+s+'</option>'}).join('')+'</select><input type="text" data-f="decisionNote" placeholder="ひとこと（例：やってみよう。結果を来週教えて）" value="'+esc(p.decisionNote)+'"></div></div>':'')+
   '</div>';
@@ -639,7 +644,7 @@ async function saveReport(){
   if(!db){toast('通信できません。電波を確認してください');return}
   var o=readReport();
   var good=o.proposals.filter(function(p){return p.title&&p.idea});
-  if(!state.admin&&!good.length){if(!confirm('改善提案（タイトルと「どう変えるか」）がまだ書かれていません。このまま送りますか？'))return}
+  if(!state.admin&&!good.length){if(!confirm('改善提案（テーマと「どう変えるか」）がまだ書かれていません。このまま送りますか？'))return}
   if(!state.admin&&!o.author){toast('記入者の名前を入れてください');var a=document.querySelector('[data-r="author"]');if(a)a.focus();return}
   var N=state.nums||{};
   var upd={
@@ -654,15 +659,58 @@ async function saveReport(){
   document.querySelectorAll('[data-fu]').forEach(function(el){var f=state.followups[+el.dataset.fu];if(!f)return;
     var st=el.querySelector('[data-fu-f="status"]').value, rs=el.querySelector('[data-fu-f="result"]').value.trim();
     if(st!==(f.p.status||'提案')||rs!==(f.p.result||'')){var base='nippo/'+state.shop+'/'+f.k+'/proposals/'+f.i+'/';fuUpd[base+'status']=st;fuUpd[base+'result']=rs;fuUpd[base+'resultAt']=Date.now()}});
+  // Musubuチャットへの共有（提案の要約・代表の判断・振り返りの結果）
+  var chat=buildChatPosts(upd.proposals, upd.author||'', fuUpd);
+  Object.assign(fuUpd, chat.writes);
   $('saveBtn').disabled=true;
   try{
     await db.ref('nippo/'+state.shop+'/'+k8(state.date)).update(upd);
     if(Object.keys(fuUpd).length)await db.ref().update(fuUpd);
+    if(chat.n)toast('Musubuチャットに'+chat.n+'件共有しました');
     try{localStorage.removeItem(draftKey())}catch(e){}
     state.dirty=false;toast(state.admin?'返信を保存しました':'日報を送りました。おつかれさまでした');
     load();
   }catch(e){toast('保存できませんでした：'+e.message)}
   $('saveBtn').disabled=false;
+}
+
+// ===== Musubuチャットへ自動共有【追加 R8.11.12】 =====
+// 送る内容：①新しい改善提案の要約 ②代表の判断（採用・保留・見送り）③振り返りで「効果あり／効果なし」になった結果
+// 数字（売上・人件費など）はチャットに出さない。Musubuの形式：stock/{enya|marco}/chat/{key} = {id,user,text,time,ts,_r,pinned}
+var CHAT_USER='📝 日報';
+function cut(t,n){t=String(t||'').replace(/\s+/g,' ').trim();if(!t)return '';var ix=t.indexOf('。'),f=ix>=0?t.slice(0,ix+1):t;if(f.length>=8&&f.length<t.length&&f.length<=n)t=f;return t.length>n?t.slice(0,n-1)+'…':t}
+function dLabel(k){return (+k.slice(4,6))+'/'+(+k.slice(6,8))}
+function summarize(p,author,k){
+  var lines=['💡 改善提案｜'+SHOP[state.shop].name+' '+dLabel(k)+(author?'（'+author+'）':'')];
+  [['title','テーマ'],['problem','何が起きたか'],['cause','なぜ'],['idea','どう変えるか'],['effect','期待する効果'],['who','誰が・いつから']].forEach(function(x){if(p[x[0]]){var t=String(p[x[0]]).replace(/\s+/g,' ').trim();lines.push('・'+x[1]+'：'+(t.length>80?t.slice(0,79)+'…':t))}});
+  if(p.needDecision)lines.push('（代表の判断待ち）');
+  return lines.join('\n');
+}
+var DEC_ICON={'採用・試行中':'✅ 採用','保留':'⏸ 保留','見送り':'🙏 見送り','効果あり（定着）':'🎉 効果あり','効果なし（やめる）':'🔁 効果なし'};
+function chatMsg(text){var d=new Date();var key=db.ref('stock/'+state.shop+'/chat').push().key;
+  return {key:key,data:{id:key,user:CHAT_USER,text:text,time:d.getHours()+':'+pad(d.getMinutes()),ts:Date.now(),_r:false,pinned:false,src:'nippo'}}}
+function buildChatPosts(props,author,fuUpd){
+  var w={},n=0,k=k8(state.date),base='stock/'+state.shop+'/chat/';
+  var orig=(state.report&&state.report.proposals&&(Array.isArray(state.report.proposals)?state.report.proposals:Object.values(state.report.proposals)))||[];
+  props.forEach(function(p,i){
+    if(p.share===false||!p.title||!p.idea)return;
+    var text=summarize(p,author||(state.report&&state.report.author)||'',k);
+    if(!p.chatKey){var m=chatMsg(text);w[base+m.key]=m.data;p.chatKey=m.key;p.chatSig=text;n++}
+    else if(p.chatSig!==text){w[base+p.chatKey+'/text']=text;w[base+p.chatKey+'/edited']=true;p.chatSig=text}
+    // 代表の判断が変わったら一言共有
+    var st=p.status||'提案';
+    if(state.admin&&st!=='提案'&&DEC_ICON[st]&&p.decPosted!==st){
+      var m2=chatMsg(DEC_ICON[st]+'｜「'+cut(p.title,30)+'」'+(p.decisionNote?'\n代表：'+cut(p.decisionNote,60):''));w[base+m2.key]=m2.data;p.decPosted=st;n++}
+  });
+  // 振り返りで結果が出た提案
+  state.followups.forEach(function(f){
+    var sk='nippo/'+state.shop+'/'+f.k+'/proposals/'+f.i+'/';
+    var st=fuUpd[sk+'status'];if(!st||st===f.p.status||!/効果/.test(st)||f.p.decPosted===st||f.p.share===false)return;
+    var rs=fuUpd[sk+'result']!=null?fuUpd[sk+'result']:f.p.result;
+    var m=chatMsg(DEC_ICON[st]+'｜'+SHOP[state.shop].name+' '+dLabel(f.k)+'の提案「'+cut(f.p.title,30)+'」'+(rs?'\n結果：'+cut(rs,60):''));
+    w[base+m.key]=m.data;w[sk+'decPosted']=st;n++;
+  });
+  return {writes:w,n:n};
 }
 
 // ===== これまでの日報 =====
