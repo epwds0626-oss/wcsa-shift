@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<title>店長日報</title>
+<style>
+:root{
+  --bg:#eef1f3; --surface:#fff; --surface2:#f1f2f6; --surface3:#e7e9ef;
+  --border:#d7dae2; --text:#1a1c22; --text2:#5b6070; --text3:#8c92a4;
+  --accent:#b07d00; --accent-soft:rgba(176,125,0,.12);
+  --ok:#0a7d4f; --ok-soft:#e6f5ee; --warn:#b26a00; --warn-soft:#fff3e0; --crit:#c0001a; --crit-soft:#fdecec;
+  --shadow:0 1px 3px rgba(20,25,40,.06),0 4px 16px rgba(20,25,40,.06);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Yu Gothic','Noto Sans JP',sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font-family:inherit;font-size:14px}
+#app{display:flex;flex-direction:column;height:100%}
+.mhead{position:sticky;top:0;z-index:30;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 6px rgba(20,25,40,.05)}
+.row{display:flex;align-items:center;gap:8px;padding:9px 12px;flex-wrap:wrap}
+.title{font-size:15px;font-weight:800;white-space:nowrap}
+.spacer{flex:1}
+.hbtn{border:1px solid var(--border);background:var(--surface2);color:var(--text2);height:34px;padding:0 12px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.hbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.seg{display:flex;background:var(--surface3);border-radius:10px;padding:3px;gap:2px;flex-shrink:0}
+.seg button{border:none;background:transparent;color:var(--text2);font-size:13px;font-weight:700;padding:7px 12px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.seg button.active{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.datenav{display:flex;align-items:center;gap:4px}
+.datenav .arw{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);font-size:16px;cursor:pointer;color:var(--text2)}
+.datenav .dl{font-size:15px;font-weight:900;min-width:118px;text-align:center;font-variant-numeric:tabular-nums}
+.datenav .dl small{display:block;font-size:10.5px;font-weight:700;color:var(--accent)}
+.body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 120px}
+.wrap{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px}
+.card h2{font-size:15px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card .lead{font-size:12.5px;color:var(--text2);margin-bottom:10px}
+.main{border:2px solid var(--accent);background:linear-gradient(0deg,var(--surface),var(--surface)) padding-box}
+.main h2{font-size:17px}
+.note{font-size:12px;color:var(--text2)}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.chip.w{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.chip.c{background:var(--crit-soft);color:var(--crit);border-color:transparent}
+.chip.a{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+/* 数字 */
+.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.kc{border:1px solid var(--border);border-radius:11px;padding:9px 11px;background:var(--surface2)}
+.kc .kl{font-size:11.5px;color:var(--text2);font-weight:700;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.kc .kv{font-size:19px;font-weight:900;font-variant-numeric:tabular-nums;margin-top:2px}
+.kc .ks{font-size:11.5px;color:var(--text2);font-variant-numeric:tabular-nums}
+.kc.op .kv.pos{color:var(--ok)} .kc.op .kv.neg{color:var(--crit)}
+.kbar{display:flex;height:22px;border-radius:7px;overflow:hidden;margin-top:10px;background:var(--surface3)}
+.kbar i{display:flex;align-items:center;justify-content:center;font-style:normal;font-size:10.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;min-width:0}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:11.5px;color:var(--text2)}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px;background:var(--c)}
+/* フォーム */
+label.f{display:block;font-size:12.5px;font-weight:800;color:var(--text);margin:10px 0 4px}
+label.f .q{font-weight:500;color:var(--text2);font-size:11.5px;margin-left:4px}
+textarea,input[type=text],input[type=password],select{width:100%;border:1px solid var(--border);border-radius:9px;padding:9px 10px;background:#fff;color:var(--text)}
+textarea{min-height:64px;resize:vertical;line-height:1.5}
+textarea:focus,input:focus,select:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:560px){.two{grid-template-columns:1fr}}
+.prop{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px;background:var(--surface2)}
+.prop-h{display:flex;align-items:center;gap:8px}
+.prop-h .num{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.prop-h input{font-weight:800}
+.steps{display:flex;gap:4px;margin:10px 0 2px;flex-wrap:wrap}
+.steps span{font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:2px 7px}
+.chk{display:flex;flex-direction:column;gap:6px}
+.chk label{display:flex;gap:8px;align-items:center;font-size:13.5px;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text);height:38px;padding:0 14px;border-radius:10px;font-weight:800;cursor:pointer}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.sm{height:30px;padding:0 10px;font-size:12.5px}
+.btn.ghost{background:transparent;border-style:dashed;color:var(--accent);border-color:var(--accent)}
+.savebar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-top:1px solid var(--border);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;justify-content:center}
+.savebar .st{font-size:12px;color:var(--text2)}
+.fu{border-left:4px solid var(--accent);padding:8px 10px;background:var(--surface2);border-radius:8px;margin-top:8px}
+.fu .t{font-weight:800}
+.fu .m{font-size:12px;color:var(--text2)}
+.list-item{display:flex;gap:10px;align-items:flex-start;padding:10px 4px;border-bottom:1px solid var(--surface3);cursor:pointer}
+.list-item:last-child{border-bottom:none}
+.list-item .d{font-weight:900;min-width:74px;font-variant-numeric:tabular-nums}
+.list-item .p{flex:1;font-size:13px}
+.admin{border:2px dashed var(--accent)}
+.lock{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.lock .in{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:22px;max-width:340px;width:100%;display:flex;flex-direction:column;gap:10px;text-align:center}
+.lock .t{font-size:18px;font-weight:900}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#1a1c22;color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:700;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
+.toast.on{opacity:1}
+.hint{font-size:12px;color:var(--warn);background:var(--warn-soft);border-radius:8px;padding:6px 10px;margin-top:8px}
+/* 読みもの */
+.gsw{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gsw button{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:10px;text-align:left;cursor:pointer}
+.gsw button b{display:block;font-size:14.5px}
+.gsw button span{font-size:11.5px;color:var(--text2)}
+.gsw button.active{border:2px solid var(--accent);background:var(--accent-soft)}
+details.ch{border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow)}
+details.ch>summary{list-style:none;cursor:pointer;padding:13px 14px;font-weight:800;font-size:14.5px;display:flex;gap:8px;align-items:center}
+details.ch>summary::-webkit-details-marker{display:none}
+details.ch>summary .n{width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+details.ch>summary::after{content:"▼";margin-left:auto;font-size:11px;color:var(--text3)}
+details.ch[open]>summary::after{content:"▲"}
+.gc{padding:0 14px 14px;font-size:14px}
+.gc p,.gc ul,.gc ol{margin:8px 0}
+.gc ul,.gc ol{padding-left:20px}
+.gc li{margin:4px 0}
+.gc h4{font-size:14px;margin:14px 0 4px;padding-left:8px;border-left:3px solid var(--accent)}
+.gc .pt{font-size:14.5px;background:var(--accent-soft);border-radius:9px;padding:9px 11px}
+.tw{overflow-x:auto;margin:8px 0}
+.tw table{border-collapse:collapse;width:100%;font-size:13px;min-width:520px}
+.tw td:first-child,.tw th:first-child{min-width:5.5em}
+.tw th,.tw td{border:1px solid var(--border);padding:6px 8px;vertical-align:top;text-align:left}
+.tw th{background:var(--surface2);font-size:12px}
+.todo{border:1px dashed var(--accent);border-radius:10px;padding:8px 12px;margin-top:10px;background:var(--surface2)}
+.todo ul{list-style:none;padding-left:0}
+.todo li::before{content:"☐ ";color:var(--accent);font-weight:900}
+.dg{border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0;background:var(--surface2)}
+.dg-t{font-weight:800;margin-bottom:10px}
+.tree{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tb{border:1.5px solid var(--border);background:#fff;border-radius:9px;padding:7px 12px;text-align:center;min-width:200px;max-width:100%}
+.tb b{display:block;font-size:13.5px}.tb span{font-size:11.5px;color:var(--text2)}
+.tb.acc,.fb.acc,.cb.acc{border:2px solid var(--accent);background:var(--accent-soft)}
+.up{font-size:11px;color:var(--text3);line-height:1.2}
+.tr2{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.tr2>div{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tr2 .tb{min-width:0;width:100%}
+.flow,.cyc{display:flex;flex-wrap:wrap;align-items:stretch;gap:4px}
+.fb,.cb{flex:1 1 90px;border:1.5px solid var(--border);background:#fff;border-radius:9px;padding:7px 8px;text-align:center}
+.fb small{display:block;font-size:10.5px;font-weight:800;color:var(--accent)}
+.fb b,.cb b{display:block;font-size:13px}.fb span,.cb span{font-size:11px;color:var(--text2)}
+.fa,.ca{display:flex;align-items:center;color:var(--text3);font-weight:900}
+.tip{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.tip .ic{font-size:20px}
+.tip .tx{flex:1}
+.tip .mo{font-size:11.5px;color:var(--accent);font-weight:800;white-space:nowrap}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div id="lock" class="lock" hidden><div class="in">
+  <div class="t">店長日報</div>
+  <div class="note" id="lockMsg">店長用のパスワードを入力してください</div>
+  <input id="pw" type="password" autocomplete="current-password" aria-label="パスワード">
+  <button class="btn pri" id="pwBtn" type="button">開く</button>
+  <div id="pwErr" class="note" style="color:var(--crit)" hidden>パスワードが違います</div>
+  <button class="btn" type="button" onclick="goHome()">WCSAに戻る</button>
+</div></div>
+
+<div id="app">
+  <div class="mhead">
+    <div class="row">
+      <button class="hbtn" type="button" onclick="goHome()" aria-label="WCSAに戻る">🏠</button>
+      <span class="title">店長日報</span>
+      <div class="seg" id="shopSeg">
+        <button data-shop="enya" type="button" onclick="setShop('enya')">本店</button>
+        <button data-shop="marco" type="button" onclick="setShop('marco')">マルコ</button>
+      </div>
+      <span class="spacer"></span>
+      <div class="seg" id="viewSeg">
+        <button data-view="write" type="button" onclick="setView('write')">書く</button>
+        <button data-view="list" type="button" onclick="setView('list')">これまで</button>
+        <button data-view="learn" type="button" onclick="setView('learn')">学ぶ</button>
+      </div>
+    </div>
+    <div class="row" style="padding-top:0" id="dateRow">
+      <div class="datenav">
+        <button class="arw" type="button" onclick="shiftDate(-1)" aria-label="前の日">‹</button>
+        <div class="dl" id="dateLabel"></div>
+        <button class="arw" type="button" onclick="shiftDate(1)" aria-label="次の日">›</button>
+      </div>
+      <button class="hbtn" type="button" onclick="goToday()">今日</button>
+      <span class="spacer"></span>
+      <span class="note" id="authorNote"></span>
+    </div>
+  </div>
+  <div class="body"><div class="wrap" id="main"></div></div>
+</div>
+<div class="savebar" id="savebar" hidden>
+  <span class="st" id="saveSt"></span>
+  <button class="btn pri" type="button" id="saveBtn" onclick="saveReport()">日報を送る</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 読みもの：「店づくりの土台」「マーケティングの基本」【追加 R8.11.12】 =====
+// 中身を直すときは、この GUIDES の文章を書き換える（html はそのまま画面に表示される）
+var GUIDES=[
+{id:'base',icon:'🏠',title:'店づくりの土台',sub:'なぜ働くのか、どう働くのか',chapters:[
+{id:'words',t:'まず知っておきたい5つの言葉',html:`
+<p class="pt">店のお金の流れは、<b>「売上 − 経費 = 利益」</b>の一行で表せます。</p>
+<div class="tw"><table><thead><tr><th>言葉</th><th>意味</th><th>例</th></tr></thead><tbody>
+<tr><td><b>売上</b></td><td>お客さまに払っていただいたお金の合計。売上 = 客数 × 客単価。「どれだけ選ばれたか」の通知表</td><td>客単価3,000円のお客さまが1日40人なら、売上は12万円</td></tr>
+<tr><td><b>経費</b></td><td>店を動かすために使うお金。食材（原価）、人件費、家賃、水道光熱費、消耗品、修理代など</td><td>魚を仕入れる、照明をつける、包丁を研ぐ。すべて経費</td></tr>
+<tr><td><b>人件費</b></td><td>働く人に払うお金。時給・給料に加え、社会保険料や交通費も含む。飲食店で一番大きい経費のひとつ</td><td>暇な時間に4人いて、忙しい時間に3人しかいない → 人数ではなくシフトの組み方の問題</td></tr>
+<tr><td><b>利益</b></td><td>売上から経費を全部引いて残るお金。店の未来のための費用</td><td>設備の買い替え、昇給、不漁や災害への備えは、ここから出る</td></tr>
+<tr><td><b>改善</b></td><td>昨日より少し良くするための、小さな変更を続けること。大きな改革ではない</td><td>洗い場が詰まる → 下げた皿の置き場所を変える → 翌週に詰まりが減ったか見る</td></tr>
+</tbody></table></div>
+<h4>売上1,000円はどこへ行く？</h4>
+<p class="note">一般的な飲食店の目安です。実際の割合は店ごとに違います。自分の店の実際の数字は、日報の「今日の数字」で毎日見られます。</p>
+<div class="tw"><table><thead><tr><th>行き先</th><th>目安</th></tr></thead><tbody>
+<tr><td>食材（原価）</td><td>約300円</td></tr><tr><td>人件費</td><td>約300円</td></tr><tr><td>家賃</td><td>約100円</td></tr>
+<tr><td>水道光熱費・消耗品・修理など</td><td>約200〜250円</td></tr><tr><td><b>利益</b></td><td><b>約50〜100円</b></td></tr></tbody></table></div>
+<p>1,000円売っても、手元に残るのは50〜100円ほどです。だから1,000円のロスは、10〜20倍の売上でようやく取り戻せる重さがあります。</p>
+<div class="todo"><b>明日からやること</b><ul><li>自分の店の「今日の客数」と「客単価」を、閉店後に一度見る</li><li>捨てた食材があったら、「いくら分か」を一緒に考える</li></ul></div>`},
+{id:'why',t:'なぜ働くのか — すべての前提',html:`
+<p class="pt">店は、<b>お客さまと、一緒に働く仲間と、その家族の暮らしを良くし続けるため</b>にあります。利益も売上も効率も、すべてそのための手段です。</p>
+<div class="dg"><div class="dg-t">毎日の仕事は、すべて「お客さまと仲間の暮らし」につながっている</div>
+<div class="tree">
+<div class="tb acc"><b>目的：お客さまと仲間の暮らしを良くし続ける</b><span>創業1907年。続くことが、お客さまと地域への約束</span></div><div class="up">▲</div>
+<div class="tb"><b>店が続き、良くなる</b><span>給料・設備・品質・不測の備え</span></div><div class="up">▲</div>
+<div class="tb"><b>利益が残る</b><span>未来の店のための費用</span></div><div class="up">▲ 売上 − 経費</div>
+<div class="tr2"><div><div class="tb"><b>売上・客数を増やす</b><span>お客さまに選ばれた回数</span></div><div class="up">▲</div><div class="tb"><b>マーケティング・接客</b><span>選ばれる理由を作る</span></div></div>
+<div><div class="tb"><b>経費のムダを減らす</b><span>届かないお金を人と品質へ</span></div><div class="up">▲</div><div class="tb"><b>効率のよい運営</b><span>段取り・ロス削減・整理整頓</span></div></div></div>
+</div><div class="note" style="margin-top:6px">下から上へ「何のために？」をたどると、皿洗いも仕込みも接客も、すべて一番上の目的につながっています。</div></div>
+<h4>店は誰のためにあるのか</h4>
+<ul><li><b>お客さま</b>：おいしい食事と、楽しい時間。</li><li><b>働く仲間とその家族</b>：給料、安心して働ける場所、成長。</li><li><b>取引先</b>：大洗の漁師さんや仲買さん。私たちが買い続けることで、その仕事も続きます。</li><li><b>地域</b>：大洗に人が来る理由のひとつになります。</li></ul>
+<p>どれか一つのために他を犠牲にすると、店は長く続きません。</p>
+<h4>続くことが、いちばんの価値</h4>
+<p>えんやどっと丸は1907年の清水商店から、100年以上続いてきました。その時々の人たちがお客さまに選ばれ、利益を残し、次の世代に店を渡してきたからです。どんなに良い店でも、つぶれてしまえば誰も幸せにできません。</p>
+<h4>「なぜ」をたどる</h4>
+<div class="tw"><table><thead><tr><th>問い</th><th>答え</th><th>もう一段深く</th></tr></thead><tbody>
+<tr><td>なぜ利益が必要か</td><td>店を続けるため。物価は上がり、設備は古くなり、不漁や災害も来る</td><td>利益は「未来の店のための費用」。今日の利益が、来年の給料や新しい冷蔵庫になる</td></tr>
+<tr><td>なぜ売上・客数を増やすのか</td><td>経費を削るのには限界があるが、売上には上限がない</td><td>売上は「お客さまからの評価の合計」、客数は「選ばれた回数」。数字は、お客さまの声を数えたもの</td></tr>
+<tr><td>なぜ経費を抑えるのか</td><td>誰にも届かないお金を減らすため</td><td>捨てた食材、消し忘れの電気、ムダな残業は、お客さまにも仲間にも届かない。浮いたお金は給料と品質に回せる</td></tr>
+<tr><td>なぜ効率よく働くのか</td><td>時間も限りある経費だから</td><td>探し物や二度手間が減れば、お客さまに向き合う時間と、早く帰れる時間が増える</td></tr>
+<tr><td>なぜマーケティングが大事か</td><td>選ばれる理由を、偶然ではなく仕組みにするため</td><td>値下げや無理な長時間労働で客を集めると、忙しいのに誰も報われない</td></tr>
+</tbody></table></div>
+<h4>具体例で考える</h4>
+<ol><li><b>食材を1,000円分捨てた</b>：仮に利益率5%なら、取り戻すには売上2万円が必要です。客単価3,000円なら、お客さま約7人分の会計が消えたのと同じです。</li>
+<li><b>1日あと5人来てくれた</b>：仮に客単価3,000円なら、月に約45万円の売上増です。その一部が、賞与や新しい道具になります。</li>
+<li><b>真夏に冷蔵庫が壊れた</b>：まとまった修理代をすぐに出せるのは、利益を残してきた店だけです。残していなければ、借金するか営業を止めるしかありません。</li></ol>
+<h4>利益のために削ってはいけないもの</h4>
+<p>鮮度と味、食の安全、お客さまへの誠実さ、働く人の健康と法令順守。この4つを削ると客数が落ち、結局は利益も失います。経費を抑えるとは、<b>ここ以外のムダ</b>を減らすことです。</p>`},
+{id:'run',t:'お店が回るコツ',html:`
+<p class="pt"><b>営業中の出来は、開店前の準備でほぼ決まります。</b>忙しい時間に考えたり探したりしなくていい状態を、先に作っておきます。</p>
+<div class="tw"><table><thead><tr><th>コツ</th><th>こうする</th><th>例</th></tr></thead><tbody>
+<tr><td>準備が8割</td><td>ピークの前に仕込み・補充・備品を終える</td><td>ランチ前に、渡し皿やカトラリーを満杯にしておく</td></tr>
+<tr><td>決めごとは書いて貼る</td><td>「人に聞かないと分からないこと」を減らす</td><td>開店・閉店の手順をキッチンの壁に1枚で貼る</td></tr>
+<tr><td>置き場所を決める</td><td>「探す」時間をゼロにする（整理・整頓）</td><td>使ったら戻す場所に、テープで印をつける</td></tr>
+<tr><td>報告・連絡・相談は早く</td><td>悪い知らせほど先に伝える</td><td>「アジがあと3つです」を、切れる前に言う</td></tr>
+<tr><td>声に出して共有</td><td>注文・提供・切れを復唱する</td><td>「3番卓、おまかせ2つ入ります」「はい、おまかせ2つ」</td></tr>
+</tbody></table></div>
+<div class="todo"><b>明日からやること</b><ul><li>開店前に「今日の予約数・おすすめ・切れそうな物」を3分で共有する</li><li>探し物をしたら、その場で置き場所を決める</li><li>困ったことは、その日のうちに店長に伝える</li></ul></div>`},
+{id:'team',t:'仲間との人間関係',html:`
+<p class="pt"><b>雰囲気のいい店は、お客さまにも伝わります。</b>厨房とホールがギスギスしていれば、それは料理の味と接客に出ます。</p>
+<ul><li><b>挨拶は自分から</b>：「おはようございます」「お疲れさまでした」を、相手の目を見て言う。</li>
+<li><b>「ありがとう」を言葉にする</b>：助けてもらったら、その場で一言。当たり前のことほど口に出す。</li>
+<li><b>人ではなく、仕組みを責める</b>：ミスが起きたら「誰がやった」より「どうすれば起きないか」を話す。</li>
+<li><b>陰口は言わない、聞かない</b>：不満は本人か店長に直接伝える。陰口は店全体の信頼を削ります。</li>
+<li><b>忙しいときこそ声をかける</b>：「手伝います」「洗い物やります」の一言が、ピークを乗り切る力になります。</li></ul>
+<p><b>例</b>：新人がお皿を割ったとき。「何やってるの」ではなく「ケガはない？」と声をかけ、後で「重ね方を変えようか」と仕組みを直す。その人は次から失敗を隠さなくなります。</p>
+<div class="todo"><b>明日からやること</b><ul><li>今日助けてくれた人に、帰る前に「ありがとう」を言う</li><li>ミスの話をするときは、「次はどうするか」で終わらせる</li></ul></div>`},
+{id:'guest',t:'お客さまとの接し方',html:`
+<p class="pt"><b>お客さまが覚えているのは、「最初の10秒」と「最後の10秒」です。</b>ここで印象のほとんどが決まります。</p>
+<div class="dg"><div class="dg-t">お客さまの印象は、最初と最後で決まる</div>
+<div class="flow"><div class="fb acc"><small>最初の10秒</small><b>入店</b><span>すぐに目と声を向ける</span></div><div class="fa">›</div>
+<div class="fb"><b>ご案内</b><span>席まで笑顔で</span></div><div class="fa">›</div>
+<div class="fb"><b>ご注文</b><span>おすすめを一つ伝える</span></div><div class="fa">›</div>
+<div class="fb"><b>ご提供</b><span>一皿の物語を一言添える</span></div><div class="fa">›</div>
+<div class="fb acc"><small>最後の10秒</small><b>お会計</b><span>目を見てありがとう</span></div><div class="fa">›</div>
+<div class="fb acc"><small>最後の10秒</small><b>お見送り</b><span>またお待ちしています</span></div></div></div>
+<ul><li><b>最初の10秒</b>：入口を見て、すぐに「いらっしゃいませ」。手が離せなくても、目と声だけは向ける。</li>
+<li><b>一言添える</b>：料理を出すときに「今朝大洗港で揚がったヒラメです」など、その一皿の物語を一つ。</li>
+<li><b>名前と好みを覚える</b>：常連さんに「いつもの、ご飯少なめですね」。覚えてもらえていることが、また来る理由になります。</li>
+<li><b>断るときは代わりを出す</b>：「それは切れています」で終わらせず、「代わりに今日は○○がおすすめです」。</li>
+<li><b>最後の10秒</b>：会計のあとに「またお待ちしています」。できれば入口まで見送る。</li></ul>
+<h4>ご意見・苦情は「贈り物」</h4>
+<p>不満を口にしてくれるお客さまは、まだ店に期待してくれています。何も言わずに来なくなる方が、ずっと怖いことです。対応はいつも同じ順番で行います。</p>
+<ol><li><b>まず謝る</b>：不快な思いをさせたことに対して。言い訳はしない。</li><li><b>最後まで聞く</b>：途中で遮らず、うなずきながら。</li><li><b>すぐに対処する</b>：自分で判断できなければ、すぐ店長を呼ぶ。</li><li><b>お礼を言う</b>：「教えていただき、ありがとうございます」。</li><li><b>店で共有する</b>：その日のうちに伝え、同じことが起きないように仕組みを直す。</li></ol>
+<div class="todo"><b>明日からやること</b><ul><li>料理を出すときに、一皿につき一言を添える</li><li>常連さんの名前と好みを、1人覚える</li></ul></div>`},
+{id:'staff',t:'スタッフとの向き合い方（店長向け）',html:`
+<p class="pt"><b>店長の仕事は、自分が一番働くことではなく、スタッフが力を出せる状態を作ることです。</b></p>
+<div class="tw"><table><thead><tr><th>場面</th><th>こうする</th><th>なぜ</th></tr></thead><tbody>
+<tr><td>指示するとき</td><td>「何を」だけでなく「なぜ」も伝える</td><td>理由が分かれば、自分で判断できるようになる</td></tr>
+<tr><td>褒めるとき</td><td>みんなの前で、具体的に</td><td>「いいね」より「さっきのお客さまへの一言、良かった」の方が、何を続ければいいか伝わる</td></tr>
+<tr><td>注意するとき</td><td>一対一で、人ではなく行動について</td><td>人前で叱ると、反省より恥じが残る</td></tr>
+<tr><td>任せるとき</td><td>任せたら口を出しすぎず、終わったら一緒に振り返る</td><td>小さな失敗を経験しないと、人は育たない</td></tr>
+<tr><td>話を聞くとき</td><td>月に一度、5分でも一対一で話す時間を作る</td><td>辞める人の多くは、不満を言う場所がなかった人</td></tr>
+</tbody></table></div>
+<p><b>守るべきこと</b>：えこひいきをしない。休憩と休日を確実に取らせる。労働時間は正しく記録する。仲間の健康と生活を守ることは、店を守ることと同じです。</p>
+<div class="todo"><b>明日からやること</b><ul><li>今日良かったスタッフの行動を1つ、具体的に褒める</li><li>今月中に、全員と5分ずつ一対一で話す</li></ul></div>`},
+{id:'kaizen',t:'店をさらに良くする習慣',html:`
+<p class="pt"><b>店は、大きな改革よりも、小さな改善の積み重ねで良くなります。</b>「気づく→考える→一つ変える→確かめる」を、毎日・毎週・毎月の習慣にします。日報の「改善提案」は、この①〜③を書く場所です。</p>
+<div class="dg"><div class="dg-t">小さな改善を、何度も回す</div>
+<div class="cyc"><div class="cb acc"><b>① 気づく</b><span>終礼で「困った」を出す</span></div><div class="ca">→</div><div class="cb"><b>② 考える</b><span>なぜ起きたかを話す</span></div><div class="ca">→</div><div class="cb"><b>③ 一つ変える</b><span>やり方を一つだけ変える</span></div><div class="ca">→</div><div class="cb"><b>④ 確かめる</b><span>翌週、良くなったか見る</span></div><div class="ca">↺</div></div></div>
+<div class="tw"><table><thead><tr><th>いつ</th><th>やること</th><th>時間</th></tr></thead><tbody>
+<tr><td>毎日（終礼）</td><td>一人ずつ「今日良かったこと」と「困ったこと」を1つずつ言う</td><td>5分</td></tr>
+<tr><td>毎日</td><td>客数・売上・捨てた食材を記録する（日報）</td><td>3分</td></tr>
+<tr><td>毎週</td><td>「困ったこと」の中から1つ選び、直し方を決めて試す</td><td>15分</td></tr>
+<tr><td>毎月</td><td>数字とお客さまの声を振り返り、来月の重点を1つ決める</td><td>30分</td></tr>
+<tr><td>時々</td><td>他の店に食べに行き、「うちでもできること」を1つ持ち帰る</td><td>—</td></tr>
+</tbody></table></div>
+<p><b>例</b>：終礼で「ピーク時におしぼりが足りなくなる」という声が3日続いた。→ 週の改善で「開店前に2倍分準備する」と決める。→ 翌週、足りなくなったか確かめる。これだけで、その分のバタバタが消えます。</p>
+<div class="todo"><b>明日からやること</b><ul><li>終礼で「良かったこと・困ったこと」を一人1つずつ言う</li><li>「困ったこと」は日報の改善提案に書き、週に1つだけ直す</li></ul></div>`}
+]},
+{id:'mkt',icon:'📈',title:'マーケティングの基本',sub:'選ばれる理由を、仕組みにする',chapters:[
+{id:'what',t:'マーケティングとは何か',html:`
+<p class="pt">マーケティングとは、<b>「誰に・何を・どう届けて・また来てもらうか」を決め、それを数字で直し続ける仕組み</b>です。宣伝やSNS投稿は、その最後の一部にすぎません。</p>
+<ul><li>目指すのは「売り込まなくても選ばれる状態」です。</li><li>なぜ売上や利益が大事なのかは、「店づくりの土台」の「なぜ働くのか」を先に読んでください。</li></ul>
+<div class="dg"><div class="dg-t">利益は目的ではなく、店を続けて良くするための燃料</div>
+<div class="cyc"><div class="cb"><b>マーケティング</b><span>選ばれる理由を作る</span></div><div class="ca">→</div><div class="cb"><b>客数・売上が増える</b><span>売上 = 客数 × 客単価</span></div><div class="ca">→</div><div class="cb acc"><b>利益が残る</b><span>売上 − 経費</span></div><div class="ca">→</div><div class="cb"><b>再投資</b><span>給料・設備・品質・備え</span></div><div class="ca">→</div><div class="cb"><b>店の価値が上がる</b><span>料理・接客・働きやすさ</span></div><div class="ca">↺</div></div></div>`},
+{id:'steps',t:'体系：6つの段階（重要度の高い順）',html:`
+<p class="pt">順番が大事です。①〜④が固まっていないうちに⑤の宣伝を強めても、お金と時間が漏れます。</p>
+<div class="tw"><table><thead><tr><th>段階</th><th>やること</th><th>なぜ大事か</th></tr></thead><tbody>
+<tr><td>① 顧客理解</td><td>お客さんが片づけたい「用事」を知る。例：「大洗で本物の魚を失敗せず食べたい」</td><td>ここを外すと、後の施策がすべて的外れになる。いちばん安く、いちばん効く</td></tr>
+<tr><td>② STP</td><td>客層を分け（S）、狙う層を絞り（T）、「○○ならうち」と一言で言える立ち位置を決める（P）</td><td>小さな店は資本で勝てない。絞るほど覚えてもらいやすい</td></tr>
+<tr><td>③ 4P</td><td>商品・価格・提供方法・伝え方を②と矛盾なくそろえる</td><td>「高級鮨」を名乗りながら紙皿では、お客さんは混乱する</td></tr>
+<tr><td>④ リピート（LTV）</td><td>「また来る理由」を設計する。季節の品、名前を覚える接客、次回予約の導線</td><td>新規客を獲るには、既存客を維持する何倍もの費用がかかる（よく「5倍」と言われる経験則）</td></tr>
+<tr><td>⑤ 認知・集客</td><td>Googleマップ、口コミ、Instagram、紹介で知らせる</td><td>①〜④が固まっていれば、事実を見せるだけで効く</td></tr>
+<tr><td>⑥ 計測・改善</td><td>客数・客単価・リピート率・「どこで知ったか」の4つを見る</td><td>測らないものは直せない。勘が当たっているかを確かめる唯一の手段</td></tr>
+</tbody></table></div>
+<p>⑥で分かったことは①に戻ります。<b>知る → 決める → 作る → 続けてもらう → 知らせる → 測る → また知る</b>、という循環です。</p>`},
+{id:'shops',t:'各店への当てはめ',html:`
+<p class="pt">3つの事業は、お客さんも段階も違うため、力を入れる段階も違います。</p>
+<h4>本店（えんやどっと丸）：鮨を主役にする</h4>
+<ul><li><b>① 用事</b>：観光客は「大洗でしか食べられない魚を、失敗せず食べたい」。</li><li><b>② 立ち位置</b>：「大洗港の朝獲れを、カウンターのおまかせで」と一言で言えるようにする。</li><li><b>③ 4P</b>：品書きに産地と漁港名を書く。おまかせの価格帯を明確にする。カウンターを主役にする。</li><li><b>⑥ 計測</b>：平日のおまかせの出数と客単価を週ごとに追う。</li></ul>
+<h4>パスタのマルコ：開店1年目</h4>
+<ul><li><b>⑤ を優先</b>：まだ知られていない段階。Googleマップの写真・営業時間・口コミへの返信を最優先にする。</li><li><b>④ も同時に</b>：初来店のお客さんに「次はこれを食べに来て」と言える季節の一皿を用意する。</li><li><b>物販</b>：「店で食べた味を家で再現したい」という用事を満たし、来店と来店の間もお店とつながる装置になる。</li></ul>
+<h4>FishHack：飲食店向けの卸売（B2B）</h4>
+<ul><li><b>① 用事</b>：仕入れ担当者は「鮮度が安定した魚を、手間なく、少量でも欲しい」。</li><li><b>② 立ち位置</b>：「大洗港から、本店と同じ目利きで届ける」。自社の店が実例になるのが強み。</li><li><b>営業の流れ</b>：見込み客のリスト化 → 試食サンプル → 少量の定期便 → 定期便の拡大。継続率がそのままLTVになる。</li></ul>`},
+{id:'pros',t:'メリット・デメリットと落とし穴',html:`
+<p class="pt">体系的に進めると無駄は減りますが、考えること自体が目的になる危険もあります。</p>
+<div class="tw"><table><thead><tr><th>メリット</th><th>デメリット</th></tr></thead><tbody>
+<tr><td>施策の優先順位がつき、お金と時間を無駄にしにくい</td><td>分析に時間をかけすぎると、動きが遅くなる</td></tr>
+<tr><td>店長同士で判断基準を共有できる</td><td>枠組みを埋めること自体が目的になりやすい</td></tr>
+<tr><td>失敗したとき、どこが悪かったか特定できる</td><td>数字を取る手間が現場の負担になる</td></tr></tbody></table></div>
+<h4>落とし穴</h4>
+<ul><li><b>力の分散</b>：3事業はそれぞれ顧客も立ち位置も違う。全部を同じ熱量でやると、どれも中途半端になりやすい。</li><li><b>SNSへの偏り</b>：飲食店の来店のきっかけは、Googleマップ検索の方が大きいことが多い。投稿が来店に結びついているか確かめる。</li><li><b>「どこで知ったか」を取っていない</b>：これが分からないと、⑤と⑥が勘頼みになる。</li></ul>
+<p><b>より早い始め方</b>：枠組みを全部埋めるより、既存のお客さま10人に「なぜ来たか、何が良かったか」を聞く方が早くて正確です。答えの中に①と②の答えがほぼ入っています。</p>`},
+{id:'todo',t:'実践チェックリスト',html:`
+<p class="pt">まずは数字とお客さまの声を集めることから始めます。</p>
+<div class="todo"><ul><li><b>今日</b>：会計時に「何で知りましたか？」と一言聞き、紙に正の字で記録する（30秒で済む）</li><li><b>今週</b>：常連のお客さま3人に「うちのどこが好きか」を聞き、その言葉をそのまま書き留める</li><li><b>今月</b>：「○○なら本店」「○○ならマルコ」を一文ずつ決め、Googleマップの紹介文と品書きの冒頭をその一文にそろえる</li><li><b>毎月</b>：客数・客単価・リピート率・「どこで知ったか」を店長会議で確認する</li></ul></div>`}
+]}
+];
+// 今日のヒント（日付で決まるので、その日は全員同じヒントが出る）
+var TIPS=[
+['base','words','1,000円売っても、残る利益は50〜100円ほど。1,000円のロスは、10〜20倍の売上でようやく取り戻せる。'],
+['base','why','利益は「未来の店のための費用」。今日の利益が、来年の給料や新しい冷蔵庫になる。'],
+['base','why','経費を抑えるとは、鮮度・安全・誠実さ・健康以外のムダを減らすこと。'],
+['base','run','営業中の出来は、開店前の準備でほぼ決まる。ピークの前に補充を終えよう。'],
+['base','run','悪い知らせほど先に。「アジがあと3つです」は、切れる前に言う。'],
+['base','team','ミスが起きたら「誰が」より「どうすれば起きないか」。人ではなく仕組みを直す。'],
+['base','team','助けてもらったら、その場で「ありがとう」。当たり前のことほど口に出す。'],
+['base','guest','お客さまが覚えているのは、最初の10秒と最後の10秒。'],
+['base','guest','料理を出すときは、その一皿の物語を一言添える。'],
+['base','guest','苦情は贈り物。謝る→最後まで聞く→すぐ対処→お礼→店で共有。'],
+['base','staff','褒めるのはみんなの前で具体的に。注意するのは一対一で、行動について。'],
+['base','kaizen','気づく→考える→一つ変える→確かめる。日報の改善提案は、この①〜③を書く場所。'],
+['mkt','steps','新規客を獲るには、既存客を維持する何倍もの費用がかかる。また来る理由を一つ作ろう。'],
+['mkt','steps','測らないものは直せない。会計時に「何で知りましたか？」と一言聞いてみよう。'],
+['mkt','pros','常連さん3人に「うちのどこが好きか」を聞く。その言葉が、店の一言になる。']
+];
+</script>
+<script>
+var firebaseConfig={apiKey:"AIzaSyA3YVQwyAudMEZJs_rfEW8IHfxh4Grvlbw",authDomain:"wcsa-shift.firebaseapp.com",databaseURL:"https://wcsa-shift-default-rtdb.firebaseio.com",projectId:"wcsa-shift",storageBucket:"wcsa-shift.firebasestorage.app",messagingSenderId:"521554404721",appId:"1:521554404721:web:f59a570dd7e10f3aed82d0"};
+var db=null;
+try{ if(!firebase.apps.length)firebase.initializeApp(firebaseConfig); db=firebase.database(); }catch(e){ db=null; }
+
+// ===== 設定 =====
+var SHOP={
+  enya: {name:'本店',  mk:'honten', sk:'honten', shiftKey:'wcsa',  accent:'#b07d00', soft:'rgba(176,125,0,.12)'},
+  marco:{name:'マルコ',mk:'marco',  sk:'marco',  shiftKey:'marco', accent:'#1a7fbf', soft:'rgba(26,127,191,.12)'}
+};
+var CHECKS=[['health','全員の体調確認をした'],['temp','冷蔵・冷凍庫の温度を記録した'],['safe','けが・事故はなかった（あれば「最初に伝えること」へ）'],['close','火の元・ガス・戸締りを確認した'],['punch','打刻漏れはない']];
+var STATUS=['提案','採用・試行中','効果あり（定着）','効果なし（やめる）','保留','見送り'];
+var OPEN_ST={'提案':1,'採用・試行中':1,'保留':1};
+var DOW='日月火水木金土';
+// 店長用パスワードの初期値（SHA-256。代表が日報画面で設定し直すと、そちらが優先される）
+var DEFAULT_PW={enya:'facef4c87297971d6f26912024251dd471bc6108130bd8c9b68961771062189a',marco:'43ade537d84ddd05b335e5cca69cca964a88125ff522215bbc962f626f6bfdd8'};
+
+var state={learn:{g:'base',c:null}, shop:'enya', date:null, view:'write', admin:false, report:null, followups:[], dirty:false, nums:null};
+
+// ===== ユーティリティ =====
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function yen(v){return v==null||isNaN(v)?'—':(v<0?'−':'')+'¥'+Math.round(Math.abs(v)).toLocaleString()}
+function pct(v,s){return v==null||!(s>0)?'—':(v/s*100).toFixed(1)+'%'}
+function pad(n){return String(n).padStart(2,'0')}
+function dKey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}       // シフト用 YYYY-MM-DD
+function k8(ds){return ds.replace(/-/g,'')}                                                    // 売上・日報用 YYYYMMDD
+function addDays(ds,n){var p=ds.split('-').map(Number);var d=new Date(p[0],p[1]-1,p[2]+n);return dKey(d)}
+function defaultDate(){var t=new Date();if(t.getHours()<5)t.setDate(t.getDate()-1);return dKey(t)}   // 深夜0〜5時は前日の日報
+function toast(m){var t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove('on')},2600)}
+function goHome(){try{if(window.parent&&window.parent!==window&&typeof window.parent.switchMode==='function'){window.parent.switchMode('shift');return}}catch(e){}location.href='./'}
+function isAdmin(){try{return !!(window.parent&&window.parent!==window&&window.parent.adminUnlocked)}catch(e){return false}}
+async function sha(t){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return Array.prototype.map.call(new Uint8Array(b),function(x){return x.toString(16).padStart(2,'0')}).join('')}
+function once(path){return db?db.ref(path).once('value').then(function(s){return s.val()}).catch(function(){return null}):Promise.resolve(null)}
+function segActive(id,attr,val){document.querySelectorAll('#'+id+' button').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-'+attr)===val)})}
+
+// ===== 起動・ロック =====
+function boot(){
+  var q=new URLSearchParams(location.search);
+  var s=q.get('shop')||localStorage.getItem('nippo_shop')||'enya'; if(!SHOP[s])s='enya';
+  state.shop=s; state.date=defaultDate(); state.admin=isAdmin();
+  applyTheme(); segActive('shopSeg','shop',s); segActive('viewSeg','view','write');
+  checkLock();
+}
+function applyTheme(){var S=SHOP[state.shop];document.documentElement.style.setProperty('--accent',S.accent);document.documentElement.style.setProperty('--accent-soft',S.soft)}
+function unlockedKey(){return 'nippo_ok_'+state.shop}
+async function checkLock(){
+  state.admin=isAdmin();
+  if(state.admin||sessionStorage.getItem(unlockedKey())==='1'){$('lock').hidden=true;load();return}
+  var h=(await once('nippo_cfg/pw/'+state.shop))||DEFAULT_PW[state.shop];
+  $('lock').hidden=false; $('pwErr').hidden=true; $('pw').value='';
+  if(!h){$('lockMsg').textContent='まだ'+SHOP[state.shop].name+'の店長用パスワードが設定されていません。代表がWCSAの管理者ログイン後に日報を開き、パスワードを設定してください。';$('pw').hidden=true;$('pwBtn').hidden=true;return}
+  $('lockMsg').textContent=SHOP[state.shop].name+'の店長用パスワードを入力してください'; $('pw').hidden=false; $('pwBtn').hidden=false;
+  $('pwBtn').onclick=async function(){
+    var v=$('pw').value.trim(); if(!v)return;
+    if(await sha('nippo:'+state.shop+':'+v)===h){sessionStorage.setItem(unlockedKey(),'1');$('lock').hidden=true;load()}
+    else $('pwErr').hidden=false;
+  };
+  $('pw').onkeydown=function(e){if(e.key==='Enter')$('pwBtn').click()};
+}
+function setShop(s){if(s===state.shop)return;if(state.dirty&&!confirm('保存していない入力があります。店を切り替えますか？'))return;
+  state.shop=s;localStorage.setItem('nippo_shop',s);state.dirty=false;applyTheme();segActive('shopSeg','shop',s);checkLock()}
+function setView(v){if(state.dirty&&v!=='write'&&!confirm('保存していない入力があります。移動しますか？'))return;state.view=v;segActive('viewSeg','view',v);load()}
+function shiftDate(n){if(state.dirty&&!confirm('保存していない入力があります。日付を変えますか？'))return;state.date=addDays(state.date,n);state.dirty=false;state.view='write';segActive('viewSeg','view','write');load()}
+function goToday(){if(state.dirty&&!confirm('保存していない入力があります。移動しますか？'))return;state.date=defaultDate();state.dirty=false;state.view='write';segActive('viewSeg','view','write');load()}
+function renderDateLabel(){var p=state.date.split('-').map(Number),d=new Date(p[0],p[1]-1,p[2]);var t=defaultDate();
+  $('dateLabel').innerHTML=(p[1])+'月'+p[2]+'日（'+DOW[d.getDay()]+'）<small>'+(state.date===t?'今日の日報':state.date<t?'過去の日報':'未来の日付')+'</small>'}
+
+// ===== 読み込み =====
+async function load(){
+  state.admin=isAdmin();
+  $('dateRow').hidden=state.view!=='write';
+  if(state.view==='list'){ $('savebar').hidden=true; return renderList(); }
+  if(state.view==='learn'){ $('savebar').hidden=true; return renderLearn(); }
+  renderDateLabel();
+  $('main').innerHTML='<div class="card"><div class="note">読み込み中…</div></div>';
+  var S=SHOP[state.shop], k=k8(state.date), pk=k8(addDays(state.date,-7));
+  var res=await Promise.all([
+    once('nippo_metrics/'+S.mk+'/'+k), once('nippo_metrics/'+S.mk+'/'+pk), once('nippo_metrics/rates/'+S.mk),
+    once('sales_daily/'+S.sk+'/'+k), once('sales_daily/'+S.sk+'/'+pk),
+    once(S.shiftKey+'/shifts/'+state.date),
+    once('nippo/'+state.shop+'/'+k),
+    db?db.ref('nippo/'+state.shop).orderByKey().endAt(String(+k-1)).limitToLast(30).once('value').then(function(s){return s.val()}).catch(function(){return null}):null,
+    state.shop==='marco'?once('sales_daily/marco_mtd'):null,
+    state.shop==='marco'?once('sales_daily/marco'):null
+  ]);
+  state.nums=calcNums({m:res[0],pm:res[1],rates:res[2],sd:res[3],psd:res[4],shift:res[5],mtd:res[8],marcoAll:res[9],k:k});
+  state.report=res[6]||{};
+  state.followups=collectFollowups(res[7]||{});
+  state.dirty=false;
+  renderWrite();
+}
+
+// ===== 数字の計算 =====
+// 確定：日別人件費ページが保存した nippo_metrics（打刻と台帳から計算）
+// 見込み：売上はPOSのCSV（sales_daily）、人件費はシフト予定の時間×直近28日の1時間あたり人件費、食材費は売上×原価率、固定費は月の固定費の日割り
+function salesFrom(sd,tax){if(!sd)return null;if(sd.sales!=null)return +sd.sales;return +(tax==='税込'?sd.gross:sd.net)}
+function shiftHours(sh){
+  if(!sh)return null;var by={};
+  ['before','lunch','dinner'].forEach(function(k){(sh[k]||[]).forEach(function(p){if(!p||!p.name||!p.start||!p.end)return;
+    var a=toMin(p.start),b=toMin(p.end);if(b<=a)b+=1440;var x=by[p.name];if(!x)by[p.name]={a:a,b:b};else{x.a=Math.min(x.a,a);x.b=Math.max(x.b,b)}})});
+  var names=Object.keys(by);if(!names.length)return null;
+  var h=0;names.forEach(function(n){var m=(by[n].b-by[n].a)/60;h+=m-(m>8?1:m>6?0.75:0)});   // 休憩：6時間超45分・8時間超1時間
+  return {h:h,n:names.length};
+}
+function toMin(t){var p=String(t).split(':');return (+p[0])*60+(+p[1]||0)}
+function calcNums(o){
+  var r=o.rates||{}, tax=r.tax||'税抜', m=o.m||null, N={tax:tax,flags:{}};
+  // 売上・客数
+  var s=salesFrom(o.sd,tax), est=false;
+  if(s==null&&state.shop==='marco'&&o.mtd&&o.mtd.asOf===o.k&&o.marcoAll){
+    var pre=o.k.slice(0,6),other=0;Object.keys(o.marcoAll).forEach(function(kk){var v=o.marcoAll[kk];if(kk.indexOf(pre)===0&&kk!==o.k&&v&&!v.est)other+=salesFrom(v,tax)||0});
+    var tot=+(tax==='税込'?o.mtd.gross:o.mtd.net)-other; if(tot>0){s=tot;est=true}
+  }
+  if(s==null&&m&&m.s!=null)s=m.s;
+  N.S=s; N.salesEst=est; N.cust=o.sd&&o.sd.cust?+o.sd.cust:null; N.fhs=m&&m.fhs?m.fhs:0;
+  // 人件費
+  if(m&&m.l!=null&&(m.l>0||m.h>0)){N.L=m.l;N.flags.L='確定';N.H=m.h}
+  else{var sh=shiftHours(o.shift);if(sh&&r.lph){N.L=sh.h*r.lph;N.H=sh.h;N.flags.L='見込み';N.staff=sh.n}else{N.L=null;N.flags.L=sh?'率なし':'シフトなし'}}
+  // 食材費
+  if(m&&m.f!=null){N.F=m.f;N.flags.F=m.prov?'仮':'確定'}
+  else if(s!=null&&r.foodRate!=null){N.F=s*r.foodRate+(N.fhs*(r.fhRate||0));N.flags.F='見込み'}
+  else N.F=null;
+  // 固定費
+  if(m&&m.x!=null){N.X=m.x;N.flags.X=m.prov?'仮':'確定'}
+  else{var fd=r.fixedDay&&r.fixedDay[o.k.slice(0,6)];N.X=fd!=null?fd:null;N.flags.X=fd!=null?'日割り':null}
+  var SS=(N.S||0)+N.fhs;
+  N.SS=SS; N.O=(N.S!=null&&N.L!=null&&N.F!=null&&N.X!=null)?SS-N.L-N.F-N.X:null;
+  N.avg=N.S!=null&&N.cust?N.S/N.cust:null;
+  N.prodH=N.H>0&&N.S!=null?SS/N.H:null;
+  // 先週の同じ曜日
+  var pm=o.pm||null, ps=salesFrom(o.psd,tax); if(ps==null&&pm&&pm.s!=null)ps=pm.s;
+  N.P={S:ps,cust:o.psd&&o.psd.cust?+o.psd.cust:null,L:pm?pm.l:null,O:(pm&&pm.s!=null&&pm.l!=null&&pm.f!=null&&pm.x!=null)?(pm.s+(pm.fhs||0))-pm.l-pm.f-pm.x:null,SS:pm?(pm.s||0)+(pm.fhs||0):null};
+  N.ratesAt=r.at||null; N.noMetrics=!o.rates;
+  return N;
+}
+
+// ===== 前回までの提案（振り返り） =====
+function collectFollowups(all){
+  var out=[];Object.keys(all).sort().reverse().forEach(function(k){var r=all[k];if(!r||!r.proposals)return;
+    (Array.isArray(r.proposals)?r.proposals:Object.values(r.proposals)).forEach(function(p,i){if(p&&p.title&&OPEN_ST[p.status||'提案'])out.push({k:k,i:i,p:p})})});
+  return out.slice(0,8);
+}
+
+// ===== 書く画面 =====
+function flagChip(f){if(!f)return '';var c=f==='確定'?'ok':f==='見込み'||f==='日割り'?'a':'w';return '<span class="chip '+c+'">'+esc(f)+'</span>'}
+function diffTxt(c,p){if(c==null||p==null||!(p>0))return '';var d=(c/p*100-100);return '<span style="color:'+(d>=0?'var(--ok)':'var(--crit)')+'">先週比 '+(d>=0?'+':'')+d.toFixed(1)+'%</span>'}
+function numsHTML(){
+  var N=state.nums, S=SHOP[state.shop];
+  if(!N)return '';
+  var noSales=N.S==null;
+  var card=function(cls,lb,flag,v,sub){return '<div class="kc '+(cls||'')+'"><div class="kl">'+lb+' '+flagChip(flag)+'</div><div class="kv'+(cls==='op'&&v!=='—'?(N.O>=0?' pos':' neg'):'')+'">'+v+'</div><div class="ks">'+(sub||'')+'</div></div>'};
+  var h='<div class="card"><h2>📊 今日の数字 <span class="note" style="font-weight:500">自動で入ります</span></h2>';
+  h+='<div class="kgrid">';
+  h+=card('', '売上（'+esc(N.tax)+'）', N.salesEst?'推定':null, yen(N.S), (N.fhs?'＋FishHack '+yen(N.fhs)+'<br>':'')+diffTxt(N.S,N.P.S));
+  h+=card('', '客数・客単価', null, N.cust!=null?N.cust+'人':'—', (N.avg!=null?'客単価 '+yen(N.avg)+'　':'')+diffTxt(N.cust,N.P.cust));
+  h+=card('', '人件費', N.flags.L, yen(N.L), '売上比 <b>'+pct(N.L,N.SS)+'</b>'+(N.H?'　'+N.H.toFixed(1)+'時間'+(N.staff?'・'+N.staff+'人':''):''));
+  h+=card('', '食材費', N.flags.F, yen(N.F), '売上比 <b>'+pct(N.F,N.SS)+'</b>　FL比率 <b>'+(N.L!=null&&N.F!=null?pct(N.L+N.F,N.SS):'—')+'</b>');
+  h+=card('', '固定費', N.flags.X, yen(N.X), '売上比 <b>'+pct(N.X,N.SS)+'</b>');
+  h+=card('op', '営業利益', (N.flags.L==='確定'&&N.flags.F==='確定'&&N.flags.X==='確定')?'確定':N.O!=null?'見込み':null, N.O==null?'—':yen(N.O), '利益率 <b>'+pct(N.O,N.SS)+'</b>'+(N.P.O!=null?'<br>先週 '+yen(N.P.O):''));
+  h+='</div>';
+  if(N.SS>0&&N.L!=null&&N.F!=null&&N.X!=null){
+    var seg=function(v,c,lb){return v>0?'<i style="flex:'+v+' 0 0;background:'+c+'" title="'+lb+'">'+(v/N.SS>.09?lb+' '+pct(v,N.SS):'')+'</i>':''};
+    h+='<div class="kbar">'+seg(N.L,'#c77d0a','人件費')+seg(N.F,'#1a7fbf','食材費')+seg(N.X,'#8c92a4','固定費')+seg(Math.max(0,N.O),'#0a7d4f','利益')+'</div>';
+    h+='<div class="note" style="margin-top:4px">売上1,000円のうち、人件費 '+Math.round(N.L/N.SS*1000)+'円・食材費 '+Math.round(N.F/N.SS*1000)+'円・固定費 '+Math.round(N.X/N.SS*1000)+'円、残る利益は <b>'+Math.round(N.O/N.SS*1000)+'円</b></div>';
+  }
+  var hints=[];
+  if(noSales)hints.push('売上がまだ入っていません。チャレンジの「売上CSVから更新」でPOSのCSVを取り込むと自動で入ります。');
+  if(N.flags.L==='見込み')hints.push('人件費はシフト予定からの見込みです。翌日以降、打刻から計算した確定値に自動で置き換わります。');
+  if(N.flags.L==='シフトなし')hints.push('この日のシフトが登録されていないため、人件費の見込みを出せません。');
+  if(N.noMetrics)hints.push('代表が「日別人件費」を一度開くと、人件費・食材費・固定費の計算に必要な率が保存されます。');
+  if(S.name==='本店'&&N.fhs)hints.push('本店の数字にはFishHackの売上・原価を含めています（FishHackの作業は本店の人件費に入っているため）。');
+  if(hints.length)h+='<div class="hint">'+hints.map(esc).join('<br>')+'</div>';
+  h+='</div>';
+  return h;
+}
+function propHTML(p,i){
+  p=p||{};
+  var adm=state.admin&&p.title;
+  return '<div class="prop" data-i="'+i+'">'+
+    '<div class="prop-h"><span class="num">'+(i+1)+'</span><input type="text" data-f="title" placeholder="提案のタイトル（例：団体の日は前菜を先に盛る）" value="'+esc(p.title)+'" aria-label="提案のタイトル">'+
+    (i>0?'<button class="btn sm" type="button" onclick="removeProp('+i+')" aria-label="この提案を消す">×</button>':'')+'</div>'+
+    '<div class="steps"><span>① 何が起きた</span><span>② なぜ</span><span>③ どう変える</span><span>④ どうなる</span><span>⑤ 誰が・いつ</span></div>'+
+    '<label class="f">① 何が起きたか（困ったこと・ムダ・お客さまの不満）<span class="q">事実を具体的に</span></label>'+
+    '<textarea data-f="problem" placeholder="例：19時台に団体予約と重なり、一般のお客さまの提供が25分遅れた">'+esc(p.problem)+'</textarea>'+
+    '<label class="f">② なぜ起きたか<span class="q">人ではなく、やり方・仕組みの原因を</span></label>'+
+    '<textarea data-f="cause" placeholder="例：団体の前菜をその場で盛り付けていて、刺し場が15分ふさがった">'+esc(p.cause)+'</textarea>'+
+    '<label class="f">③ どう変えるか（提案）<span class="q">一つだけ、明日から試せる形で</span></label>'+
+    '<textarea data-f="idea" placeholder="例：団体予約の日は、開店前に前菜を盛って冷蔵庫に入れておく">'+esc(p.idea)+'</textarea>'+
+    '<div class="two"><div><label class="f">④ 期待する効果<span class="q">時間・金額・お客さまの変化</span></label>'+
+    '<textarea data-f="effect" placeholder="例：提供の遅れが15分以内に収まる。お詫びのサービスが減る">'+esc(p.effect)+'</textarea></div>'+
+    '<div><label class="f">⑤ 誰が・いつから試すか</label>'+
+    '<textarea data-f="who" placeholder="例：刺し場の〇〇さん、次の団体予約（金曜）から">'+esc(p.who)+'</textarea></div></div>'+
+    '<div class="chk" style="margin-top:8px"><label><input type="checkbox" data-f="needDecision"'+(p.needDecision?' checked':'')+'> 代表の判断が必要（お金がかかる・ルールを変える など）</label></div>'+
+    (p.status&&p.status!=='提案'?'<div style="margin-top:6px"><span class="chip a">'+esc(p.status)+'</span>'+(p.decisionNote?' <span class="note">'+esc(p.decisionNote)+'</span>':'')+'</div>':'')+
+    (adm?'<div class="fu" style="border-left-color:var(--ok)"><div class="t">代表の判断</div><div class="two"><select data-f="status" aria-label="判断">'+STATUS.map(function(s){return '<option'+((p.status||'提案')===s?' selected':'')+'>'+s+'</option>'}).join('')+'</select><input type="text" data-f="decisionNote" placeholder="ひとこと（例：やってみよう。結果を来週教えて）" value="'+esc(p.decisionNote)+'"></div></div>':'')+
+  '</div>';
+}
+function renderWrite(){
+  var r=state.report||{}, N=state.nums;
+  var props=(r.proposals&&(Array.isArray(r.proposals)?r.proposals:Object.values(r.proposals)))||[];
+  var draft=loadDraft(); if(draft&&(!r.savedAt||draft.at>r.savedAt)){r=Object.assign({},r,draft.r);props=draft.r.proposals||props;state.dirty=true}
+  if(!props.length)props=[{}];
+  var h='';
+  h+=numsHTML();
+  h+=tipHTML();
+  // ★ 改善提案（メイン）
+  h+='<div class="card main"><h2>💡 今日の改善提案</h2><div class="lead">今日いちばん「こうすれば良くなる」と思ったことを書いてください。小さなことで大丈夫です。数字を見て気づいたことも歓迎です。 <a href="#" onclick="openGuide(\'base\',\'kaizen\');return false" style="color:var(--accent);font-weight:800">改善の進め方を読む ›</a></div>'+
+     '<div id="props">'+props.map(propHTML).join('')+'</div>'+
+     '<button class="btn ghost" type="button" style="margin-top:10px;width:100%" onclick="addProp()">＋ 提案をもう一つ書く</button></div>';
+  // 前回までの提案の振り返り
+  if(state.followups.length){
+    h+='<div class="card"><h2>🔁 これまでの提案、その後どうなった？</h2><div class="lead">試している提案の結果を一言で。効果が分かったら状態を変えてください。</div>';
+    state.followups.forEach(function(f,j){var p=f.p;
+      h+='<div class="fu" data-fu="'+j+'"><div class="t">'+esc(p.title)+' <span class="chip a">'+esc(p.status||'提案')+'</span></div><div class="m">'+esc(f.k.slice(4,6)+'/'+f.k.slice(6,8))+' の提案'+(p.decisionNote?'　代表：'+esc(p.decisionNote):'')+'</div>'+
+        '<div class="two" style="margin-top:6px"><select data-fu-f="status" aria-label="状態">'+STATUS.map(function(s){return '<option'+((p.status||'提案')===s?' selected':'')+'>'+s+'</option>'}).join('')+'</select>'+
+        '<input type="text" data-fu-f="result" placeholder="結果（例：金曜に試して遅れゼロ）" value="'+esc(p.result)+'"></div></div>'});
+    h+='</div>';
+  }
+  // 最初に伝えること
+  h+='<div class="card"><h2>⚠️ 最初に伝えること <span class="note" style="font-weight:500">なければ空欄</span></h2><div class="lead">事故・けが・苦情・設備の故障など。「何が起きたか・今どうなっているか・何をしたか」の順で。</div>'+
+     '<textarea data-r="alert" placeholder="例：20時ごろ製氷機が止まった。今は動いているが異音あり。業者に明日の点検を依頼済み">'+esc(r.alert)+'</textarea></div>';
+  // 今日のひとこと
+  h+='<div class="card"><h2>🙂 今日のひとこと</h2>'+
+     '<label class="f">良かったこと</label><textarea data-r="good" placeholder="例：ランチの回転が早く、待ちが10分以内だった">'+esc(r.good)+'</textarea>'+
+     '<div class="two"><div><label class="f">お客さまの声</label><textarea data-r="voice" placeholder="例：「ヒラメが甘くておいしかった」">'+esc(r.voice)+'</textarea></div>'+
+     '<div><label class="f">スタッフの良かった行動<span class="q">名前と内容</span></label><textarea data-r="staffGood" placeholder="例：〇〇さんが待ちのお客さまに自分から声をかけていた">'+esc(r.staffGood)+'</textarea></div></div></div>';
+  // 安全・衛生
+  var ck=r.checks||{};
+  h+='<div class="card"><h2>✅ 安全・衛生</h2><div class="chk">'+CHECKS.map(function(c){return '<label><input type="checkbox" data-ck="'+c[0]+'"'+(ck[c[0]]?' checked':'')+'> '+c[1]+'</label>'}).join('')+'</div></div>';
+  // 明日の重点
+  h+='<div class="card"><h2>🎯 明日の重点（一つだけ）</h2><input type="text" data-r="tomorrow" placeholder="例：平日ランチの提供時間を15分以内に保つ" value="'+esc(r.tomorrow)+'">'+
+     '<div class="two" style="margin-top:8px"><div><label class="f">予約・団体</label><input type="text" data-r="reserve" value="'+esc(r.reserve)+'"></div><div><label class="f">記入者</label><input type="text" data-r="author" placeholder="名前" value="'+esc(r.author||localStorage.getItem('nippo_author_'+state.shop)||'')+'"></div></div></div>';
+  // 代表から
+  if(state.admin){
+    h+='<div class="card admin"><h2>📝 代表から（店長に返信）</h2><textarea data-r="ownerComment" placeholder="例：提案ありがとう。前菜の先盛り、金曜から試そう">'+esc(r.ownerComment)+'</textarea></div>';
+    h+=adminCfgHTML();
+  }else if(r.ownerComment){
+    h+='<div class="card" style="border-left:4px solid var(--ok)"><h2>📝 代表から</h2><div style="white-space:pre-wrap">'+esc(r.ownerComment)+'</div></div>';
+  }
+  $('main').innerHTML=h;
+  $('savebar').hidden=false;
+  $('authorNote').textContent=r.savedAt?'送信済み '+fmtTime(r.savedAt)+(r.author?'（'+r.author+'）':''):'未送信';
+  updateSaveSt();
+  bindInputs();
+}
+function fmtTime(t){var d=new Date(t);return (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes())}
+function bindInputs(){
+  $('main').querySelectorAll('input,textarea,select').forEach(function(el){
+    if(el.id==='cfgPw'||el.dataset.cfg)return;
+    el.addEventListener('input',function(){state.dirty=true;saveDraft();updateSaveSt()});
+    el.addEventListener('change',function(){state.dirty=true;saveDraft();updateSaveSt()});
+  });
+}
+function updateSaveSt(){$('saveSt').textContent=state.dirty?'未保存の変更があります（この端末に下書き保存中）':(state.report&&state.report.savedAt?'送信済み':'');
+  $('saveBtn').textContent=state.report&&state.report.savedAt?'日報を更新する':'日報を送る'}
+function addProp(){var props=readProps();props.push({});$('props').innerHTML=props.map(propHTML).join('');bindInputs();state.dirty=true;saveDraft();updateSaveSt()}
+function removeProp(i){var props=readProps();props.splice(i,1);$('props').innerHTML=props.map(propHTML).join('');bindInputs();state.dirty=true;saveDraft();updateSaveSt()}
+function readProps(){
+  var orig=(state.report&&state.report.proposals&&(Array.isArray(state.report.proposals)?state.report.proposals:Object.values(state.report.proposals)))||[];
+  return Array.prototype.map.call(document.querySelectorAll('#props .prop'),function(el,i){
+    var p=Object.assign({},orig[i]||{});
+    el.querySelectorAll('[data-f]').forEach(function(f){var k=f.dataset.f;p[k]=f.type==='checkbox'?f.checked:f.value.trim()});
+    if(!p.status)p.status='提案';
+    return p;
+  });
+}
+function readReport(){
+  var o={};
+  $('main').querySelectorAll('[data-r]').forEach(function(el){o[el.dataset.r]=el.value.trim()});
+  o.checks={};$('main').querySelectorAll('[data-ck]').forEach(function(el){o.checks[el.dataset.ck]=el.checked});
+  o.proposals=readProps().filter(function(p){return p.title||p.problem||p.idea});
+  return o;
+}
+function draftKey(){return 'nippo_draft_'+state.shop+'_'+k8(state.date)}
+function saveDraft(){try{localStorage.setItem(draftKey(),JSON.stringify({at:Date.now(),r:readReport()}))}catch(e){}}
+function loadDraft(){try{return JSON.parse(localStorage.getItem(draftKey())||'null')}catch(e){return null}}
+
+// ===== 保存 =====
+async function saveReport(){
+  if(!db){toast('通信できません。電波を確認してください');return}
+  var o=readReport();
+  var good=o.proposals.filter(function(p){return p.title&&p.idea});
+  if(!state.admin&&!good.length){if(!confirm('改善提案（タイトルと「どう変えるか」）がまだ書かれていません。このまま送りますか？'))return}
+  if(!state.admin&&!o.author){toast('記入者の名前を入れてください');var a=document.querySelector('[data-r="author"]');if(a)a.focus();return}
+  var N=state.nums||{};
+  var upd={
+    savedAt:Date.now(), alert:o.alert||'', good:o.good||'', voice:o.voice||'', staffGood:o.staffGood||'',
+    tomorrow:o.tomorrow||'', reserve:o.reserve||'', checks:o.checks, proposals:o.proposals,
+    snap:{S:N.S==null?null:Math.round(N.S),fhs:N.fhs||0,cust:N.cust,L:N.L==null?null:Math.round(N.L),F:N.F==null?null:Math.round(N.F),X:N.X==null?null:Math.round(N.X),O:N.O==null?null:Math.round(N.O),flags:N.flags||{}}
+  };
+  if(state.admin){upd.ownerComment=o.ownerComment||'';upd.ownerAt=Date.now();if(state.report&&state.report.author)upd.author=state.report.author;if(o.author)upd.author=o.author;if(state.report&&state.report.savedAt)upd.savedAt=state.report.savedAt}
+  else{upd.author=o.author;try{localStorage.setItem('nippo_author_'+state.shop,o.author)}catch(e){}}
+  // 振り返りの更新（元の日報の提案に書き戻す）
+  var fuUpd={};
+  document.querySelectorAll('[data-fu]').forEach(function(el){var f=state.followups[+el.dataset.fu];if(!f)return;
+    var st=el.querySelector('[data-fu-f="status"]').value, rs=el.querySelector('[data-fu-f="result"]').value.trim();
+    if(st!==(f.p.status||'提案')||rs!==(f.p.result||'')){var base='nippo/'+state.shop+'/'+f.k+'/proposals/'+f.i+'/';fuUpd[base+'status']=st;fuUpd[base+'result']=rs;fuUpd[base+'resultAt']=Date.now()}});
+  $('saveBtn').disabled=true;
+  try{
+    await db.ref('nippo/'+state.shop+'/'+k8(state.date)).update(upd);
+    if(Object.keys(fuUpd).length)await db.ref().update(fuUpd);
+    try{localStorage.removeItem(draftKey())}catch(e){}
+    state.dirty=false;toast(state.admin?'返信を保存しました':'日報を送りました。おつかれさまでした');
+    load();
+  }catch(e){toast('保存できませんでした：'+e.message)}
+  $('saveBtn').disabled=false;
+}
+
+// ===== これまでの日報 =====
+async function renderList(){
+  $('main').innerHTML='<div class="card"><div class="note">読み込み中…</div></div>';
+  var all=db?await db.ref('nippo/'+state.shop).orderByKey().limitToLast(45).once('value').then(function(s){return s.val()}).catch(function(){return null}):null;
+  all=all||{};
+  var ks=Object.keys(all).sort().reverse();
+  var h='<div class="card"><h2>📚 '+SHOP[state.shop].name+'のこれまでの日報</h2><div class="lead">タップするとその日の日報を開きます。</div>';
+  if(!ks.length)h+='<div class="note">まだ日報がありません。</div>';
+  ks.forEach(function(k){var r=all[k]||{},ps=(r.proposals&&(Array.isArray(r.proposals)?r.proposals:Object.values(r.proposals)))||[];
+    var d=new Date(+k.slice(0,4),+k.slice(4,6)-1,+k.slice(6,8));
+    h+='<div class="list-item" onclick="openDate(\''+k+'\')"><div class="d">'+(+k.slice(4,6))+'/'+(+k.slice(6,8))+'（'+DOW[d.getDay()]+'）<div class="note">'+esc(r.author||'')+'</div></div><div class="p">'+
+      (r.alert?'<div><span class="chip c">要連絡</span> '+esc(r.alert.slice(0,40))+'</div>':'')+
+      (ps.length?ps.map(function(p){return '<div>💡 '+esc(p.title||'（タイトルなし）')+' <span class="chip a">'+esc(p.status||'提案')+'</span>'+(p.needDecision&&(p.status||'提案')==='提案'?' <span class="chip w">判断待ち</span>':'')+'</div>'}).join(''):'<div class="note">提案なし</div>')+
+      (r.snap&&r.snap.S!=null?'<div class="note">売上 '+yen(r.snap.S)+(r.snap.O!=null?'　営業利益 '+yen(r.snap.O):'')+'</div>':'')+
+      (r.ownerComment?'<div class="note" style="color:var(--ok)">📝 代表から返信あり</div>':'')+
+      '</div></div>'});
+  h+='</div>';
+  if(state.admin)h+=adminCfgHTML();
+  $('main').innerHTML=h;
+}
+function openDate(k){state.date=k.slice(0,4)+'-'+k.slice(4,6)+'-'+k.slice(6,8);state.view='write';segActive('viewSeg','view','write');load()}
+
+// ===== 学ぶ（店づくりの土台・マーケティングの基本） =====
+function todayTip(){var p=state.date.split('-').map(Number);var n=Math.floor(Date.UTC(p[0],p[1]-1,p[2])/864e5);return TIPS[((n*5)%TIPS.length+TIPS.length)%TIPS.length]}
+function tipHTML(){var t=todayTip(),g=GUIDES.filter(function(x){return x.id===t[0]})[0];
+  return '<div class="card"><div class="tip" onclick="openGuide(\''+t[0]+'\',\''+t[1]+'\')"><span class="ic">📖</span><div class="tx"><div class="note" style="font-weight:800">今日のヒント（'+esc(g.title)+'）</div><div>'+esc(t[2])+'</div></div><span class="mo">読む ›</span></div></div>'}
+function openGuide(g,c){if(state.dirty)saveDraft();state.learn={g:g,c:c};state.view='learn';segActive('viewSeg','view','learn');load()}
+function renderLearn(){
+  var L=state.learn, G=GUIDES.filter(function(x){return x.id===L.g})[0]||GUIDES[0];
+  var h='<div class="card"><h2>📖 学ぶ</h2><div class="lead">毎日の仕事の「なぜ」と「どうやって」。少しずつ読んで、改善提案のヒントにしてください。</div><div class="gsw">'+
+    GUIDES.map(function(x){return '<button type="button" class="'+(x.id===G.id?'active':'')+'" onclick="openGuide(\''+x.id+'\',null)"><b>'+x.icon+' '+esc(x.title)+'</b><span>'+esc(x.sub)+'</span></button>'}).join('')+'</div></div>';
+  G.chapters.forEach(function(c,i){h+='<details class="ch" id="ch-'+c.id+'"'+(L.c===c.id?' open':'')+'><summary><span class="n">'+(i+1)+'</span>'+esc(c.t)+'</summary><div class="gc">'+c.html+'</div></details>'});
+  h+='<div class="card"><button class="btn pri" type="button" style="width:100%" onclick="setView(\'write\')">日報を書く ›</button></div>';
+  $('main').innerHTML=h;
+  if(L.c){var el=$('ch-'+L.c);if(el)setTimeout(function(){el.scrollIntoView({block:'start'})},30)}else{var b=document.querySelector('.body');if(b)b.scrollTop=0}
+}
+
+// ===== 代表の設定（店長用パスワード） =====
+function adminCfgHTML(){
+  return '<div class="card admin"><h2>🔑 店長用パスワードの設定（代表のみ）</h2><div class="lead">'+SHOP[state.shop].name+'の店長が日報を開くためのパスワードです。店ごとに別のものを設定できます。</div>'+
+    '<div class="two"><input id="cfgPw" type="password" data-cfg="1" autocomplete="new-password" placeholder="新しいパスワード（4文字以上）"><button class="btn" type="button" onclick="setPw()">'+SHOP[state.shop].name+'のパスワードを設定</button></div></div>';
+}
+async function setPw(){
+  if(!state.admin){toast('代表のみ設定できます');return}
+  var v=$('cfgPw').value.trim(); if(v.length<4){toast('4文字以上にしてください');return}
+  await db.ref('nippo_cfg/pw/'+state.shop).set(await sha('nippo:'+state.shop+':'+v));
+  $('cfgPw').value='';toast(SHOP[state.shop].name+'の店長用パスワードを設定しました');
+}
+
+window.addEventListener('beforeunload',function(e){if(state.dirty){e.preventDefault();e.returnValue=''}});
+boot();
+</script>
+</body>
+</html>
