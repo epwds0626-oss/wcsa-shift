@@ -252,6 +252,7 @@ nav{display:flex;gap:2px}
       <button class="shop-btn" id="modeOtoshi" onclick="switchMode('otoshi')">お通し</button>
       <button class="shop-btn" id="modeManual" onclick="switchMode('manual')">マニュアル</button>
       <button class="shop-btn" id="modeShikomi" onclick="switchMode('shikomi')">仕込み</button>
+      <button class="shop-btn" id="modeNippo" onclick="switchMode('nippo')">日報</button>
     </div>
     <nav style="margin-left:auto;flex-shrink:0;">
       <button class="nav-btn active" id="nav0" onclick="showPage('calendar')">カレンダー</button>
@@ -899,6 +900,10 @@ nav{display:flex;gap:2px}
   <iframe id="shikomi-frame" style="width:100%;height:100%;border:none;background:#eef1f3"></iframe>
 </div>
 <!-- ===== /今日の仕込み ===== -->
+<!-- ===== 店長日報（nippo.html）【追加 R8.11.12】 ===== -->
+<div id="nippo-wrapper" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;overflow:hidden;background:#eef1f3;">
+  <iframe id="nippo-frame" title="店長日報" style="width:100%;height:100%;border:none;background:#eef1f3"></iframe>
+</div>
 
 <div id="musubu-wrapper" style="display:none;position:fixed;top:82px;left:0;right:0;bottom:0;z-index:50;overflow:hidden;">
 <style>
@@ -2161,7 +2166,7 @@ var SHOPS = [
 var currentShop = 0;
 
 window.addEventListener('resize', function(){
-  ['fish-wrapper','study-wrapper','cooking-wrapper','otoshi-wrapper','manual-wrapper','labor-wrapper','shikomi-wrapper'].forEach(function(id){
+  ['fish-wrapper','study-wrapper','cooking-wrapper','otoshi-wrapper','manual-wrapper','labor-wrapper','shikomi-wrapper','nippo-wrapper'].forEach(function(id){
     var fw = document.getElementById(id);
     if (fw && fw.style.display === 'block') {
       fw.style.top = '0';
@@ -2176,7 +2181,7 @@ function switchMode(mode, shopIdx) {
   var pdfBtn = document.querySelector('.pdf-btn');
 
   // 全モードボタンをリセット
-  ['modeShift','modeMusubu','modeChallenge','modeFish','modeStudy','modeCooking','modeOtoshi','modeManual','modeShikomi'].forEach(function(id) {
+  ['modeShift','modeMusubu','modeChallenge','modeFish','modeStudy','modeCooking','modeOtoshi','modeManual','modeShikomi','modeNippo'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.className = 'shop-btn'; el.style.cssText = ''; }
   });
@@ -2196,6 +2201,32 @@ function switchMode(mode, shopIdx) {
   if (laborWrapper) laborWrapper.style.display = 'none';
   var shikomiWrapper = document.getElementById('shikomi-wrapper');
   if (shikomiWrapper) shikomiWrapper.style.display = 'none';
+  var nippoWrapper = document.getElementById('nippo-wrapper');
+  if (nippoWrapper) nippoWrapper.style.display = 'none';
+
+  // 店長日報【追加 R8.11.12】：店長用パスワード（代表は管理者ログインで開ける）は日報ページ側で確認
+  if (mode === 'nippo') {
+    if (musubuWrapper) musubuWrapper.style.display = 'none';
+    var mainHeaderNp = document.getElementById('main-header');
+    if (mainHeaderNp) mainHeaderNp.style.display = 'none';
+    var npf = document.getElementById('nippo-frame');
+    var npShop = (shopIdx !== undefined ? shopIdx : currentShop) === 1 ? 'marco' : 'enya';
+    var npKey = npShop + (adminUnlocked ? ':a' : '');
+    if (npf && npf.getAttribute('data-k') !== npKey) { npf.setAttribute('data-k', npKey); npf.setAttribute('src', 'nippo.html?shop=' + npShop + '&v=' + Date.now()); } // 最新版を読む（GitHub Pagesのキャッシュ対策）
+    if (nippoWrapper) {
+      nippoWrapper.style.top = '0';
+      nippoWrapper.style.height = window.innerHeight + 'px';
+      nippoWrapper.style.display = 'block';
+    }
+    ['page-calendar','page-wish','page-admin','page-admin-lock','page-challenge'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    if (headerNav) headerNav.style.display = 'none';
+    if (pdfBtn) pdfBtn.style.display = 'none';
+    var mnp = document.getElementById('modeNippo');
+    if (mnp) { mnp.className = 'shop-btn active'; mnp.style.cssText = 'background:var(--accent);color:#0a0a0f'; }
+    return;
+  }
 
   if (mode === 'shikomi') {
     if (musubuWrapper) musubuWrapper.style.display = 'none';
