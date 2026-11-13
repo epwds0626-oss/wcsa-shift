@@ -51,6 +51,7 @@ button,input,textarea,select{font-family:inherit;font-size:14px}
 .kc .kl{font-size:11.5px;color:var(--text2);font-weight:700;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 .kc .kv{font-size:19px;font-weight:900;font-variant-numeric:tabular-nums;margin-top:2px}
 .kc .ks{font-size:11.5px;color:var(--text2);font-variant-numeric:tabular-nums}
+.kc.total{background:var(--accent-soft);border-color:var(--accent)}
 .kc.op .kv.pos{color:var(--ok)} .kc.op .kv.neg{color:var(--crit)}
 .kbar{display:flex;height:22px;border-radius:7px;overflow:hidden;margin-top:10px;background:var(--surface3)}
 .kbar i{display:flex;align-items:center;justify-content:center;font-style:normal;font-size:10.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;min-width:0}
@@ -446,13 +447,56 @@ async function load(){
     once('nippo/'+state.shop+'/'+k),
     db?db.ref('nippo/'+state.shop).orderByKey().endAt(String(+k-1)).limitToLast(30).once('value').then(function(s){return s.val()}).catch(function(){return null}):null,
     state.shop==='marco'?once('sales_daily/marco_mtd'):null,
-    state.shop==='marco'?once('sales_daily/marco'):null
+    state.shop==='marco'?once('sales_daily/marco'):null,
+    state.shop==='enya'?fetchFH(state.date):null,
+    state.shop==='enya'?fetchFH(addDays(state.date,-7)):null
   ]);
-  state.nums=calcNums({m:res[0],pm:res[1],rates:res[2],sd:res[3],psd:res[4],shift:res[5],mtd:res[8],marcoAll:res[9],k:k});
+  state.calcIn={m:res[0],pm:res[1],rates:res[2],sd:res[3],psd:res[4],shift:res[5],mtd:res[8],marcoAll:res[9],fh:res[10],pfh:res[11],k:k};
+  state.nums=calcNums(state.calcIn);
   state.report=res[6]||{};
   state.followups=collectFollowups(res[7]||{});
   state.dirty=false;
   renderWrite();
+  watchFH(state.date);
+}
+
+// ===== FishHackの売上（FishHackアプリの納品データから直接）【追加 R8.11.13】 =====
+// 計算は日別人件費（labor.html の loadFishHack）と同じ：伝票ごとに税率別に端数切り捨て。Excel取込分は除く
+var FH_DB='https://fishhack-74de3-default-rtdb.asia-southeast1.firebasedatabase.app';
+async function fetchFH(ds){
+  var q=FH_DB+'/fishhack/deliveries.json?orderBy='+encodeURIComponent('"date"')+'&equalTo='+encodeURIComponent('"'+ds+'"');
+  var data=null;
+  try{var r=await fetch(q);if(r.ok)data=await r.json()}catch(e){}
+  if(data==null){try{var r2=await fetch(FH_DB+'/fishhack/deliveries.json');if(r2.ok)data=await r2.json()}catch(e){}}   // 索引がない場合は全件から探す（日別人件費と同じ）
+  if(data==null)return null;
+  var net=0,gross=0,n=0,num=function(v){v=+v;return isNaN(v)?0:v};
+  Object.keys(data).forEach(function(k){var d=data[k];if(!d||d.source==='excel'||String(d.date)!==ds)return;
+    var nt=0,t8=0,t10=0;(d.items||[]).forEach(function(it){var t=it.total!=null?Math.floor(num(it.total)):Math.floor(num(it.qty)*num(it.price)-num(it.disc));nt+=t;if(+it.tax===8)t8+=t;else t10+=t});
+    net+=nt;gross+=nt+Math.floor(t8*0.08)+Math.floor(t10*0.10);n++});
+  return {net:net,gross:gross,n:n};
+}
+
+// 即時反映：FishHackのデータベースを購読し、納品が入ったら数字の欄だけ描き直す（入力中の日報は消えない）
+var fhApp=null, fhRef=null;
+function sumFH(data,ds){var net=0,gross=0,n=0,num=function(v){v=+v;return isNaN(v)?0:v};
+  Object.keys(data||{}).forEach(function(k){var d=data[k];if(!d||d.source==='excel'||String(d.date)!==ds)return;
+    var nt=0,t8=0,t10=0;(d.items||[]).forEach(function(it){var t=it.total!=null?Math.floor(num(it.total)):Math.floor(num(it.qty)*num(it.price)-num(it.disc));nt+=t;if(+it.tax===8)t8+=t;else t10+=t});
+    net+=nt;gross+=nt+Math.floor(t8*0.08)+Math.floor(t10*0.10);n++});
+  return {net:net,gross:gross,n:n}}
+function watchFH(ds){
+  if(fhRef){try{fhRef.off()}catch(e){}fhRef=null}
+  if(state.shop!=='enya'||typeof firebase==='undefined')return;
+  try{
+    if(!fhApp)fhApp=firebase.apps.filter(function(a){return a.name==='fishhack'})[0]||firebase.initializeApp({databaseURL:FH_DB},'fishhack');
+    fhRef=fhApp.database().ref('fishhack/deliveries').orderByChild('date').equalTo(ds);
+    fhRef.on('value',function(snap){
+      if(state.view!=='write'||state.date!==ds||state.shop!=='enya'||!state.calcIn)return;
+      var v=sumFH(snap.val(),ds); var old=state.calcIn.fh;
+      if(old&&old.net===v.net&&old.gross===v.gross&&old.n===v.n)return;
+      state.calcIn.fh=v; state.nums=calcNums(state.calcIn);
+      var box=$('numsBox'); if(box){box.innerHTML=numsHTML(); toast('FishHackの売上を更新しました');}
+    });
+  }catch(e){console.warn('FishHackの購読に失敗',e)}
 }
 
 // ===== 数字の計算 =====
@@ -477,7 +521,9 @@ function calcNums(o){
     var tot=+(tax==='税込'?o.mtd.gross:o.mtd.net)-other; if(tot>0){s=tot;est=true}
   }
   if(s==null&&m&&m.s!=null)s=m.s;
-  N.S=s; N.salesEst=est; N.cust=o.sd&&o.sd.cust?+o.sd.cust:null; N.fhs=m&&m.fhs?m.fhs:0;
+  N.S=s; N.salesEst=est; N.cust=o.sd&&o.sd.cust?+o.sd.cust:null;
+  var fhLive=o.fh?(tax==='税込'?o.fh.gross:o.fh.net):null;
+  N.fhs=m&&m.fhs!=null?m.fhs:(fhLive||0); N.fhN=o.fh?o.fh.n:null;
   // 人件費
   if(m&&m.l!=null&&(m.l>0||m.h>0)){N.L=m.l;N.flags.L='確定';N.H=m.h}
   else{var sh=shiftHours(o.shift);if(sh&&r.lph){N.L=sh.h*r.lph;N.H=sh.h;N.flags.L='見込み';N.staff=sh.n}else{N.L=null;N.flags.L=sh?'率なし':'シフトなし'}}
@@ -494,7 +540,8 @@ function calcNums(o){
   N.prodH=N.H>0&&N.S!=null?SS/N.H:null;
   // 先週の同じ曜日
   var pm=o.pm||null, ps=salesFrom(o.psd,tax); if(ps==null&&pm&&pm.s!=null)ps=pm.s;
-  N.P={S:ps,cust:o.psd&&o.psd.cust?+o.psd.cust:null,L:pm?pm.l:null,O:(pm&&pm.s!=null&&pm.l!=null&&pm.f!=null&&pm.x!=null)?(pm.s+(pm.fhs||0))-pm.l-pm.f-pm.x:null,SS:pm?(pm.s||0)+(pm.fhs||0):null};
+  var pfh=pm&&pm.fhs!=null?pm.fhs:(o.pfh?(tax==='税込'?o.pfh.gross:o.pfh.net):null);
+  N.P={S:ps,fhs:pfh,cust:o.psd&&o.psd.cust?+o.psd.cust:null,L:pm?pm.l:null,O:(pm&&pm.s!=null&&pm.l!=null&&pm.f!=null&&pm.x!=null)?(pm.s+(pm.fhs||0))-pm.l-pm.f-pm.x:null,SS:ps!=null?ps+(pfh||0):null};
   N.ratesAt=r.at||null; N.noMetrics=!o.rates;
   return N;
 }
@@ -516,25 +563,34 @@ function numsHTML(){
   var card=function(cls,lb,flag,v,sub){return '<div class="kc '+(cls||'')+'"><div class="kl">'+lb+' '+flagChip(flag)+'</div><div class="kv'+(cls==='op'&&v!=='—'?(N.O>=0?' pos':' neg'):'')+'">'+v+'</div><div class="ks">'+(sub||'')+'</div></div>'};
   var h='<div class="card"><h2>📊 今日の数字 <span class="note" style="font-weight:500">自動で入ります</span></h2>';
   h+='<div class="kgrid">';
-  h+=card('', '売上（'+esc(N.tax)+'）', N.salesEst?'推定':null, yen(N.S), (N.fhs?'＋FishHack '+yen(N.fhs)+'<br>':'')+diffTxt(N.S,N.P.S));
+  var isH=state.shop==='enya', base=isH?'合計売上比':'売上比';
+  if(isH){
+    h+=card('', '本店売上（'+esc(N.tax)+'）', null, yen(N.S), diffTxt(N.S,N.P.S));
+    h+=card('', 'FishHack売上', null, yen(N.fhs), (N.fhN!=null?'納品 '+N.fhN+'件　':'')+diffTxt(N.fhs,N.P.fhs));
+    h+=card('total', '合計売上', null, N.S==null&&!N.fhs?'—':yen(N.SS), '本店＋FishHack　'+diffTxt(N.S!=null?N.SS:null,N.P.SS));
+  }else{
+    h+=card('', '売上（'+esc(N.tax)+'）', N.salesEst?'推定':null, yen(N.S), diffTxt(N.S,N.P.S));
+  }
   h+=card('', '客数・客単価', null, N.cust!=null?N.cust+'人':'—', (N.avg!=null?'客単価 '+yen(N.avg)+'　':'')+diffTxt(N.cust,N.P.cust));
-  h+=card('', '人件費', N.flags.L, yen(N.L), '売上比 <b>'+pct(N.L,N.SS)+'</b>'+(N.H?'　'+N.H.toFixed(1)+'時間'+(N.staff?'・'+N.staff+'人':''):''));
-  h+=card('', '食材費', N.flags.F, yen(N.F), '売上比 <b>'+pct(N.F,N.SS)+'</b>　FL比率 <b>'+(N.L!=null&&N.F!=null?pct(N.L+N.F,N.SS):'—')+'</b>');
-  h+=card('', '固定費', N.flags.X, yen(N.X), '売上比 <b>'+pct(N.X,N.SS)+'</b>');
-  h+=card('op', '営業利益', (N.flags.L==='確定'&&N.flags.F==='確定'&&N.flags.X==='確定')?'確定':N.O!=null?'見込み':null, N.O==null?'—':yen(N.O), '利益率 <b>'+pct(N.O,N.SS)+'</b>'+(N.P.O!=null?'<br>先週 '+yen(N.P.O):''));
+  h+=card('', '人件費', N.flags.L, yen(N.L), base+' <b>'+pct(N.L,N.SS)+'</b>'+(N.H?'　'+N.H.toFixed(1)+'時間'+(N.staff?'・'+N.staff+'人':''):''));
+  h+=card('', '食材費', N.flags.F, yen(N.F), base+' <b>'+pct(N.F,N.SS)+'</b>　FL比率 <b>'+(N.L!=null&&N.F!=null?pct(N.L+N.F,N.SS):'—')+'</b>');
+  h+=card('', '固定費', N.flags.X, yen(N.X), base+' <b>'+pct(N.X,N.SS)+'</b>');
+  h+=card('op', '営業利益', (N.flags.L==='確定'&&N.flags.F==='確定'&&N.flags.X==='確定')?'確定':N.O!=null?'見込み':null, N.O==null?'—':yen(N.O), (isH?'合計売上比 ':'利益率 ')+'<b>'+pct(N.O,N.SS)+'</b>'+(N.P.O!=null?'<br>先週 '+yen(N.P.O):''));
   h+='</div>';
   if(N.SS>0&&N.L!=null&&N.F!=null&&N.X!=null){
     var seg=function(v,c,lb){return v>0?'<i style="flex:'+v+' 0 0;background:'+c+'" title="'+lb+'">'+(v/N.SS>.09?lb+' '+pct(v,N.SS):'')+'</i>':''};
     h+='<div class="kbar">'+seg(N.L,'#c77d0a','人件費')+seg(N.F,'#1a7fbf','食材費')+seg(N.X,'#8c92a4','固定費')+seg(Math.max(0,N.O),'#0a7d4f','利益')+'</div>';
-    h+='<div class="note" style="margin-top:4px">売上1,000円のうち、人件費 '+Math.round(N.L/N.SS*1000)+'円・食材費 '+Math.round(N.F/N.SS*1000)+'円・固定費 '+Math.round(N.X/N.SS*1000)+'円、残る利益は <b>'+Math.round(N.O/N.SS*1000)+'円</b></div>';
+    h+='<div class="note" style="margin-top:4px">'+(isH?'合計':'')+'売上1,000円のうち、人件費 '+Math.round(N.L/N.SS*1000)+'円・食材費 '+Math.round(N.F/N.SS*1000)+'円・固定費 '+Math.round(N.X/N.SS*1000)+'円、残る利益は <b>'+Math.round(N.O/N.SS*1000)+'円</b></div>';
   }
   var hints=[];
   if(noSales)hints.push('売上がまだ入っていません。チャレンジの「売上CSVから更新」でPOSのCSVを取り込むと自動で入ります。');
   if(N.flags.L==='見込み')hints.push('人件費はシフト予定からの見込みです。翌日以降、打刻から計算した確定値に自動で置き換わります。');
   if(N.flags.L==='シフトなし')hints.push('この日のシフトが登録されていないため、人件費の見込みを出せません。');
   if(N.noMetrics)hints.push('代表が「日別人件費」を一度開くと、人件費・食材費・固定費の計算に必要な率が保存されます。');
-  if(S.name==='本店'&&N.fhs)hints.push('本店の数字にはFishHackの売上・原価を含めています（FishHackの作業は本店の人件費に入っているため）。');
+  if(isH)hints.push('人件費・食材費・固定費・営業利益の率は、合計売上（本店＋FishHack）で割っています。FishHackの作業は本店の人件費に入っているためです。');
+  if(isH)hints.push('本店の人件費には、マルコに出向している2名分も入っています。');
   if(hints.length)h+='<div class="hint">'+hints.map(esc).join('<br>')+'</div>';
+  if(!isH)h+='<div class="hint" style="background:var(--crit-soft);color:var(--crit);font-weight:700">⚠ マルコの人件費には、本店から出向している2名分が入っていません（本店の人件費で計算しています）。実際のマルコの人件費・人件費率はこれより高く、営業利益はこれより低くなります。</div>';
   h+='</div>';
   return h;
 }
@@ -565,7 +621,7 @@ function renderWrite(){
   var draft=loadDraft(); if(draft&&(!r.savedAt||draft.at>r.savedAt)){r=Object.assign({},r,draft.r);props=draft.r.proposals||props;state.dirty=true}
   if(!props.length)props=[{}];
   var h='';
-  h+=numsHTML();
+  h+='<div id="numsBox">'+numsHTML()+'</div>';
   h+=tipHTML();
   // ★ 改善提案（メイン）
   h+='<div class="card main"><h2>💡 今日の改善提案</h2><div class="lead">今日いちばん「こうすれば良くなる」と思ったことを書いてください。小さなことで大丈夫です。数字を見て気づいたことも歓迎です。 <a href="#" onclick="openGuide(\'base\',\'kaizen\');return false" style="color:var(--accent);font-weight:800">改善の進め方を読む ›</a></div>'+
