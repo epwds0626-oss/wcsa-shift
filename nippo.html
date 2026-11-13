@@ -646,8 +646,10 @@ function renderWrite(){
   // 安全・衛生
   var ck=r.checks||{};
   h+='<div class="card"><h2>✅ 安全・衛生</h2><div class="chk">'+CHECKS.map(function(c){return '<label><input type="checkbox" data-ck="'+c[0]+'"'+(ck[c[0]]?' checked':'')+'> '+c[1]+'</label>'}).join('')+'</div></div>';
-  // 明日の重点
-  h+='<div class="card"><h2>🎯 明日の重点（一つだけ）</h2><input type="text" data-r="tomorrow" placeholder="例：平日ランチの提供時間を15分以内に保つ" value="'+esc(r.tomorrow)+'"></div>';
+  // 明日の重点（一つだけ）：明日の店の状況で、一番気をつけること
+  h+='<div class="card"><h2>🎯 明日の重点 <span class="note" style="font-weight:500">一つだけ</span></h2>'+
+     '<div class="lead">明日いちばん気をつけること。大型予約・納品・仕込みなど、明日の店の状況を書いて、次の人に引き継ぎます。</div>'+
+     '<input type="text" data-r="tomorrow" placeholder="例：大型予約あり（煮魚膳×30食・12時）／FishHack納品多数／仕込み多数" value="'+esc(r.tomorrow)+'"></div>';
   // 代表から
   if(state.admin){
     h+='<div class="card admin"><h2>📝 代表から（店長に返信）</h2><textarea data-r="ownerComment" placeholder="例：提案ありがとう。前菜の先盛り、金曜から試そう">'+esc(r.ownerComment)+'</textarea></div>';
