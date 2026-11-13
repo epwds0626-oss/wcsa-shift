@@ -639,17 +639,15 @@ function renderWrite(){
   // 最初に伝えること
   h+='<div class="card"><h2>⚠️ 最初に伝えること <span class="note" style="font-weight:500">なければ空欄</span></h2><div class="lead">事故・けが・苦情・設備の故障など。「何が起きたか・今どうなっているか・何をしたか」の順で。</div>'+
      '<textarea data-r="alert" placeholder="例：20時ごろ製氷機が止まった。今は動いているが異音あり。業者に明日の点検を依頼済み">'+esc(r.alert)+'</textarea></div>';
-  // 今日のひとこと
-  h+='<div class="card"><h2>🙂 今日のひとこと</h2>'+
-     '<label class="f">良かったこと</label><textarea data-r="good" placeholder="例：ランチの回転が早く、待ちが10分以内だった">'+esc(r.good)+'</textarea>'+
-     '<div class="two"><div><label class="f">お客さまの声</label><textarea data-r="voice" placeholder="例：「ヒラメが甘くておいしかった」">'+esc(r.voice)+'</textarea></div>'+
-     '<div><label class="f">スタッフの良かった行動<span class="q">名前と内容</span></label><textarea data-r="staffGood" placeholder="例：〇〇さんが待ちのお客さまに自分から声をかけていた">'+esc(r.staffGood)+'</textarea></div></div></div>';
+  // 今日の気づき（一つだけ・なんでもOK）
+  h+='<div class="card"><h2>👀 今日の気づき <span class="note" style="font-weight:500">一つだけ</span></h2>'+
+     '<div class="lead">良かったスタッフの行動、お客さまの声、直すべきオペレーションなど、気づいたことを一つ。なんでもOKです。</div>'+
+     '<textarea data-r="kizuki" placeholder="例：お客さまに「あんこう鍋おいしかった」と言われた／〇〇さんが待ちのお客さまに自分から声をかけていた／ランチのピークで洗い場が詰まった">'+esc(r.kizuki||[r.good,r.voice,r.staffGood].filter(Boolean).join('\n'))+'</textarea></div>';
   // 安全・衛生
   var ck=r.checks||{};
   h+='<div class="card"><h2>✅ 安全・衛生</h2><div class="chk">'+CHECKS.map(function(c){return '<label><input type="checkbox" data-ck="'+c[0]+'"'+(ck[c[0]]?' checked':'')+'> '+c[1]+'</label>'}).join('')+'</div></div>';
   // 明日の重点
-  h+='<div class="card"><h2>🎯 明日の重点（一つだけ）</h2><input type="text" data-r="tomorrow" placeholder="例：平日ランチの提供時間を15分以内に保つ" value="'+esc(r.tomorrow)+'">'+
-     '<div class="two" style="margin-top:8px"><div><label class="f">予約・団体</label><input type="text" data-r="reserve" value="'+esc(r.reserve)+'"></div><div><label class="f">記入者</label><input type="text" data-r="author" placeholder="名前" value="'+esc(r.author||localStorage.getItem('nippo_author_'+state.shop)||'')+'"></div></div></div>';
+  h+='<div class="card"><h2>🎯 明日の重点（一つだけ）</h2><input type="text" data-r="tomorrow" placeholder="例：平日ランチの提供時間を15分以内に保つ" value="'+esc(r.tomorrow)+'"></div>';
   // 代表から
   if(state.admin){
     h+='<div class="card admin"><h2>📝 代表から（店長に返信）</h2><textarea data-r="ownerComment" placeholder="例：提案ありがとう。前菜の先盛り、金曜から試そう">'+esc(r.ownerComment)+'</textarea></div>';
@@ -701,15 +699,15 @@ async function saveReport(){
   var o=readReport();
   var good=o.proposals.filter(function(p){return p.title&&p.idea});
   if(!state.admin&&!good.length){if(!confirm('改善提案（テーマと「どう変えるか」）がまだ書かれていません。このまま送りますか？'))return}
-  if(!state.admin&&!o.author){toast('記入者の名前を入れてください');var a=document.querySelector('[data-r="author"]');if(a)a.focus();return}
   var N=state.nums||{};
   var upd={
-    savedAt:Date.now(), alert:o.alert||'', good:o.good||'', voice:o.voice||'', staffGood:o.staffGood||'',
-    tomorrow:o.tomorrow||'', reserve:o.reserve||'', checks:o.checks, proposals:o.proposals,
+    savedAt:Date.now(), alert:o.alert||'', kizuki:o.kizuki||'',
+    tomorrow:o.tomorrow||'', checks:o.checks, proposals:o.proposals,
     snap:{S:N.S==null?null:Math.round(N.S),fhs:N.fhs||0,cust:N.cust,L:N.L==null?null:Math.round(N.L),F:N.F==null?null:Math.round(N.F),X:N.X==null?null:Math.round(N.X),O:N.O==null?null:Math.round(N.O),flags:N.flags||{}}
   };
-  if(state.admin){upd.ownerComment=o.ownerComment||'';upd.ownerAt=Date.now();if(state.report&&state.report.author)upd.author=state.report.author;if(o.author)upd.author=o.author;if(state.report&&state.report.savedAt)upd.savedAt=state.report.savedAt}
-  else{upd.author=o.author;try{localStorage.setItem('nippo_author_'+state.shop,o.author)}catch(e){}}
+  // 記入者は原則、各店の店長（本店店長・マルコ店長）。代表が返信だけ保存するときは元の記入者のまま
+  if(state.admin){upd.ownerComment=o.ownerComment||'';upd.ownerAt=Date.now();if(state.report&&state.report.savedAt)upd.savedAt=state.report.savedAt;upd.author=(state.report&&state.report.author)||SHOP[state.shop].name+'店長'}
+  else upd.author=SHOP[state.shop].name+'店長';
   // 振り返りの更新（元の日報の提案に書き戻す）
   var fuUpd={};
   document.querySelectorAll('[data-fu]').forEach(function(el){var f=state.followups[+el.dataset.fu];if(!f)return;
