@@ -610,7 +610,7 @@ function propHTML(p,i){
     line('who','誰が・いつから','例：刺し場の〇〇さん、金曜の団体から',40)+
     '</div>'+
     '<div class="chk" style="margin-top:8px"><label><input type="checkbox" data-f="needDecision"'+(p.needDecision?' checked':'')+'> 代表の判断が必要（お金がかかる・ルールを変える など）</label>'+
-    '<label><input type="checkbox" data-f="share"'+(p.share===false?'':' checked')+'> Musubuチャットでみんなに共有する'+(p.chatKey?' <span class="chip ok">共有済み</span>':'')+'</label></div>'+
+    '<label><input type="checkbox" data-f="share"'+(p.share===false?'':' checked')+'> Musubuチャット（本店・マルコ両方）でみんなに共有する'+(p.chatKey?' <span class="chip ok">共有済み</span>':'')+'</label></div>'+
     (p.status&&p.status!=='提案'?'<div style="margin-top:6px"><span class="chip a">'+esc(p.status)+'</span>'+(p.decisionNote?' <span class="note">'+esc(p.decisionNote)+'</span>':'')+'</div>':'')+
     (adm?'<div class="fu" style="border-left-color:var(--ok)"><div class="t">代表の判断</div><div class="two"><select data-f="status" aria-label="判断">'+STATUS.map(function(s){return '<option'+((p.status||'提案')===s?' selected':'')+'>'+s+'</option>'}).join('')+'</select><input type="text" data-f="decisionNote" placeholder="ひとこと（例：やってみよう。結果を来週教えて）" value="'+esc(p.decisionNote)+'"></div></div>':'')+
   '</div>';
@@ -722,7 +722,7 @@ async function saveReport(){
   try{
     await db.ref('nippo/'+state.shop+'/'+k8(state.date)).update(upd);
     if(Object.keys(fuUpd).length)await db.ref().update(fuUpd);
-    if(chat.n)toast('Musubuチャットに'+chat.n+'件共有しました');
+    if(chat.n)toast('本店・マルコのMusubuチャットに'+chat.n+'件共有しました');
     try{localStorage.removeItem(draftKey())}catch(e){}
     state.dirty=false;toast(state.admin?'返信を保存しました':'日報を送りました。おつかれさまでした');
     load();
@@ -743,28 +743,35 @@ function summarize(p,author,k){
   return lines.join('\n');
 }
 var DEC_ICON={'採用・試行中':'✅ 採用','保留':'⏸ 保留','見送り':'🙏 見送り','効果あり（定着）':'🎉 効果あり','効果なし（やめる）':'🔁 効果なし'};
+// 両店のチャットに流す（お互いの改善提案が分かるように）【R8.11.13】
+var CHAT_SHOPS=['enya','marco'];
 function chatMsg(text){var d=new Date();var key=db.ref('stock/'+state.shop+'/chat').push().key;
-  return {key:key,data:{id:key,user:CHAT_USER,text:text,time:d.getHours()+':'+pad(d.getMinutes()),ts:Date.now(),_r:false,pinned:false,src:'nippo'}}}
+  return {key:key,data:{id:key,user:CHAT_USER,text:text,time:d.getHours()+':'+pad(d.getMinutes()),ts:Date.now(),_r:false,pinned:false,src:'nippo',from:state.shop}}}
+function postBoth(w,text){var ks={};CHAT_SHOPS.forEach(function(sh){var m=chatMsg(text);w['stock/'+sh+'/chat/'+m.key]=m.data;ks[sh]=m.key});return ks}
 function buildChatPosts(props,author,fuUpd){
-  var w={},n=0,k=k8(state.date),base='stock/'+state.shop+'/chat/';
-  var orig=(state.report&&state.report.proposals&&(Array.isArray(state.report.proposals)?state.report.proposals:Object.values(state.report.proposals)))||[];
+  var w={},n=0,k=k8(state.date);
   props.forEach(function(p,i){
     if(p.share===false||!p.title||!p.idea)return;
     var text=summarize(p,author||(state.report&&state.report.author)||'',k);
-    if(!p.chatKey){var m=chatMsg(text);w[base+m.key]=m.data;p.chatKey=m.key;p.chatSig=text;n++}
-    else if(p.chatSig!==text){w[base+p.chatKey+'/text']=text;w[base+p.chatKey+'/edited']=true;p.chatSig=text}
+    var ks=p.chatKeys||{}; if(p.chatKey&&!ks[state.shop])ks[state.shop]=p.chatKey;   // 以前の形式（自店だけに投稿）にも対応
+    var posted=false;
+    CHAT_SHOPS.forEach(function(sh){
+      if(!ks[sh]){var m=chatMsg(text);w['stock/'+sh+'/chat/'+m.key]=m.data;ks[sh]=m.key;posted=true}
+      else if(p.chatSig!==text){w['stock/'+sh+'/chat/'+ks[sh]+'/text']=text;w['stock/'+sh+'/chat/'+ks[sh]+'/edited']=true}
+    });
+    p.chatKeys=ks; p.chatKey=ks[state.shop]; p.chatSig=text; if(posted)n++;
     // 代表の判断が変わったら一言共有
     var st=p.status||'提案';
     if(state.admin&&st!=='提案'&&DEC_ICON[st]&&p.decPosted!==st){
-      var m2=chatMsg(DEC_ICON[st]+'｜「'+cut(p.title,30)+'」'+(p.decisionNote?'\n代表：'+cut(p.decisionNote,60):''));w[base+m2.key]=m2.data;p.decPosted=st;n++}
+      postBoth(w,DEC_ICON[st]+'｜'+SHOP[state.shop].name+'「'+cut(p.title,30)+'」'+(p.decisionNote?'\n代表：'+cut(p.decisionNote,60):''));p.decPosted=st;n++}
   });
   // 振り返りで結果が出た提案
   state.followups.forEach(function(f){
     var sk='nippo/'+state.shop+'/'+f.k+'/proposals/'+f.i+'/';
     var st=fuUpd[sk+'status'];if(!st||st===f.p.status||!/効果/.test(st)||f.p.decPosted===st||f.p.share===false)return;
     var rs=fuUpd[sk+'result']!=null?fuUpd[sk+'result']:f.p.result;
-    var m=chatMsg(DEC_ICON[st]+'｜'+SHOP[state.shop].name+' '+dLabel(f.k)+'の提案「'+cut(f.p.title,30)+'」'+(rs?'\n結果：'+cut(rs,60):''));
-    w[base+m.key]=m.data;w[sk+'decPosted']=st;n++;
+    postBoth(w,DEC_ICON[st]+'｜'+SHOP[state.shop].name+' '+dLabel(f.k)+'の提案「'+cut(f.p.title,30)+'」'+(rs?'\n結果：'+cut(rs,60):''));
+    w[sk+'decPosted']=st;n++;
   });
   return {writes:w,n:n};
 }
