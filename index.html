@@ -5446,7 +5446,7 @@ function renderCal() {
     var dt = new Date(yr, mo, d);
     var key = dKey(dt);
     var cell = document.createElement('div');
-    var status = S.dayStatus[key] || 'open';
+    var status = dayStatusOf(key);
     cell.className = 'cal-day';
     if (dt.toDateString() === today.toDateString()) cell.className += ' today';
     if (status === 'closed') cell.className += ' closed-day';
@@ -5845,7 +5845,7 @@ function renderAdminCal() {
     var total = (sh.before||[]).length + (sh.lunch||[]).length + (sh.dinner||[]).length;
     var badge = total > 0 ? '<div class="acal-badge">' + total + '名</div>' : '';
     var statusBadge = '';
-    var ds = S.dayStatus[key] || 'open';
+    var ds = dayStatusOf(key);
     if (ds === 'closed') statusBadge = '<div style="font-size:9px;color:var(--accent3)">休業</div>';
     else if (ds === 'lunch') statusBadge = '<div style="font-size:9px;color:var(--accent)">L only</div>';
     cell.innerHTML = '<div class="acal-num">' + d + '</div>' + badge + statusBadge;
@@ -5870,7 +5870,7 @@ function openAdminModal(date) {
   var DOW = ['日','月','火','水','木','金','土'];
   document.getElementById('adminModalTitle').textContent = date.getFullYear() + '年' + (date.getMonth()+1) + '月' + date.getDate() + '日（' + DOW[date.getDay()] + '）';
   var statusSel = document.getElementById('dayStatusSel');
-  if (statusSel) statusSel.value = S.dayStatus[dKey(date)] || 'open';
+  if (statusSel) statusSel.value = dayStatusOf(dKey(date));
   fillSel(document.getElementById('asName'), S.staff);
   fillSel(document.getElementById('asStart'), TIMES, '11:00');
   fillSel(document.getElementById('asEnd'), TIMES, '15:00');
@@ -5950,6 +5950,11 @@ function copyFromPrevDay() {
   if (!S.editedDays) S.editedDays = [];
   if (S.editedDays.indexOf(curKey) < 0) S.editedDays.push(curKey);
   renderAdminModal(); saveS();
+}
+// 【R8.11.15】日の営業区分。未設定の日は、マルコ＝ランチのみ（ランチ営業の店）、本店＝通常営業
+function dayStatusOf(key) {
+  if (S.dayStatus && S.dayStatus[key]) return S.dayStatus[key];
+  return (typeof currentShop !== 'undefined' && currentShop === 1) ? 'lunch' : 'open';
 }
 function setDayStatus(val) {
   if (!S.adminSelDate) return;
@@ -6043,7 +6048,7 @@ function addAdminShift() {
   var endTotal = eH * 60 + eM;
 
   // ランチのみの日はディナーに追加しない
-  var dayStatus = S.dayStatus[key] || 'open';
+  var dayStatus = dayStatusOf(key);
   // 営業前(〜10:45開始): before + lunch + dinner(ランチのみ以外)に自動反映
   // ランチ帯(〜16:00開始): lunch + dinner(終了16:30以降かつランチのみ以外)
   // ディナー帯(16:00超開始): dinnerのみ
