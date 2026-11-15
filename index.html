@@ -5884,6 +5884,14 @@ function renderAdminModal() {
   var tabsEl = document.getElementById('adminSessTabs');
   tabsEl.innerHTML = '';
   var tabs = [{k:'before',l:'営業前',c:'ab'},{k:'lunch',l:'ランチ',c:'al'},{k:'dinner',l:'ディナー',c:'ad'}];
+  // 【R8.11.15】ランチのみの日はディナーのタブを出さない（すでにディナーに人が入っている日だけ、消せるように残す）
+  if (S.adminSelDate) {
+    var amKey = dKey(S.adminSelDate), amSh = S.shifts[amKey] || {};
+    if (dayStatusOf(amKey) === 'lunch' && !(amSh.dinner || []).length) {
+      tabs = tabs.filter(function(t){ return t.k !== 'dinner'; });
+      if (sess === 'dinner') { sess = 'lunch'; S.adminSess = 'lunch'; }
+    }
+  }
   var i;
   for (i = 0; i < tabs.length; i++) {
     var t = document.createElement('button');
