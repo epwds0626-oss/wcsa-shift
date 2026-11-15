@@ -701,9 +701,12 @@ function buildPeople(){
   });
 }
 
+// その日が属する給与期間（21日〜翌20日）の初日 "YYYY/MM/21"。定休日設定の保存キー
+function payKeyOf(d){const [y,m,dd]=d.split("/").map(Number);return dstr(dd>=21?new Date(y,m-1,21):new Date(y,m-2,21))}
 function closedSet(s){
   // 暦月表示中は、その月にかかる給与期間ごとの定休日設定を合わせて使う
-  if(CAL&&dates===CAL.monthDates){const u=new Set();CAL.parts.forEach(p=>((cfg.closed[p.dates[0]]||{})[s]||[]).forEach(d=>u.add(d)));return u}
+  // 【R8.11.15修正】打刻をまだ読んでいない給与期間（例：11/21〜）の日も、その日が属する給与期間の設定から読む
+  if(CAL&&dates===CAL.monthDates){const u=new Set();dates.forEach(d=>{if(((cfg.closed[payKeyOf(d)]||{})[s]||[]).includes(d))u.add(d)});return u}
   return new Set((cfg.closed[dates[0]]||{})[s]||[])}
 function openDays(s){const c=closedSet(s);return dates.filter(d=>!c.has(d))}
 
@@ -1354,7 +1357,7 @@ function renderCals(){
     dates.forEach(d=>g+=`<button data-s="${s}" data-d="${d}" class="${c.has(d)?"off":""}" aria-pressed="${!c.has(d)}">${+d.slice(8)}</button>`);
     return g+"</div></div>"}).join("");
   el.querySelectorAll("button").forEach(b=>b.onclick=()=>{
-    const key=CAL&&dates===CAL.monthDates?(CAL.parts.find(p=>p.dates.includes(b.dataset.d))||{dates:[dates[0]]}).dates[0]:dates[0];
+    const key=CAL&&dates===CAL.monthDates?payKeyOf(b.dataset.d):dates[0];
     cfg.closed[key]=cfg.closed[key]||{};cfg.closed[key][b.dataset.s]=cfg.closed[key][b.dataset.s]||[];
     const arr=cfg.closed[key][b.dataset.s], i=arr.indexOf(b.dataset.d);
     i>=0?arr.splice(i,1):arr.push(b.dataset.d); saveCfg(); renderCals(); renderDaily()});
