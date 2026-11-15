@@ -1004,16 +1004,17 @@ function renderTrendL(res,shown,inProg){
   if(trendSel==null||trendSel>=rws.length){trendSel=null;for(let j=rws.length-1;j>=0;j--)if(rws[j].S>0){trendSel=j;break}}
   const cs=getComputedStyle(document.documentElement), cv=n=>cs.getPropertyValue(n).trim();
   const C={本店:cv("--honten")||"#1b2747",マルコ:cv("--marco")||"#b5532f",FishHack:cv("--fish")||"#1f7a8c",ok:cv("--ok")||"#2f6b47",crit:cv("--crit")||"#b23a2e",sub:cv("--sub")||"#5d6276",line:cv("--line")||"#ddd7c9",L:cv("--warn")||"#a5660b",F:"#2c6fb0"};
-  const n=rws.length,W=760,pl=48,pr=8,cw=(W-pl-pr)/n,bw=Math.max(2,cw*.7),pt=8,pb=20,x=i=>pl+cw*i+cw/2;
+  const n=rws.length,W=760,pl=48,pr=8,cw=(W-pl-pr)/n,bw=Math.max(2,cw*.7),pt=8,pb=32,x=i=>pl+cw*i+cw/2;
   const nice=v=>{if(!(v>0))return 1;const p=Math.pow(10,Math.floor(Math.log10(v))),f=v/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p};
   const ys=v=>{const a=Math.abs(v);return (v<0?"−":"")+(a>=10000?(Math.round(a/1000)/10)+"万":Math.round(a).toLocaleString())};
   const xAxis=H=>rws.map((r,i)=>{const dw=new Date(r.d).getDay(),step=n>45?7:n>20?3:1;if(i%step&&i!==n-1)return "";const hol=HOLIDAYS[r.d];
-    return `<text x="${x(i)}" y="${H-pb+13}" font-size="10" text-anchor="middle" fill="${dw===0||hol?C.crit:dw===6?"#2c5d9c":C.sub}">${+r.d.slice(5,7)}/${+r.d.slice(8)}</text>`}).join("");
+    const fc=dw===0||hol?C.crit:dw===6?"#2c5d9c":C.sub;
+    return `<text x="${x(i)}" y="${H-pb+13}" font-size="10" text-anchor="middle" fill="${fc}">${+r.d.slice(5,7)}/${+r.d.slice(8)}</text><text x="${x(i)}" y="${H-pb+26}" font-size="10" text-anchor="middle" fill="${fc}">${DOW[dw]}${hol?"祝":""}</text>`}).join("");
   const band=H=>trendSel!=null?`<rect x="${pl+cw*trendSel}" y="${pt}" width="${cw}" height="${H-pt-pb}" fill="${C.sub}" opacity=".12"/>`:"";
   const grid=(H,lo,hi,f)=>{let g="";for(let t=0;t<=4;t++){const v=lo+(hi-lo)*t/4,y=H-pb-(H-pt-pb)*t/4;g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="${C.line}"/><text x="${pl-5}" y="${y+3}" font-size="10" text-anchor="end" fill="${C.sub}">${f(v)}</text>`}return g};
   const hit=H=>rws.map((r,i)=>`<rect x="${pl+cw*i}" y="0" width="${cw}" height="${H}" fill="transparent" style="cursor:pointer" onclick="trendSel=${i};renderTrendL(trendLast.res,trendLast.shown,trendLast.inProg)"><title>${trendTipL(r)}</title></rect>`).join("");
   // ① 売上（積み上げ）
-  const H1=180,mx=nice(Math.max(...rws.map(r=>r.S),1)),y1=v=>H1-pb-(H1-pt-pb)*v/mx;
+  const H1=192,mx=nice(Math.max(...rws.map(r=>r.S),1)),y1=v=>H1-pb-(H1-pt-pb)*v/mx;
   let g1=band(H1)+grid(H1,0,mx,ys);
   rws.forEach((r,i)=>{if(r.cl&&!(r.S>0)){g1+=`<text x="${x(i)}" y="${H1-pb-3}" font-size="9" text-anchor="middle" fill="${C.sub}" opacity=".6">休</text>`;return}
     let acc=0;r.parts.forEach(([k,v])=>{if(!(v>0))return;g1+=`<rect x="${x(i)-bw/2}" y="${y1(acc+v)}" width="${bw}" height="${y1(acc)-y1(acc+v)}" fill="${C[k]}"${r.live?' opacity=".5"':""}/>`;acc+=v})});
@@ -1021,13 +1022,13 @@ function renderTrendL(res,shown,inProg){
   if(avg>0)g1+=`<line x1="${pl}" x2="${W-pr}" y1="${y1(avg)}" y2="${y1(avg)}" stroke="${C.sub}" stroke-dasharray="4 3"/>`;
   g1+=xAxis(H1)+hit(H1);
   // ② 人件費率・FL比率
-  const H2=150,rv=[];rws.forEach(r=>{if(r.S>0&&r.L!=null){rv.push(r.L/r.S);if(r.F!=null)rv.push((r.L+r.F)/r.S)}});
+  const H2=162,rv=[];rws.forEach(r=>{if(r.S>0&&r.L!=null){rv.push(r.L/r.S);if(r.F!=null)rv.push((r.L+r.F)/r.S)}});
   const tg=num(cfg.target||30)/100,rmx=Math.min(1,Math.max(.6,nice(Math.max(...rv,tg+.05)))),y2=v=>H2-pb-(H2-pt-pb)*Math.min(v,rmx)/rmx;
   const ln=(get,c)=>{let d="",dots="";rws.forEach((r,i)=>{const v=r.S>0?get(r):null;if(v==null)return;d+=(d?"L":"M")+x(i).toFixed(1)+" "+y2(v).toFixed(1);dots+=`<circle cx="${x(i)}" cy="${y2(v)}" r="${n>45?1.5:2.5}" fill="${c}"/>`});return d?`<path d="${d}" fill="none" stroke="${c}" stroke-width="1.8"/>${dots}`:""};
   let g2=band(H2)+grid(H2,0,rmx,v=>Math.round(v*100)+"%")+`<line x1="${pl}" x2="${W-pr}" y1="${y2(tg)}" y2="${y2(tg)}" stroke="${C.ok}" stroke-dasharray="6 4"/><text x="${W-pr-2}" y="${y2(tg)-3}" font-size="10" text-anchor="end" fill="${C.ok}">目標 ${Math.round(tg*100)}%</text>`;
   g2+=ln(r=>r.L!=null&&r.F!=null?(r.L+r.F)/r.S:null,C.F)+ln(r=>r.L!=null?r.L/r.S:null,C.L)+xAxis(H2)+hit(H2);
   // ③ 営業利益
-  const H3=150,ov=rws.filter(r=>r.O!=null).map(r=>r.O),hi=nice(Math.max(...ov,1));let lo=-nice(Math.max(...ov.map(v=>-v),1));if(!ov.some(v=>v<0))lo=0;
+  const H3=162,ov=rws.filter(r=>r.O!=null).map(r=>r.O),hi=nice(Math.max(...ov,1));let lo=-nice(Math.max(...ov.map(v=>-v),1));if(!ov.some(v=>v<0))lo=0;
   const y3=v=>H3-pb-(H3-pt-pb)*(v-lo)/(hi-lo);
   let g3=band(H3)+grid(H3,lo,hi,ys)+`<line x1="${pl}" x2="${W-pr}" y1="${y3(0)}" y2="${y3(0)}" stroke="${C.sub}"/>`;
   rws.forEach((r,i)=>{if(r.O==null)return;const a=y3(Math.max(0,r.O)),b=y3(Math.min(0,r.O));g3+=`<rect x="${x(i)-bw/2}" y="${a}" width="${bw}" height="${Math.max(1,b-a)}" fill="${r.O>=0?C.ok:C.crit}"/>`});
