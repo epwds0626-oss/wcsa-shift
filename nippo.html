@@ -589,13 +589,14 @@ function renderTrend(){
   if(!has){body.innerHTML='<div class="note">この期間のデータがまだありません。売上はチャレンジの「売上CSVから更新」、人件費・食材費・固定費は代表が「日別人件費」を開くと保存されます。</div>';return}
   var x=function(i){return pl+cw*i+cw/2};
   var xAxis=function(H,pb){var g='';rows.forEach(function(r,i){var p=r.ds.split('-').map(Number),dw=new Date(p[0],p[1]-1,p[2]).getDay(),step=n>45?7:n>20?3:1;
-      if(i%step===0||i===n-1)g+='<text x="'+x(i)+'" y="'+(H-pb+13)+'" font-size="10" text-anchor="middle" fill="'+(dw===0?'#c0001a':dw===6?'#1a5fa0':'#8c92a4')+'">'+p[1]+'/'+p[2]+'</text>'});return g};
+      var fc=dw===0?'#c0001a':dw===6?'#1a5fa0':'#8c92a4';
+      if(i%step===0||i===n-1)g+='<text x="'+x(i)+'" y="'+(H-pb+13)+'" font-size="10" text-anchor="middle" fill="'+fc+'">'+p[1]+'/'+p[2]+'</text><text x="'+x(i)+'" y="'+(H-pb+26)+'" font-size="10" text-anchor="middle" fill="'+fc+'">'+DOW[dw]+'</text>'});return g};
   var selBand=function(H,pt,pb){return trend.sel!=null?'<rect x="'+(pl+cw*trend.sel)+'" y="'+pt+'" width="'+cw+'" height="'+(H-pt-pb)+'" fill="rgba(0,0,0,.06)"/>':''};
   var hit=function(H){var g='';rows.forEach(function(r,i){g+='<rect x="'+(pl+cw*i)+'" y="0" width="'+cw+'" height="'+H+'" fill="transparent" style="cursor:pointer" onclick="selTrend('+i+')"><title>'+esc(trendTip(r))+'</title></rect>'});return g};
   var grid=function(H,pt,pb,lo,hi,fmt){var g='';for(var t=0;t<=4;t++){var v=lo+(hi-lo)*t/4,y=H-pb-(H-pt-pb)*t/4;g+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y+'" y2="'+y+'" stroke="#e7e9ef"/><text x="'+(pl-5)+'" y="'+(y+3)+'" font-size="10" text-anchor="end" fill="#8c92a4">'+fmt(v)+'</text>'}return g};
   var acc=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#b07d00';
   // ① 売上
-  var H1=170,pt=8,pb=20,mx=niceMax(Math.max.apply(null,rows.map(function(r){return r.SS||0})));
+  var H1=184,pt=8,pb=32,mx=niceMax(Math.max.apply(null,rows.map(function(r){return r.SS||0})));
   var y1=function(v){return H1-pb-(H1-pt-pb)*v/mx};
   var g1=selBand(H1,pt,pb)+grid(H1,pt,pb,0,mx,yenShort);
   rows.forEach(function(r,i){if(r.closed&&!(r.SS>0)){g1+='<text x="'+x(i)+'" y="'+(H1-pb-3)+'" font-size="9" text-anchor="middle" fill="#c0c4cf">休</text>';return}
@@ -606,7 +607,7 @@ function renderTrend(){
   if(avg>0)g1+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y1(avg)+'" y2="'+y1(avg)+'" stroke="#5b6070" stroke-dasharray="4 3"/>';
   g1+=xAxis(H1,pb)+hit(H1);
   // ② 率（人件費率・FL比率）
-  var H2=140,rv=[];rows.forEach(function(r){if(r.SS>0){if(r.L!=null)rv.push(r.L/r.SS);if(r.L!=null&&r.F!=null)rv.push((r.L+r.F)/r.SS)}});
+  var H2=152,rv=[];rows.forEach(function(r){if(r.SS>0){if(r.L!=null)rv.push(r.L/r.SS);if(r.L!=null&&r.F!=null)rv.push((r.L+r.F)/r.SS)}});
   var rmx=Math.min(1,Math.max(.6,niceMax(Math.max.apply(null,rv.concat([.1])))));
   var y2=function(v){return H2-pb-(H2-pt-pb)*Math.min(v,rmx)/rmx};
   var line=function(get,c){var d='',dots='';rows.forEach(function(r,i){var v=r.SS>0?get(r):null;if(v==null){return}d+=(d?'L':'M')+x(i).toFixed(1)+' '+y2(v).toFixed(1);dots+='<circle cx="'+x(i)+'" cy="'+y2(v)+'" r="'+(n>45?1.5:2.5)+'" fill="'+c+'"'+(r.est?' opacity=".5"':'')+'/>'});
@@ -615,7 +616,7 @@ function renderTrend(){
   g2+=line(function(r){return r.L!=null&&r.F!=null?(r.L+r.F)/r.SS:null},'#1a7fbf')+line(function(r){return r.L!=null?r.L/r.SS:null},'#c77d0a');
   g2+=xAxis(H2,pb)+hit(H2);
   // ③ 営業利益
-  var H3=140,ov=rows.filter(function(r){return r.O!=null}).map(function(r){return r.O}),hi=niceMax(Math.max.apply(null,ov.concat([1]))),lo=-niceMax(Math.max.apply(null,ov.map(function(v){return -v}).concat([1])));
+  var H3=152,ov=rows.filter(function(r){return r.O!=null}).map(function(r){return r.O}),hi=niceMax(Math.max.apply(null,ov.concat([1]))),lo=-niceMax(Math.max.apply(null,ov.map(function(v){return -v}).concat([1])));
   if(!ov.some(function(v){return v<0}))lo=0;
   var y3=function(v){return H3-pb-(H3-pt-pb)*(v-lo)/(hi-lo)};
   var g3=selBand(H3,pt,pb)+grid(H3,pt,pb,lo,hi,yenShort)+'<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y3(0)+'" y2="'+y3(0)+'" stroke="#8c92a4"/>';
