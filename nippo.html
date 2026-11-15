@@ -457,6 +457,7 @@ async function load(){
   state.followups=collectFollowups(res[7]||{});
   state.dirty=false;
   renderWrite();
+  loadTrend();
   watchFH(state.date);
 }
 
@@ -546,6 +547,109 @@ function calcNums(o){
   return N;
 }
 
+// ===== 日別の推移グラフ【追加 R8.11.15】 =====
+// 確定値は nippo_metrics（日別人件費ページが保存）、売上は sales_daily（POSのCSV）。表示中の日は「今日の数字」の見込みで補う
+var trend={days:30,rows:null,sel:null,req:0};
+function trendCardHTML(){
+  return '<div class="card" id="trendBox"><h2>📈 日別の推移 <span class="note" style="font-weight:500">この日までの直近の数字</span>'+
+    '<span class="seg" id="trendSeg" style="margin-left:auto">'+[[14,'2週'],[30,'1か月'],[90,'3か月']].map(function(x){return '<button type="button" data-days="'+x[0]+'" class="'+(trend.days===x[0]?'active':'')+'" onclick="setTrendDays('+x[0]+')">'+x[1]+'</button>'}).join('')+'</span></h2>'+
+    '<div id="trendBody"><div class="note">読み込み中…</div></div></div>';
+}
+function setTrendDays(n){trend.days=n;segActive('trendSeg','days',String(n));loadTrend()}
+async function loadTrend(){
+  var body=$('trendBody');if(!body)return;
+  var my=++trend.req, S=SHOP[state.shop], endD=state.date, startD=addDays(endD,-(trend.days-1)), a=k8(startD), b=k8(endD);
+  var q=function(p){return db?db.ref(p).orderByKey().startAt(a).endAt(b).once('value').then(function(s){return s.val()}).catch(function(){return null}):Promise.resolve(null)};
+  var res=await Promise.all([q('nippo_metrics/'+S.mk),q('sales_daily/'+S.sk)]);
+  if(my!==trend.req||!$('trendBody'))return;
+  var M=res[0]||{}, SD=res[1]||{}, tax=(state.calcIn&&state.calcIn.rates&&state.calcIn.rates.tax)||'税抜', isH=state.shop==='enya', rows=[];
+  for(var i=0;i<trend.days;i++){
+    var ds=addDays(startD,i),k=k8(ds),m=M[k]||null,sd=SD[k]||null;
+    var s=salesFrom(sd,tax); if(s==null&&m&&m.s!=null)s=+m.s;
+    var r={ds:ds,k:k,S:s,fhs:isH&&m&&m.fhs!=null?+m.fhs:0,L:m&&m.l!=null?+m.l:null,F:m&&m.f!=null?+m.f:null,X:m&&m.x!=null?+m.x:null,cust:sd&&sd.cust?+sd.cust:null,est:false,closed:!!(m&&m.closed)};
+    if(k===k8(state.date)&&state.nums){var N=state.nums;   // 表示中の日：今日の数字（見込みを含む）で補う
+      if(r.S==null&&N.S!=null){r.S=N.S;r.est=true} if(isH&&!r.fhs&&N.fhs)r.fhs=N.fhs;
+      if(r.L==null&&N.L!=null){r.L=N.L;r.est=true} if(r.F==null&&N.F!=null){r.F=N.F;r.est=true} if(r.X==null&&N.X!=null)r.X=N.X;
+      if(r.cust==null&&N.cust!=null)r.cust=N.cust}
+    r.SS=(r.S||0)+(r.fhs||0);
+    r.O=(r.S!=null&&r.L!=null&&r.F!=null&&r.X!=null)?r.SS-r.L-r.F-r.X:null;
+    if(!r.closed&&!(r.SS>0)&&m&&m.l===0)r.closed=true;
+    rows.push(r);
+  }
+  trend.rows=rows; trend.sel=null;
+  for(var j=rows.length-1;j>=0;j--){if(rows[j].SS>0){trend.sel=j;break}}
+  renderTrend();
+}
+function niceMax(v){if(!(v>0))return 1;var p=Math.pow(10,Math.floor(Math.log10(v))),f=v/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p}
+function yenShort(v){var a=Math.abs(v);return (v<0?'−':'')+(a>=10000?(Math.round(a/1000)/10)+'万':Math.round(a).toLocaleString())}
+function renderTrend(){
+  var body=$('trendBody'),rows=trend.rows;if(!body||!rows)return;
+  var isH=state.shop==='enya',n=rows.length,W=720,pl=46,pr=8,cw=(W-pl-pr)/n,bw=Math.max(2,cw*0.7);
+  var has=rows.some(function(r){return r.SS>0||r.L!=null});
+  if(!has){body.innerHTML='<div class="note">この期間のデータがまだありません。売上はチャレンジの「売上CSVから更新」、人件費・食材費・固定費は代表が「日別人件費」を開くと保存されます。</div>';return}
+  var x=function(i){return pl+cw*i+cw/2};
+  var xAxis=function(H,pb){var g='';rows.forEach(function(r,i){var p=r.ds.split('-').map(Number),dw=new Date(p[0],p[1]-1,p[2]).getDay(),step=n>45?7:n>20?3:1;
+      if(i%step===0||i===n-1)g+='<text x="'+x(i)+'" y="'+(H-pb+13)+'" font-size="10" text-anchor="middle" fill="'+(dw===0?'#c0001a':dw===6?'#1a5fa0':'#8c92a4')+'">'+p[1]+'/'+p[2]+'</text>'});return g};
+  var selBand=function(H,pt,pb){return trend.sel!=null?'<rect x="'+(pl+cw*trend.sel)+'" y="'+pt+'" width="'+cw+'" height="'+(H-pt-pb)+'" fill="rgba(0,0,0,.06)"/>':''};
+  var hit=function(H){var g='';rows.forEach(function(r,i){g+='<rect x="'+(pl+cw*i)+'" y="0" width="'+cw+'" height="'+H+'" fill="transparent" style="cursor:pointer" onclick="selTrend('+i+')"><title>'+esc(trendTip(r))+'</title></rect>'});return g};
+  var grid=function(H,pt,pb,lo,hi,fmt){var g='';for(var t=0;t<=4;t++){var v=lo+(hi-lo)*t/4,y=H-pb-(H-pt-pb)*t/4;g+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y+'" y2="'+y+'" stroke="#e7e9ef"/><text x="'+(pl-5)+'" y="'+(y+3)+'" font-size="10" text-anchor="end" fill="#8c92a4">'+fmt(v)+'</text>'}return g};
+  var acc=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#b07d00';
+  // ① 売上
+  var H1=170,pt=8,pb=20,mx=niceMax(Math.max.apply(null,rows.map(function(r){return r.SS||0})));
+  var y1=function(v){return H1-pb-(H1-pt-pb)*v/mx};
+  var g1=selBand(H1,pt,pb)+grid(H1,pt,pb,0,mx,yenShort);
+  rows.forEach(function(r,i){if(r.closed&&!(r.SS>0)){g1+='<text x="'+x(i)+'" y="'+(H1-pb-3)+'" font-size="9" text-anchor="middle" fill="#c0c4cf">休</text>';return}
+    var s=r.S||0,f=r.fhs||0,op=r.est?' opacity=".5"':'';
+    if(s>0)g1+='<rect x="'+(x(i)-bw/2)+'" y="'+y1(s)+'" width="'+bw+'" height="'+(H1-pb-y1(s))+'" fill="'+acc+'"'+op+'/>';
+    if(f>0)g1+='<rect x="'+(x(i)-bw/2)+'" y="'+y1(s+f)+'" width="'+bw+'" height="'+(y1(s)-y1(s+f))+'" fill="#0f8b8d"'+op+'/>'});
+  var open=rows.filter(function(r){return r.SS>0}),avg=open.length?open.reduce(function(a,r){return a+r.SS},0)/open.length:0;
+  if(avg>0)g1+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y1(avg)+'" y2="'+y1(avg)+'" stroke="#5b6070" stroke-dasharray="4 3"/>';
+  g1+=xAxis(H1,pb)+hit(H1);
+  // ② 率（人件費率・FL比率）
+  var H2=140,rv=[];rows.forEach(function(r){if(r.SS>0){if(r.L!=null)rv.push(r.L/r.SS);if(r.L!=null&&r.F!=null)rv.push((r.L+r.F)/r.SS)}});
+  var rmx=Math.min(1,Math.max(.6,niceMax(Math.max.apply(null,rv.concat([.1])))));
+  var y2=function(v){return H2-pb-(H2-pt-pb)*Math.min(v,rmx)/rmx};
+  var line=function(get,c){var d='',dots='';rows.forEach(function(r,i){var v=r.SS>0?get(r):null;if(v==null){return}d+=(d?'L':'M')+x(i).toFixed(1)+' '+y2(v).toFixed(1);dots+='<circle cx="'+x(i)+'" cy="'+y2(v)+'" r="'+(n>45?1.5:2.5)+'" fill="'+c+'"'+(r.est?' opacity=".5"':'')+'/>'});
+    return d?'<path d="'+d+'" fill="none" stroke="'+c+'" stroke-width="1.8"/>'+dots:''};
+  var g2=selBand(H2,pt,pb)+grid(H2,pt,pb,0,rmx,function(v){return Math.round(v*100)+'%'});
+  g2+=line(function(r){return r.L!=null&&r.F!=null?(r.L+r.F)/r.SS:null},'#1a7fbf')+line(function(r){return r.L!=null?r.L/r.SS:null},'#c77d0a');
+  g2+=xAxis(H2,pb)+hit(H2);
+  // ③ 営業利益
+  var H3=140,ov=rows.filter(function(r){return r.O!=null}).map(function(r){return r.O}),hi=niceMax(Math.max.apply(null,ov.concat([1]))),lo=-niceMax(Math.max.apply(null,ov.map(function(v){return -v}).concat([1])));
+  if(!ov.some(function(v){return v<0}))lo=0;
+  var y3=function(v){return H3-pb-(H3-pt-pb)*(v-lo)/(hi-lo)};
+  var g3=selBand(H3,pt,pb)+grid(H3,pt,pb,lo,hi,yenShort)+'<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y3(0)+'" y2="'+y3(0)+'" stroke="#8c92a4"/>';
+  rows.forEach(function(r,i){if(r.O==null)return;var a=y3(Math.max(0,r.O)),b=y3(Math.min(0,r.O));g3+='<rect x="'+(x(i)-bw/2)+'" y="'+a+'" width="'+bw+'" height="'+Math.max(1,b-a)+'" fill="'+(r.O>=0?'#0a7d4f':'#c0001a')+'"'+(r.est?' opacity=".5"':'')+'/>'});
+  g3+=xAxis(H3,pb)+hit(H3);
+  // 期間のまとめ
+  var sum=function(f){return rows.reduce(function(a,r){var v=f(r);return a+(v||0)},0)};
+  var full=rows.filter(function(r){return r.O!=null}),tS=sum(function(r){return r.SS}),fS=full.reduce(function(a,r){return a+r.SS},0),fL=full.reduce(function(a,r){return a+r.L},0),fF=full.reduce(function(a,r){return a+r.F},0),tO=full.reduce(function(a,r){return a+r.O},0);
+  var svg=function(H,g){return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block" role="img">'+g+'</svg>'};
+  var lg=function(c,t,dash){return '<span><i style="display:inline-block;width:12px;height:'+(dash?'0;border-top:2px dashed '+c:'10px;background:'+c)+';margin-right:4px;vertical-align:middle;border-radius:2px"></i>'+t+'</span>'};
+  var h='<div class="kgrid" style="margin-bottom:8px">'+
+    '<div class="kc"><div class="kl">期間の'+(isH?'合計':'')+'売上</div><div class="kv">'+yen(tS)+'</div><div class="ks">営業 '+open.length+'日・1日平均 '+yen(avg)+'</div></div>'+
+    '<div class="kc"><div class="kl">人件費率</div><div class="kv">'+pct(fL,fS)+'</div><div class="ks">FL比率 '+pct(fL+fF,fS)+'</div></div>'+
+    '<div class="kc op"><div class="kl">営業利益の合計</div><div class="kv '+(tO>=0?'pos':'neg')+'">'+(full.length?yen(tO):'—')+'</div><div class="ks">'+(full.length?'利益率 '+pct(tO,fS)+'（'+full.length+'日分・定休日の固定費も含む）':'人件費などがそろった日がまだありません')+'</div></div></div>';
+  h+='<div class="note" style="font-weight:700;margin-top:6px">売上</div>'+svg(H1,g1)+'<div class="legend">'+lg(acc,isH?'本店':'売上')+(isH?lg('#0f8b8d','FishHack'):'')+lg('#5b6070','1日平均',1)+'</div>';
+  h+='<div class="note" style="font-weight:700;margin-top:10px">人件費率・FL比率'+(isH?'（合計売上比）':'')+'</div>'+svg(H2,g2)+'<div class="legend">'+lg('#c77d0a','人件費率',1)+lg('#1a7fbf','FL比率（人件費＋食材費）',1)+'</div>';
+  h+='<div class="note" style="font-weight:700;margin-top:10px">営業利益</div>'+svg(H3,g3);
+  h+='<div class="hint" id="trendSel" style="margin-top:8px">'+(trend.sel!=null?esc(trendTip(rows[trend.sel])):'グラフの日をタップすると、その日の数字が出ます。')+'</div>';
+  h+='<div class="note" style="margin-top:6px">薄い色は見込み（シフト予定・原価率から計算）の日。「休」は定休日。人件費・食材費・固定費は代表が「日別人件費」を開いた日まで保存されます。</div>';
+  body.innerHTML=h;
+}
+function trendTip(r){
+  var p=r.ds.split('-').map(Number),dw=DOW[new Date(p[0],p[1]-1,p[2]).getDay()],isH=state.shop==='enya';
+  if(r.closed&&!(r.SS>0))return p[1]+'/'+p[2]+'（'+dw+'）定休日';
+  var t=p[1]+'/'+p[2]+'（'+dw+'）'+(r.est?'［見込みを含む］':'')+'　'+(isH?'合計売上 '+yen(r.SS)+'（本店 '+yen(r.S)+'・FishHack '+yen(r.fhs)+'）':'売上 '+yen(r.S));
+  if(r.cust)t+='　客数 '+r.cust+'人';
+  if(r.L!=null)t+='　人件費 '+yen(r.L)+'（'+pct(r.L,r.SS)+'）';
+  if(r.F!=null)t+='　食材費 '+yen(r.F);
+  if(r.X!=null)t+='　固定費 '+yen(r.X);
+  if(r.O!=null)t+='　営業利益 '+yen(r.O)+'（'+pct(r.O,r.SS)+'）';
+  return t;
+}
+function selTrend(i){trend.sel=i;renderTrend()}
+
 // ===== 前回までの提案（振り返り） =====
 function collectFollowups(all){
   var out=[];Object.keys(all).sort().reverse().forEach(function(k){var r=all[k];if(!r||!r.proposals)return;
@@ -622,6 +726,7 @@ function renderWrite(){
   if(!props.length)props=[{}];
   var h='';
   h+='<div id="numsBox">'+numsHTML()+'</div>';
+  h+=trendCardHTML();
   h+=tipHTML();
   // ★ 改善提案（メイン）
   h+='<div class="card main"><h2>💡 今日の改善提案</h2><div class="lead">今日いちばん「こうすれば良くなる」と思ったことを書いてください。小さなことで大丈夫です。数字を見て気づいたことも歓迎です。 <a href="#" onclick="openGuide(\'base\',\'kaizen\');return false" style="color:var(--accent);font-weight:800">改善の進め方を読む ›</a></div>'+
@@ -799,7 +904,7 @@ async function renderList(){
 function openDate(k){state.date=k.slice(0,4)+'-'+k.slice(4,6)+'-'+k.slice(6,8);state.view='write';segActive('viewSeg','view','write');load()}
 
 // ===== 学ぶ（店づくりの土台・マーケティングの基本） =====
-function todayTip(){var p=state.date.split('-').map(Number);var n=Math.floor(Date.UTC(p[0],p[1]-1,p[2])/864e5);return TIPS[((n*5)%TIPS.length+TIPS.length)%TIPS.length]}
+function todayTip(){var p=state.date.split('-').map(Number);var n=Math.floor(Date.UTC(p[0],p[1]-1,p[2])/864e5);var g=function(a,b){while(b){var t=b;b=a%b;a=t}return a},st=5;while(g(st,TIPS.length)!==1)st++;return TIPS[((n*st)%TIPS.length+TIPS.length)%TIPS.length]}   // 【R8.11.15】5飛び×15個で3個しか回らなかったのを修正
 function tipHTML(){var t=todayTip(),g=GUIDES.filter(function(x){return x.id===t[0]})[0];
   return '<div class="card"><div class="tip" onclick="openGuide(\''+t[0]+'\',\''+t[1]+'\')"><span class="ic">📖</span><div class="tx"><div class="note" style="font-weight:800">今日のヒント（'+esc(g.title)+'）</div><div>'+esc(t[2])+'</div></div><span class="mo">読む ›</span></div></div>'}
 function openGuide(g,c){if(state.dirty)saveDraft();state.learn={g:g,c:c};state.view='learn';segActive('viewSeg','view','learn');load()}
