@@ -197,6 +197,10 @@ tr.avg td{font-size:12.5px}
     <p class="note"><span id="tcStatus"></span> <button class="btn sm" id="tcReload" type="button">打刻を再取得</button></p>
   </section>
   <section>
+    <h2>日別の推移</h2>
+    <div id="trendL"></div>
+  </section>
+  <section>
     <h2>日別</h2>
     <div class="toolbar"><span class="note">行をタップ → 人別の内訳と売上の手入力</span>
       <label for="target" class="note">目標人件費率 <input id="target" type="number" min="1" max="100" step="0.5" style="width:70px"> %</label>
@@ -972,6 +976,83 @@ function renderDaily(){
   tb.querySelectorAll(".sin input").forEach(inp=>{inp.onclick=e=>e.stopPropagation();inp.onchange=e=>{
     const d=inp.dataset.d,s=inp.dataset.s;cfg.sales=cfg.sales||{};cfg.sales[d]=cfg.sales[d]||{};cfg.sales[d][s]=inp.value===""?null:num(inp.value);saveCfg();renderDaily()}});
   try{publishNippoMetrics(res,shown,inProg)}catch(e){console.error("日報用の数字の保存に失敗",e)}
+  try{renderTrendL(res,shown,inProg)}catch(e){console.error("推移グラフの描画に失敗",e)}
+}
+// ===== 日別の推移グラフ【追加 R8.11.15】：表示中の期間の売上・人件費率／FL比率・営業利益を全社／本店／マルコで =====
+let trendStore="全社", trendSel=null, trendLast=null;
+function renderTrendL(res,shown,inProg){
+  trendLast={res,shown,inProg};
+  const box=document.getElementById("trendL"); if(!box)return;
+  const PC=window.PCTX||{fxDay:()=>null}, net=(cfg.tax||"税抜")==="税抜", today=dstr(new Date());
+  const dim=ym=>{const[y,m]=ym.split("/").map(Number);return new Date(y,m,0).getDate()};
+  const mxDay=ym=>ym>=MARCO_FROM?num(cfg.marcoFixed!=null?cfg.marcoFixed:288000)/(net?1.1:1)/dim(ym):0;
+  const st=trendStore;
+  const rws=shown.map(d=>{
+    const R=res[d], sb=salesOf(d,"本店")||0, sm=salesOf(d,"マルコ")||0, sf=fhSales(d), ym=d.slice(0,7);
+    const FS=PC.foodSplit?PC.foodSplit(sb,sm,sf,ym):null, X=PC.fxDay(d), xm=X==null?null:Math.min(mxDay(ym),X);
+    const live=inProg&&d===today;
+    let parts,L,F,XX,cl;
+    if(st==="本店"){parts=[["本店",sb],["FishHack",sf]];L=R.本店.cost;F=FS?FS.h+FS.f:null;XX=X==null?null:X-xm;cl=closedSet("本店").has(d)}
+    else if(st==="マルコ"){parts=[["マルコ",sm]];L=R.マルコ.cost;F=FS?FS.m:null;XX=xm;cl=closedSet("マルコ").has(d)}
+    else{parts=[["本店",sb],["マルコ",sm],["FishHack",sf]];L=R.本店.cost+R.マルコ.cost;F=FS?FS.h+FS.m+FS.f:null;XX=X;cl=closedSet("本店").has(d)&&closedSet("マルコ").has(d)}
+    const S=parts.reduce((a,p)=>a+p[1],0);
+    return {d,parts,S,L:live?null:L,F,X:XX,O:live||F==null||XX==null?null:S-L-F-XX,cl,live};
+  });
+  const seg=`<div class="toolbar"><span class="note">期間：上の期間と同じ（${shown.length?shown[0].slice(5)+"〜"+shown[shown.length-1].slice(5):""}）。グラフの日をタップするとその日の数字</span>
+    <span style="display:inline-flex;gap:4px;margin-left:auto">${["全社","本店","マルコ"].map(s=>`<button type="button" class="btn sm${s===st?" pri":""}" style="${s===st?"background:var(--ink);color:var(--panel)":""}" onclick="trendStore='${s}';trendSel=null;renderTrendL(trendLast.res,trendLast.shown,trendLast.inProg)">${s}</button>`).join("")}</span></div>`;
+  if(!rws.some(r=>r.S>0||r.L)){box.innerHTML=seg+'<p class="note">この期間のデータがまだありません。</p>';return}
+  if(trendSel==null||trendSel>=rws.length){trendSel=null;for(let j=rws.length-1;j>=0;j--)if(rws[j].S>0){trendSel=j;break}}
+  const cs=getComputedStyle(document.documentElement), cv=n=>cs.getPropertyValue(n).trim();
+  const C={本店:cv("--honten")||"#1b2747",マルコ:cv("--marco")||"#b5532f",FishHack:cv("--fish")||"#1f7a8c",ok:cv("--ok")||"#2f6b47",crit:cv("--crit")||"#b23a2e",sub:cv("--sub")||"#5d6276",line:cv("--line")||"#ddd7c9",L:cv("--warn")||"#a5660b",F:"#2c6fb0"};
+  const n=rws.length,W=760,pl=48,pr=8,cw=(W-pl-pr)/n,bw=Math.max(2,cw*.7),pt=8,pb=20,x=i=>pl+cw*i+cw/2;
+  const nice=v=>{if(!(v>0))return 1;const p=Math.pow(10,Math.floor(Math.log10(v))),f=v/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p};
+  const ys=v=>{const a=Math.abs(v);return (v<0?"−":"")+(a>=10000?(Math.round(a/1000)/10)+"万":Math.round(a).toLocaleString())};
+  const xAxis=H=>rws.map((r,i)=>{const dw=new Date(r.d).getDay(),step=n>45?7:n>20?3:1;if(i%step&&i!==n-1)return "";const hol=HOLIDAYS[r.d];
+    return `<text x="${x(i)}" y="${H-pb+13}" font-size="10" text-anchor="middle" fill="${dw===0||hol?C.crit:dw===6?"#2c5d9c":C.sub}">${+r.d.slice(5,7)}/${+r.d.slice(8)}</text>`}).join("");
+  const band=H=>trendSel!=null?`<rect x="${pl+cw*trendSel}" y="${pt}" width="${cw}" height="${H-pt-pb}" fill="${C.sub}" opacity=".12"/>`:"";
+  const grid=(H,lo,hi,f)=>{let g="";for(let t=0;t<=4;t++){const v=lo+(hi-lo)*t/4,y=H-pb-(H-pt-pb)*t/4;g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="${C.line}"/><text x="${pl-5}" y="${y+3}" font-size="10" text-anchor="end" fill="${C.sub}">${f(v)}</text>`}return g};
+  const hit=H=>rws.map((r,i)=>`<rect x="${pl+cw*i}" y="0" width="${cw}" height="${H}" fill="transparent" style="cursor:pointer" onclick="trendSel=${i};renderTrendL(trendLast.res,trendLast.shown,trendLast.inProg)"><title>${trendTipL(r)}</title></rect>`).join("");
+  // ① 売上（積み上げ）
+  const H1=180,mx=nice(Math.max(...rws.map(r=>r.S),1)),y1=v=>H1-pb-(H1-pt-pb)*v/mx;
+  let g1=band(H1)+grid(H1,0,mx,ys);
+  rws.forEach((r,i)=>{if(r.cl&&!(r.S>0)){g1+=`<text x="${x(i)}" y="${H1-pb-3}" font-size="9" text-anchor="middle" fill="${C.sub}" opacity=".6">休</text>`;return}
+    let acc=0;r.parts.forEach(([k,v])=>{if(!(v>0))return;g1+=`<rect x="${x(i)-bw/2}" y="${y1(acc+v)}" width="${bw}" height="${y1(acc)-y1(acc+v)}" fill="${C[k]}"${r.live?' opacity=".5"':""}/>`;acc+=v})});
+  const op=rws.filter(r=>r.S>0),avg=op.length?op.reduce((a,r)=>a+r.S,0)/op.length:0;
+  if(avg>0)g1+=`<line x1="${pl}" x2="${W-pr}" y1="${y1(avg)}" y2="${y1(avg)}" stroke="${C.sub}" stroke-dasharray="4 3"/>`;
+  g1+=xAxis(H1)+hit(H1);
+  // ② 人件費率・FL比率
+  const H2=150,rv=[];rws.forEach(r=>{if(r.S>0&&r.L!=null){rv.push(r.L/r.S);if(r.F!=null)rv.push((r.L+r.F)/r.S)}});
+  const tg=num(cfg.target||30)/100,rmx=Math.min(1,Math.max(.6,nice(Math.max(...rv,tg+.05)))),y2=v=>H2-pb-(H2-pt-pb)*Math.min(v,rmx)/rmx;
+  const ln=(get,c)=>{let d="",dots="";rws.forEach((r,i)=>{const v=r.S>0?get(r):null;if(v==null)return;d+=(d?"L":"M")+x(i).toFixed(1)+" "+y2(v).toFixed(1);dots+=`<circle cx="${x(i)}" cy="${y2(v)}" r="${n>45?1.5:2.5}" fill="${c}"/>`});return d?`<path d="${d}" fill="none" stroke="${c}" stroke-width="1.8"/>${dots}`:""};
+  let g2=band(H2)+grid(H2,0,rmx,v=>Math.round(v*100)+"%")+`<line x1="${pl}" x2="${W-pr}" y1="${y2(tg)}" y2="${y2(tg)}" stroke="${C.ok}" stroke-dasharray="6 4"/><text x="${W-pr-2}" y="${y2(tg)-3}" font-size="10" text-anchor="end" fill="${C.ok}">目標 ${Math.round(tg*100)}%</text>`;
+  g2+=ln(r=>r.L!=null&&r.F!=null?(r.L+r.F)/r.S:null,C.F)+ln(r=>r.L!=null?r.L/r.S:null,C.L)+xAxis(H2)+hit(H2);
+  // ③ 営業利益
+  const H3=150,ov=rws.filter(r=>r.O!=null).map(r=>r.O),hi=nice(Math.max(...ov,1));let lo=-nice(Math.max(...ov.map(v=>-v),1));if(!ov.some(v=>v<0))lo=0;
+  const y3=v=>H3-pb-(H3-pt-pb)*(v-lo)/(hi-lo);
+  let g3=band(H3)+grid(H3,lo,hi,ys)+`<line x1="${pl}" x2="${W-pr}" y1="${y3(0)}" y2="${y3(0)}" stroke="${C.sub}"/>`;
+  rws.forEach((r,i)=>{if(r.O==null)return;const a=y3(Math.max(0,r.O)),b=y3(Math.min(0,r.O));g3+=`<rect x="${x(i)-bw/2}" y="${a}" width="${bw}" height="${Math.max(1,b-a)}" fill="${r.O>=0?C.ok:C.crit}"/>`});
+  g3+=xAxis(H3)+hit(H3);
+  const svg=(H,g)=>`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img">${g}</svg>`;
+  const lg=(c,t,line)=>`<span style="--c:${c}">${t}${line?"（線）":""}</span>`;
+  const sel=trendSel!=null?rws[trendSel]:null;
+  box.innerHTML=seg+
+    `<div class="note" style="font-weight:700;margin-top:6px">売上${st==="本店"?"（本店＋FishHack）":""}</div>`+svg(H1,g1)+`<div class="legend">${rws[0].parts.map(p=>lg(C[p[0]],p[0])).join("")}<span style="--c:${C.sub}">1日平均（点線）</span></div>`+
+    `<div class="note" style="font-weight:700;margin-top:12px">人件費率・FL比率${st==="本店"?"（本店＋FishHack売上比）":""}</div>`+svg(H2,g2)+`<div class="legend">${lg(C.L,"人件費率")}${lg(C.F,"FL比率（人件費＋食材費）")}<span style="--c:${C.ok}">目標人件費率（点線）</span></div>`+
+    `<div class="note" style="font-weight:700;margin-top:12px">営業利益</div>`+svg(H3,g3)+
+    `<div class="al w" style="margin-top:8px">${sel?trendTipL(sel):"グラフの日をタップすると、その日の数字が出ます。"}</div>`+
+    `<p class="note">薄い色は勤務中の今日（人件費未確定）。「休」は定休日。定休日も固定費がかかるため営業利益は赤字になります。${st==="マルコ"?"マルコの人件費には本店から出向している2名分は入っていません。":""}${st!=="全社"?"固定費の店別：マルコ＝マルコ固定費の日割り、本店＝残り。":""}</p>`;
+}
+function trendTipL(r){
+  const dw=DOW[new Date(r.d).getDay()];
+  if(r.cl&&!(r.S>0))return `${r.d.slice(5)}（${dw}）定休日`+(r.X!=null?`　固定費 ${yen(r.X)}`:"");
+  const pc=(v,s)=>s>0&&v!=null?(v/s*100).toFixed(1)+"%":"—";
+  let t=`${r.d.slice(5)}（${dw}）　売上 ${yen(r.S)}`+(r.parts.length>1?`（${r.parts.map(p=>p[0]+" "+yen(p[1])).join("・")}）`:"");
+  if(r.L!=null)t+=`　人件費 ${yen(r.L)}（${pc(r.L,r.S)}）`;else if(r.live)t+="　人件費は勤務中のため未確定";
+  if(r.F!=null)t+=`　食材費 ${yen(r.F)}`;
+  if(r.L!=null&&r.F!=null)t+=`　FL ${pc(r.L+r.F,r.S)}`;
+  if(r.X!=null)t+=`　固定費 ${yen(r.X)}`;
+  if(r.O!=null)t+=`　営業利益 ${r.O<0?"−":""}${yen(Math.abs(r.O))}（${pc(r.O,r.S)}）`;
+  return t;
 }
 // ===== 店長日報（nippo.html）用に、日ごと・店ごとの数字を Firebase nippo_metrics に保存【追加 R8.11.12】 =====
 // 日報は店長の端末で開くため、台帳（この端末にだけある）を使った計算結果をここから共有する。
