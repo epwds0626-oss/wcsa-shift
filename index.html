@@ -54,7 +54,8 @@ nav{display:flex;gap:2px}
 .month-btn{background:var(--surface2);border:1px solid var(--border);color:var(--accent);width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:18px;font-weight:900}
 .month-disp{font-size:18px;font-weight:900;color:var(--accent);min-width:130px;text-align:center}
 
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.cal-day{min-width:0}
 .cal-head{text-align:center;padding:10px 2px;font-size:11px;font-weight:700;color:var(--accent)}
 .cal-day{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 6px;min-height:80px;cursor:pointer}
 .cal-day:hover{border-color:var(--accent2)}
@@ -128,7 +129,8 @@ nav{display:flex;gap:2px}
 
 .admin-cal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;margin-top:18px}
 .admin-cal-title{font-size:18px;font-weight:900;color:var(--accent2);margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.acal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.acal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.acal-day{min-width:0}
 .acal-head{text-align:center;padding:8px 2px;font-size:11px;font-weight:700;color:var(--accent)}
 .acal-day{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 5px;min-height:54px;cursor:pointer}
 .acal-day:hover{border-color:var(--accent)}
@@ -137,6 +139,11 @@ nav{display:flex;gap:2px}
 .acal-num{font-size:14px;font-weight:900;color:var(--text)}
 .acal-day.today .acal-num{color:var(--accent)}
 .acal-badge{font-size:10px;color:var(--before);margin-top:2px}
+.acal-cmp{font-size:9.5px;color:var(--text2);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.acal-cmp span{color:var(--text3);margin-right:3px}
+.acal-ev{font-size:9.5px;line-height:1.35;margin-top:2px;padding:1px 4px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(140,146,164,.12);color:var(--text2)}
+.acal-ev.lv3{background:rgba(192,0,26,.12);color:#c0001a;font-weight:700}.acal-ev.lv2{background:rgba(232,168,74,.18);color:#a5660b}
+.acal-wx{font-size:10px;color:var(--text2);margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.acal-wx b{color:#1a5fa0}
+.adi-cmp{font-size:12.5px;margin:2px 0}.adi-ev{font-size:12.5px;margin:3px 0}.adi-ev.lv3{color:#c0001a;font-weight:700}.adi-ev.lv2{color:#a5660b}
 
 .sec-label{font-size:11px;letter-spacing:2px;color:var(--accent);font-weight:700;margin:14px 0 7px;padding:3px 0 3px 9px;border-left:3px solid var(--accent)}
 .wish-ref{display:flex;align-items:center;gap:7px;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:13px;flex-wrap:wrap}
@@ -772,6 +779,7 @@ nav{display:flex;gap:2px}
         <button class="btn btn-s" style="font-size:12px;padding:6px 12px" onclick="adminGoToday()">今日</button>
       </div>
     </div>
+    <div class="muted" style="font-size:11px;margin:-4px 0 8px">天気は大洗町（予＝予報・16日先まで／過去日は実際の天気、横の「予」は前日までの予報）。各日の「前月」は4週前・「前年」は52週前の同じ曜日の売上と客数（チャレンジの売上CSVから）。🎌大洗・周辺のイベント　📺テレビ・全国。赤＝影響大</div>
     <div class="acal-grid" id="adminCalGrid">
       <div class="acal-head">日</div><div class="acal-head">月</div><div class="acal-head">火</div>
       <div class="acal-head">水</div><div class="acal-head">木</div><div class="acal-head">金</div>
@@ -821,6 +829,7 @@ nav{display:flex;gap:2px}
         <button class="close-btn" onclick="closeModal('shiftModal')">&#10005;</button>
       </div>
     </div>
+    <div id="shiftDayInfo"></div>
     <div class="sess-tabs" id="shiftSessTabs"></div>
     <div id="shiftTableWrap"></div>
 
@@ -844,6 +853,7 @@ nav{display:flex;gap:2px}
         <button class="close-btn" onclick="closeModal('adminModal')">&#10005;</button>
       </div>
     </div>
+    <div id="adminDayInfo"></div>
     <div class="sess-tabs" id="adminSessTabs"></div>
     <div class="sec-label">📌 固定スタッフ</div>
     <div id="adminFixedPrev"></div>
@@ -5423,6 +5433,7 @@ function renderCal() {
     sf.innerHTML = '<option value="">全スタッフ</option>';
     S.staff.forEach(function(s){ var o=document.createElement('option'); o.value=s; o.textContent=s; if(s===curVal)o.selected=true; sf.appendChild(o); });
   }
+  acalLoad(true); wxLoad(yr, mo);
   var grid = document.getElementById('calGrid');
   var days = grid.querySelectorAll('.cal-day');
   var i;
@@ -5478,7 +5489,7 @@ function renderCal() {
         dots = '';
       }
     }
-    cell.innerHTML = '<div class="day-num">' + d + '</div>' + dots;
+    cell.innerHTML = '<div class="day-num">' + d + '</div>' + dots + staffCalExtra(dt);
     if (status !== 'closed') {
       (function(date){ cell.onclick = function(){ openShiftModal(date); }; })(dt);
     }
@@ -5524,6 +5535,7 @@ function openShiftModal(date) {
   var DOW = ['日','月','火','水','木','金','土'];
   document.getElementById('shiftModalTitle').textContent = date.getFullYear() + '年' + (date.getMonth()+1) + '月' + date.getDate() + '日（' + DOW[date.getDay()] + '）';
   renderShiftModal();
+  renderStaffDayInfo(date);
   document.getElementById('shiftModal').classList.add('open');
 }
 
@@ -5814,7 +5826,187 @@ function adminChangeMonth(d) {
   renderAdminCal();
 }
 
+// ===== シフト作成カレンダー：前月・前年の売上と客数、イベント【追加 R8.11.15】 =====
+// 売上は sales_daily（チャレンジの売上CSV取込で保存）。前月＝4週前の同じ曜日、前年＝52週前（364日前）の同じ曜日
+// イベントは下の一覧（調べて入れたもの）＋管理者が追加したもの（Firebase shift_events）。lv 3＝大きい影響 2＝中 1＝参考
+var ACAL_EVENTS = [
+  {s:'2026-11-13', e:'2026-12-25', t:'クリスマス アクアワールド（12/7〜11は水族館休館）', area:'大洗', lv:1},
+  {s:'2026-11-14', e:'2026-11-15', t:'大洗あんこう祭・商工感謝祭（マリンタワー前／例年2日で約10万人）', area:'大洗', lv:3},
+  {s:'2026-12-07', e:'2026-12-11', t:'アクアワールド大洗 休館', area:'大洗', lv:2},
+  {s:'2026-12-20', e:'2026-12-20', t:'M-1グランプリ決勝（夜・生放送）', area:'全国', lv:1},
+  {s:'2026-12-31', e:'2026-12-31', t:'大晦日（紅白歌合戦）', area:'全国', lv:2},
+  {s:'2027-01-01', e:'2027-01-03', t:'大洗磯前神社 初詣（三が日で約20万人）・元日は初日の出', area:'大洗', lv:3},
+  {s:'2027-01-02', e:'2027-01-03', t:'箱根駅伝（午前〜昼に中継）', area:'全国', lv:1},
+  {s:'2027-01-11', e:'2027-01-11', t:'サッカー アジアカップ 日本×インドネシア 19:30', area:'全国', lv:2},
+  {s:'2027-01-16', e:'2027-01-16', t:'サッカー アジアカップ 日本×タイ 19:30', area:'全国', lv:2},
+  {s:'2027-01-20', e:'2027-01-20', t:'サッカー アジアカップ 日本×カタール 19:30', area:'全国', lv:2},
+  {s:'2027-03-14', e:'2027-03-14', t:'大洗春まつり 海楽フェスタ（マリンタワー前）', area:'大洗', lv:2}
+];
+var ACAL = {sales:{}, loading:{}, events:{}, evLoaded:false};
+function acalEsc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function acalShopKey(){ return (typeof currentShop !== 'undefined' && currentShop === 1) ? 'marco' : 'honten'; }
+function acalK8(dt){ return dt.getFullYear() + String(dt.getMonth()+1).padStart(2,'0') + String(dt.getDate()).padStart(2,'0'); }
+function acalLoad(noSales){
+  if (!db) return;
+  if (typeof adminUnlocked !== 'undefined' && !adminUnlocked) noSales = true;   // 売上は管理者ログイン時だけ読む
+  var sk = acalShopKey();
+  if (!noSales && !ACAL.sales[sk] && !ACAL.loading[sk]) {
+    ACAL.loading[sk] = true;
+    db.ref('sales_daily/' + sk).once('value').then(function(sn){
+      ACAL.sales[sk] = sn.val() || {}; ACAL.loading[sk] = false;
+      if (acalShopKey() === sk && document.getElementById('adminCalGrid')) renderAdminCal();
+    }).catch(function(){ ACAL.loading[sk] = false; ACAL.sales[sk] = {}; });
+  }
+  if (!ACAL.evLoaded) {
+    ACAL.evLoaded = true;
+    db.ref('shift_events').on('value', function(sn){
+      ACAL.events = sn.val() || {};
+      if (document.getElementById('adminCalGrid')) renderAdminCal();
+      acalRefreshStaff();
+      var m = document.getElementById('adminModal'); if (m && m.classList.contains('open')) renderAdminDayInfo();
+    });
+  }
+}
+function acalSale(dt){
+  var v = (ACAL.sales[acalShopKey()] || {})[acalK8(dt)];
+  if (!v) return null;
+  var s = v.sales != null ? +v.sales : (v.net != null ? +v.net : +v.gross);
+  if (!(s > 0)) return null;
+  return {s:s, c:+v.cust || 0};
+}
+function acalMan(v){ return v >= 10000 ? (Math.round(v/1000)/10) + '万' : Math.round(v).toLocaleString(); }
+function acalEventsOn(key){
+  var out = [];
+  ACAL_EVENTS.forEach(function(e){ if (key >= e.s && key <= e.e) out.push(e); });
+  Object.keys(ACAL.events || {}).forEach(function(id){ var e = ACAL.events[id]; if (e && key >= e.s && key <= (e.e || e.s)) out.push(Object.assign({id:id, own:true}, e)); });
+  return out.sort(function(a,b){ return (b.lv||1) - (a.lv||1); });
+}
+function acalCellExtra(dt){
+  var key = dKey(dt), h = wxCell(dt);
+  var pm = acalSale(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - 28));
+  var py = acalSale(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - 364));
+  var line = function(lb, v){ return '<div class="acal-cmp"><span>' + lb + '</span>' + (v ? acalMan(v.s) + (v.c ? '・' + v.c + '人' : '') : '—') + '</div>'; };
+  if (ACAL.sales[acalShopKey()]) h += line('前月', pm) + line('前年', py);
+  h += acalEvCellHTML(key);
+  return h;
+}
+function acalEvCellHTML(key){
+  var h = '';
+  var evC = acalEventsOn(key).filter(function(e){ return (e.lv||1) > 1 || e.s === (e.e||e.s) || key === e.s; });
+  evC.slice(0, 2).forEach(function(e){
+    h += '<div class="acal-ev lv' + (e.lv||1) + '" title="' + acalEsc(e.t) + '">' + (e.area === '全国' ? '📺' : '🎌') + ' ' + acalEsc(e.t) + '</div>';
+  });
+  if (evC.length > 2) h += '<div class="acal-ev lv1">ほか' + (evC.length-2) + '件</div>';
+  return h;
+}
+// スタッフ用カレンダー：天気とイベント（売上・客数は出さない）
+var acalStaffTimer = null;
+function acalRefreshStaff(){
+  clearTimeout(acalStaffTimer);
+  acalStaffTimer = setTimeout(function(){
+    if (document.getElementById('calGrid') && typeof renderCal === 'function') renderCal();
+    var m = document.getElementById('shiftModal'); if (m && m.classList.contains('open') && S.selDate) renderStaffDayInfo(S.selDate);
+  }, 50);
+}
+function staffCalExtra(dt){ return wxCell(dt) + acalEvCellHTML(dKey(dt)); }
+function renderStaffDayInfo(dt){
+  var box = document.getElementById('shiftDayInfo'); if (!box || !dt) return;
+  wxLoad(dt.getFullYear(), dt.getMonth());
+  var wk = dKey(dt), ww = WX.d[wk], wf = WX.fc[wk], tdy = dKey(new Date()), h = '';
+  if (ww && ww.c != null) h += '<div class="adi-cmp">🌤 ' + wxLine(wk >= tdy ? '<b>予報</b> ' : '<b>実際</b> ', dt) + '</div>';
+  if (wk < tdy && wf) h += '<div class="adi-cmp muted">前日までの予報 ' + wxIcon(wf.c) + ' ' + wxName(wf.c) + ' ' + wxTemp(wf) + '</div>';
+  acalEventsOn(wk).forEach(function(e){ h += '<div class="adi-ev lv' + (e.lv||1) + '">' + (e.area === '全国' ? '📺' : '🎌') + ' ' + acalEsc(e.t) + '</div>'; });
+  box.innerHTML = h ? '<div style="margin:2px 0 10px">' + h + '</div>' : '';
+}
+function renderAdminDayInfo(){
+  var box = document.getElementById('adminDayInfo'); if (!box || !S.adminSelDate) return;
+  var dt = S.adminSelDate, key = dKey(dt), DW = '日月火水木金土';
+  wxLoad(dt.getFullYear(), dt.getMonth());
+  var row = function(lb, d){ var v = acalSale(d), wl = wxLine('　', d); return '<div class="adi-cmp"><b>' + lb + '</b>（' + (d.getMonth()+1) + '/' + d.getDate() + '・' + DW[d.getDay()] + '）' + (v ? '売上 ¥' + Math.round(v.s).toLocaleString() + (v.c ? '・客数 ' + v.c + '人・客単価 ¥' + Math.round(v.s / v.c).toLocaleString() : '') : 'データなし') + (wl ? '<span class="muted">' + wl + '</span>' : '') + '</div>'; };
+  var wk = dKey(dt), ww = WX.d[wk], wf = WX.fc[wk], tdy = dKey(new Date());
+  var h = '<div class="sec-label">🌤 天気（大洗町）</div>';
+  if (ww && ww.c != null) h += '<div class="adi-cmp">' + wxLine(wk >= tdy ? '<b>予報</b> ' : '<b>実際</b> ', dt) + '</div>';
+  else h += '<div class="muted" style="font-size:12px">' + (wk > dKey(new Date(Date.now() + 15*864e5)) ? '予報は16日先まで出ます' : '天気データを読み込み中…') + '</div>';
+  if (wk < tdy && wf) h += '<div class="adi-cmp"><b>前日までの予報</b> ' + wxIcon(wf.c) + ' ' + wxName(wf.c) + ' ' + wxTemp(wf) + '・降水 ' + (wf.p != null ? wf.p : '–') + 'mm</div>';
+  h += '<div class="sec-label">📈 前月・前年の同じ曜日</div>';
+  h += row('前月', new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - 28)) + row('前年', new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - 364));
+  h += '<div class="sec-label">🎌 この日のイベント</div>';
+  var evs = acalEventsOn(key);
+  if (!evs.length) h += '<div class="muted" style="font-size:12px">登録されたイベントはありません</div>';
+  evs.forEach(function(e){
+    h += '<div class="adi-ev lv' + (e.lv||1) + '">' + (e.area === '全国' ? '📺' : '🎌') + ' ' + acalEsc(e.t) + ' <span class="muted">' + acalEsc(e.area || '') + (e.s !== (e.e||e.s) ? '・' + e.s.slice(5).replace('-','/') + '〜' + (e.e||e.s).slice(5).replace('-','/') : '') + '</span>' +
+      (e.own ? ' <button class="btn btn-s" style="font-size:10px;padding:2px 8px" onclick="acalDelEvent(\'' + e.id + '\')">削除</button>' : '') + '</div>';
+  });
+  h += '<div class="add-row" style="margin-top:6px"><input class="fsel" id="adiEvT" placeholder="イベントを追加（例：近くで花火大会）" style="flex:1;min-width:180px">' +
+       '<select class="fsel" id="adiEvArea"><option>大洗</option><option>周辺</option><option>全国</option></select>' +
+       '<select class="fsel" id="adiEvLv"><option value="3">影響大</option><option value="2" selected>影響中</option><option value="1">参考</option></select>' +
+       '<input class="fsel" id="adiEvE" type="date" title="終わりの日（1日だけなら空欄）" style="width:140px">' +
+       '<button class="btn btn-b" onclick="acalAddEvent()">追加</button></div><div style="height:10px"></div>';
+  box.innerHTML = h;
+}
+function acalAddEvent(){
+  var t = (document.getElementById('adiEvT').value || '').trim(); if (!t || !db || !S.adminSelDate) return;
+  var s = dKey(S.adminSelDate), e = document.getElementById('adiEvE').value || s; if (e < s) e = s;
+  db.ref('shift_events').push({s:s, e:e, t:t, area:document.getElementById('adiEvArea').value, lv:+document.getElementById('adiEvLv').value, at:Date.now()});
+}
+function acalDelEvent(id){ if (db && confirm('このイベントを削除しますか？')) db.ref('shift_events/' + id).remove(); }
+// ===== 天気（大洗町）：予報・実際の天気と気温【追加 R8.11.15】 =====
+// Open-Meteo（無料・登録不要）。過去92日〜16日先は予報API（過去日は解析値＝実際の天気）、それより前・前年は過去データAPI
+// 予報は Firebase weather_log/{YYYYMMDD}/fc に「前日までの最新の予報」として残し、当日が過ぎたら実際の天気と並べて表示する
+var WX_LAT = 36.313, WX_LON = 140.575;
+var WX = {d:{}, fc:{}, got:{}, fcLoaded:false};
+function wxIcon(c){ c = +c; return c === 0 ? '☀️' : c <= 2 ? '🌤' : c === 3 ? '☁️' : c <= 48 ? '🌫' : c <= 57 ? '🌦' : c <= 67 ? '☔' : c <= 77 ? '❄️' : c <= 82 ? '🌧' : c <= 86 ? '🌨' : '⛈'; }
+function wxName(c){ c = +c; return c === 0 ? '快晴' : c <= 2 ? '晴れ' : c === 3 ? 'くもり' : c <= 48 ? '霧' : c <= 57 ? '霧雨' : c <= 67 ? '雨' : c <= 77 ? '雪' : c <= 82 ? 'にわか雨' : c <= 86 ? 'にわか雪' : '雷雨'; }
+function wxFetch(url, tag){
+  if (WX.got[tag]) return; WX.got[tag] = true;
+  fetch(url).then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+    if (!j || !j.daily) { WX.got[tag] = false; return; }
+    var D = j.daily, today = dKey(new Date()), upd = {};
+    D.time.forEach(function(t, i){
+      WX.d[t] = {c:D.weather_code[i], tx:D.temperature_2m_max[i], tn:D.temperature_2m_min[i], p:D.precipitation_sum[i], fut: t >= today};
+      // 今日〜2日先の予報を記録（日付が過ぎたあと「予報→実際」を比べるため）
+      if (tag === 'fc' && t >= today && t <= dKey(new Date(Date.now() + 2*864e5)) && D.weather_code[i] != null)
+        upd[t.replace(/-/g,'') + '/fc'] = {c:D.weather_code[i], tx:D.temperature_2m_max[i], tn:D.temperature_2m_min[i], p:D.precipitation_sum[i], at:Date.now()};
+    });
+    if (db && Object.keys(upd).length) db.ref('weather_log').update(upd).catch(function(){});
+    if (document.getElementById('adminCalGrid')) renderAdminCal();
+    var m = document.getElementById('adminModal'); if (m && m.classList.contains('open')) renderAdminDayInfo();
+    acalRefreshStaff();
+  }).catch(function(){ WX.got[tag] = false; });
+}
+function wxLoad(yr, mo){
+  var q = '?latitude=' + WX_LAT + '&longitude=' + WX_LON + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia%2FTokyo';
+  wxFetch('https://api.open-meteo.com/v1/forecast' + q + '&past_days=92&forecast_days=16', 'fc');
+  var f = new Date(yr, mo, 1), l = new Date(yr, mo + 1, 0), lim = new Date(Date.now() - 85*864e5);
+  if (f < lim) {   // 3か月より前の月は過去データ
+    var e = l < lim ? l : lim;
+    wxFetch('https://archive-api.open-meteo.com/v1/archive' + q + '&start_date=' + dKey(f) + '&end_date=' + dKey(e), 'ar' + dKey(f));
+  }
+  // 前年（52週前）の同じ期間
+  var pf = new Date(yr, mo, 1 - 364), pl = new Date(yr, mo + 1, -364);
+  wxFetch('https://archive-api.open-meteo.com/v1/archive' + q + '&start_date=' + dKey(pf) + '&end_date=' + dKey(pl), 'py' + dKey(pf));
+  if (!WX.fcLoaded && db) { WX.fcLoaded = true;
+    db.ref('weather_log').orderByKey().startAt(acalK8(new Date(Date.now() - 400*864e5))).once('value').then(function(sn){
+      var v = sn.val() || {}; Object.keys(v).forEach(function(k){ if (v[k] && v[k].fc) WX.fc[k.slice(0,4)+'-'+k.slice(4,6)+'-'+k.slice(6,8)] = v[k].fc; });
+      if (document.getElementById('adminCalGrid')) renderAdminCal();
+      acalRefreshStaff();
+    }).catch(function(){}); }
+}
+function wxTemp(w){ return (w.tx != null ? Math.round(w.tx) : '–') + '°/' + (w.tn != null ? Math.round(w.tn) : '–') + '°'; }
+function wxCell(dt){
+  var k = dKey(dt), w = WX.d[k], fc = WX.fc[k], today = dKey(new Date());
+  if (!w || w.c == null) return '';
+  if (k >= today) return '<div class="acal-wx" title="予報：' + wxName(w.c) + ' 降水' + (w.p||0) + 'mm">予 ' + wxIcon(w.c) + ' ' + wxTemp(w) + (w.p >= 1 ? ' <b>' + Math.round(w.p) + 'mm</b>' : '') + '</div>';
+  return '<div class="acal-wx" title="実際：' + wxName(w.c) + ' 降水' + (w.p||0) + 'mm' + (fc ? '／前日までの予報：' + wxName(fc.c) : '') + '">' + wxIcon(w.c) + ' ' + wxTemp(w) + (fc ? ' <span class="muted">予' + wxIcon(fc.c) + '</span>' : '') + '</div>';
+}
+function wxLine(lb, d){
+  var k = dKey(d), w = WX.d[k];
+  if (!w || w.c == null) return '';
+  return lb + wxIcon(w.c) + ' ' + wxName(w.c) + ' ' + wxTemp(w) + '・降水 ' + (w.p != null ? w.p : '–') + 'mm';
+}
 function renderAdminCal() {
+  acalLoad();
+  wxLoad(S.adminDate.getFullYear(), S.adminDate.getMonth());
   var yr = S.adminDate.getFullYear(), mo = S.adminDate.getMonth();
   document.getElementById('adminMonthDisp').textContent = yr + '年 ' + (mo+1) + '月';
   var grid = document.getElementById('adminCalGrid');
@@ -5848,7 +6040,7 @@ function renderAdminCal() {
     var ds = dayStatusOf(key);
     if (ds === 'closed') statusBadge = '<div style="font-size:9px;color:var(--accent3)">休業</div>';
     else if (ds === 'lunch') statusBadge = '<div style="font-size:9px;color:var(--accent)">L only</div>';
-    cell.innerHTML = '<div class="acal-num">' + d + '</div>' + badge + statusBadge;
+    cell.innerHTML = '<div class="acal-num">' + d + '</div>' + badge + statusBadge + acalCellExtra(dt);
     (function(date, k){ cell.onclick = function(){ openAdminModal(date); }; })(dt, key);
     grid.appendChild(cell);
   }
@@ -5880,6 +6072,7 @@ function openAdminModal(date) {
 }
 
 function renderAdminModal() {
+  renderAdminDayInfo();
   var sess = S.adminSess;
   var tabsEl = document.getElementById('adminSessTabs');
   tabsEl.innerHTML = '';
