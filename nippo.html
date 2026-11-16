@@ -629,8 +629,13 @@ function renderTrend(){
   var lg=function(c,t,dash){return '<span><i style="display:inline-block;width:12px;height:'+(dash?'0;border-top:2px dashed '+c:'10px;background:'+c)+';margin-right:4px;vertical-align:middle;border-radius:2px"></i>'+t+'</span>'};
   var h='<div class="kgrid" style="margin-bottom:8px">'+
     '<div class="kc"><div class="kl">期間の'+(isH?'合計':'')+'売上</div><div class="kv">'+yen(tS)+'</div><div class="ks">営業 '+open.length+'日・1日平均 '+yen(avg)+'</div></div>'+
-    '<div class="kc"><div class="kl">人件費率</div><div class="kv">'+pct(fL,fS)+'</div><div class="ks">FL比率 '+pct(fL+fF,fS)+'</div></div>'+
+    '<div class="kc"><div class="kl">人件費率</div><div class="kv">'+pct(fL,fS)+'</div><div class="ks">FL比率 '+pct(fL+fF,fS)+(full.length?'（'+full.length+'日分）':'')+'</div></div>'+
     '<div class="kc op"><div class="kl">営業利益の合計</div><div class="kv '+(tO>=0?'pos':'neg')+'">'+(full.length?yen(tO):'—')+'</div><div class="ks">'+(full.length?'利益率 '+pct(tO,fS)+'（'+full.length+'日分・定休日の固定費も含む）':'人件費などがそろった日がまだありません')+'</div></div></div>';
+  // 【R8.11.16】人件費などがそろっていない日があると、人件費率・営業利益は一部の日だけの数字になる
+  var miss=rows.filter(function(r){return r.SS>0&&r.O==null});
+  if(miss.length){var f0=full.length?full[0].ds:null,fmt=function(d){var p=d.split('-');return (+p[1])+'/'+(+p[2])};
+    h+='<div class="hint" style="background:#fdecee;color:#a0001a;margin:0 0 8px">⚠ 人件費率と営業利益は、人件費・食材費・固定費がそろった'+full.length+'日分（'+(f0?fmt(f0)+'〜'+fmt(full[full.length-1].ds):'なし')+'）だけの数字です。期間の売上（'+open.length+'日分）とは日数が違います。'+
+      '<br>人件費などがない日：'+miss.length+'日（'+fmt(miss[0].ds)+'〜'+fmt(miss[miss.length-1].ds)+'の一部）。代表が「日別人件費」でその月（給料期間）を開くと保存されて、ここに入ります。</div>'}
   h+='<div class="note" style="font-weight:700;margin-top:6px">売上</div>'+svg(H1,g1)+'<div class="legend">'+lg(acc,isH?'本店':'売上')+(isH?lg('#0f8b8d','FishHack'):'')+lg('#5b6070','1日平均',1)+'</div>';
   h+='<div class="note" style="font-weight:700;margin-top:10px">人件費率・FL比率'+(isH?'（合計売上比）':'')+'</div>'+svg(H2,g2)+'<div class="legend">'+lg('#c77d0a','人件費率',1)+lg('#1a7fbf','FL比率（人件費＋食材費）',1)+'</div>';
   h+='<div class="note" style="font-weight:700;margin-top:10px">営業利益</div>'+svg(H3,g3);
