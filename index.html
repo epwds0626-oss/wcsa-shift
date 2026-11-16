@@ -5642,11 +5642,24 @@ function renderWishList() {
     var wisOff = w.type==='off';
     var wdow = '';
     try { var wd = new Date(w.date + 'T00:00:00'); wdow = ['日','月','火','水','木','金','土'][wd.getDay()]; } catch(e){}
-    html += '<div class="wish-item"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><strong>' + w.name + '</strong><span>' + w.date + '（' + wdow + '）</span><span class="tag' + (wisOff?' off':'') + '">' + wlabel + '</span>' + (w.note ? '<span class="muted">'+w.note+'</span>' : '') + '</div><button class="btn btn-r" style="padding:4px 10px;font-size:11px" onclick="removeWish(' + i + ')">削除</button></div>';
+    html += '<div class="wish-item"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><strong>' + w.name + '</strong><span>' + w.date + '（' + wdow + '）</span>' + wishTag(w.type, wlabel) + (w.note ? '<span class="muted">'+w.note+'</span>' : '') + '</div><button class="btn btn-r" style="padding:4px 10px;font-size:11px" onclick="removeWish(' + i + ')">削除</button></div>';
   }
   el.innerHTML = html;
 }
 
+// 【R8.11.16】シフト希望の色：休み＝赤、ランチ＝黄、ディナー＝緑（通し・出勤は青）
+var WISH_COLORS = {
+  off:    {bg:'rgba(214,40,57,0.14)', fg:'#c0001a', bd:'rgba(214,40,57,0.45)', icon:'🔴'},
+  lunch:  {bg:'rgba(240,190,30,0.22)', fg:'#9a6b00', bd:'rgba(220,170,20,0.55)', icon:'🟡'},
+  dinner: {bg:'rgba(30,160,90,0.16)', fg:'#1e7a45', bd:'rgba(30,160,90,0.45)', icon:'🟢'},
+  all:    {bg:'rgba(60,120,220,0.14)', fg:'#2457a8', bd:'rgba(60,120,220,0.40)', icon:'🔵'},
+  work:   {bg:'rgba(60,120,220,0.14)', fg:'#2457a8', bd:'rgba(60,120,220,0.40)', icon:'🔵'}
+};
+function wishTag(type, label){
+  var c = WISH_COLORS[type] || WISH_COLORS.work;
+  return '<span class="tag" style="background:' + c.bg + ';color:' + c.fg + ';border-color:' + c.bd + '">' + label + '</span>';
+}
+function wishIcon(type){ return (WISH_COLORS[type] || WISH_COLORS.work).icon; }
 function removeWish(i) {
   var sorted = S.wishes.slice().sort(function(a,b){ return a.date < b.date ? -1 : 1; });
   var item = sorted[i];
@@ -5679,8 +5692,8 @@ function renderAdminWishOverview() {
     var icon = icons[w.type] || '🟢';
     html += '<div class="list-item" style="font-size:12px;padding:6px 10px">' +
       '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
-      icon + '<strong>' + w.name + '</strong><span>' + w.date + wd + '</span>' +
-      '<span class="tag' + ts + '">' + (labels[w.type]||w.type) + '</span>' +
+      wishIcon(w.type) + '<strong>' + w.name + '</strong><span>' + w.date + wd + '</span>' +
+      wishTag(w.type, labels[w.type]||w.type) +
       (w.note ? '<span class="muted">'+w.note+'</span>' : '') +
       '</div>' +
       '<button class="btn btn-r" style="padding:3px 8px;font-size:11px" onclick="adminDeleteWish('+i+')">削除</button>' +
@@ -6112,7 +6125,7 @@ function renderAdminModal() {
     var typeOff = w.type === 'off';
     var tagColor = typeOff ? ' off' : (w.type==='lunch' ? ' style="background:rgba(74,158,232,0.2);color:var(--lunch);border-color:rgba(74,158,232,0.4)"' : (w.type==='dinner' ? ' style="background:rgba(232,74,106,0.2);color:var(--dinner);border-color:rgba(232,74,106,0.4)"' : ' style="background:rgba(74,232,160,0.2);color:var(--before);border-color:rgba(74,232,160,0.4)"'));
     var icon = typeOff ? '🔴' : (w.type==='lunch' ? '🔵' : (w.type==='dinner' ? '🟠' : '🟢'));
-    wh += '<div class="wish-ref">' + icon + ' <strong>' + w.name + '</strong><span class="tag' + (typeOff ? ' off' : '') + '"' + (!typeOff ? tagColor.replace(/^ style/,' style') : '') + '>' + typeLabel + '</span>' + (w.note?'<span class="muted">'+w.note+'</span>':'') + '</div>';
+    wh += '<div class="wish-ref">' + wishIcon(w.type) + ' <strong>' + w.name + '</strong>' + wishTag(w.type, typeLabel) + (w.note?'<span class="muted">'+w.note+'</span>':'') + '</div>';
   }
   wp.innerHTML = wh || '<p class="muted">この日の希望はありません</p>';
 
