@@ -223,6 +223,90 @@ nav{display:flex;gap:2px}
 </style>
 </head>
 <body>
+<!-- ===== 起動画面（イントロ）【R8.11.17】One Table Designの見た目＋グロービング風の動き：点の地球の読み込み → 立方体ロゴとメニュー ===== -->
+<div id="wcsa-intro" aria-label="WCSA 起動画面">
+<style>
+#wcsa-intro{position:fixed;inset:0;z-index:10000;background:#000 radial-gradient(ellipse at 30% 35%,rgba(40,60,160,.22),transparent 55%),#000;background:radial-gradient(ellipse at 28% 30%,rgba(45,70,180,.20),transparent 55%),radial-gradient(ellipse at 75% 70%,rgba(110,50,160,.14),transparent 50%),#02030a;color:#1a2060;font-family:"Helvetica Neue",Arial,"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",Meiryo,sans-serif;overflow:hidden;transition:opacity .6s ease,transform .6s cubic-bezier(.7,0,.3,1);}
+#wcsa-intro::after{content:"";position:absolute;inset:0;background:#f0f0f6;opacity:0;transition:opacity .6s cubic-bezier(.4,0,.2,1) .1s;pointer-events:none;z-index:0;}
+#wcsa-intro.ph2::after{opacity:1;}
+#wcsa-intro > *{position:relative;z-index:1;}
+#wcsa-intro > canvas,#wcsa-intro > .wi-stage,#wcsa-intro > .wi-load,#wcsa-intro > .wi-skip{position:absolute;}
+#wcsa-intro.ph2{transition:opacity .6s ease,transform .6s cubic-bezier(.7,0,.3,1);}
+#wcsa-intro.out{opacity:0;transform:translateY(-4%);pointer-events:none;}
+#wi-canvas{position:absolute;inset:0;width:100%;height:100%;transition:opacity .9s ease,transform 1.2s cubic-bezier(.7,0,.3,1);}
+#wcsa-intro.ph2 #wi-canvas{opacity:0;transition:opacity .45s ease .75s;}
+.wi-load{position:absolute;left:clamp(20px,5vw,64px);bottom:clamp(20px,5vh,56px);transition:opacity .5s;}
+.wi-pct{font-size:clamp(44px,9vw,104px);font-weight:200;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums;color:#fff;}
+.wi-pct small{font-size:.4em;margin-left:4px;}
+.wi-loadtx{font-size:11px;letter-spacing:.4em;margin-top:10px;color:rgba(255,255,255,.8);}
+.wi-skip{position:absolute;right:clamp(20px,5vw,64px);bottom:clamp(24px,5vh,60px);background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:11px;letter-spacing:.35em;padding:10px 18px 10px 22px;cursor:pointer;transition:background .2s,opacity .5s;}
+.wi-skip:hover{background:rgba(255,255,255,.15);}
+#wcsa-intro.ph2 .wi-load,#wcsa-intro.ph2 .wi-skip{opacity:0;pointer-events:none;}
+.wi-head{position:absolute;top:0;left:0;right:0;height:64px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(18px,5vw,64px);box-shadow:0 1px 0 rgba(26,32,96,.08);transform:translateY(-100%);transition:transform .7s cubic-bezier(.22,1,.36,1) .15s;}
+#wcsa-intro.ph2 .wi-head{transform:none;}
+.wi-logo{color:#9a6a00;font-weight:900;font-size:20px;letter-spacing:.3em;}
+.wi-logo span{font-weight:400;font-size:10px;letter-spacing:.3em;margin-left:12px;color:#444466;}
+.wi-enter{border:1px solid #1a2060;color:#1a2060;background:#fff;font-size:12px;letter-spacing:.2em;padding:9px 20px;cursor:pointer;transition:background .2s,color .2s;}
+.wi-enter:hover{background:#1a2060;color:#fff;}
+.wi-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 20px;pointer-events:none;}
+#wcsa-intro.ph2 .wi-stage{pointer-events:auto;}
+.wi-brand{display:flex;flex-direction:column;align-items:center;gap:18px;}
+.wi-mark{width:clamp(170px,26vw,320px);height:auto;flex:none;overflow:visible;opacity:0;transition:opacity .45s ease .7s;}
+#wcsa-intro.ph2 .wi-mark{opacity:1;transform:none;animation:wi-glow 3s ease-in-out 1.3s infinite;}
+@keyframes wi-glow{0%,100%{filter:drop-shadow(0 10px 22px rgba(37,99,235,.30));}50%{filter:drop-shadow(0 10px 40px rgba(37,99,235,.60));}}
+.wi-face{opacity:0;transition:opacity .45s ease,transform .7s cubic-bezier(.22,1,.36,1);}
+.wi-face.f1,.wi-face.f2,.wi-face.f3{transform:none;}
+#wcsa-intro.ph2 .wi-face{opacity:1;transform:none;}
+#wcsa-intro.ph2 .wi-face{transition-delay:.7s;}
+.wi-edge{fill:none;stroke:#2563EB;stroke-width:1.5;stroke-dasharray:620;stroke-dashoffset:620;}
+#wcsa-intro.ph2 .wi-edge{animation:wi-draw .8s cubic-bezier(.65,0,.35,1) .7s forwards;}
+@keyframes wi-draw{to{stroke-dashoffset:0;}}
+.wi-txt{opacity:0;transition:opacity .5s ease 1.05s;}
+#wcsa-intro.ph2 .wi-txt{opacity:1;}
+.wi-name{font-size:clamp(22px,2.8vw,30px);font-weight:900;letter-spacing:.45em;margin-top:6px;color:#9a6a00;margin-right:-.35em;opacity:0;transform:translateY(14px);transition:opacity .6s ease 1s,transform .6s ease 1s;}
+.wi-tag{font-size:12px;letter-spacing:.2em;color:#444466;opacity:0;transform:translateY(10px);transition:opacity .6s ease 1.15s,transform .6s ease 1.15s;}
+#wcsa-intro.ph2 .wi-name,#wcsa-intro.ph2 .wi-tag{opacity:1;transform:none;}
+.wi-menu{display:flex;flex-direction:column;align-items:flex-end;gap:clamp(14px,3vh,26px);}
+.wi-menu button{background:none;border:0;color:#1a2060;font:inherit;font-size:clamp(14px,1.9vw,19px);font-weight:700;letter-spacing:.08em;cursor:pointer;display:flex;align-items:center;gap:12px;opacity:0;transform:translateX(16px);transition:opacity .5s,transform .5s cubic-bezier(.22,1,.36,1),color .2s;}
+#wcsa-intro.ph2 .wi-menu button{opacity:1;transform:none;}
+.wi-menu button:hover{color:#2563EB;}
+.wi-menu button i{display:inline-block;width:48px;height:9px;border-bottom:1px solid currentColor;position:relative;transition:width .3s;}
+.wi-menu button i::after{content:"";position:absolute;right:0;bottom:-1px;width:10px;border-bottom:1px solid currentColor;transform:rotate(40deg);transform-origin:right bottom;}
+.wi-menu button:hover i{width:68px;}
+.wi-menu .wi-sub{font-weight:400;font-size:.72em;color:#9a6a00;margin-right:2px;}
+.wi-foot{position:absolute;left:0;right:0;bottom:clamp(16px,4vh,40px);text-align:center;font-size:12px;letter-spacing:.12em;color:#444466;opacity:0;transition:opacity .6s 1.3s;}
+#wcsa-intro.ph2 .wi-foot{opacity:1;}
+.wi-quote{max-width:560px;margin:0 auto 12px;padding:0 20px;letter-spacing:.04em;}
+.wi-qlb{font-size:10px;letter-spacing:.45em;color:#9a6a00;margin-bottom:6px;}
+.wi-qt{font-size:clamp(13px,1.5vw,15.5px);line-height:1.8;color:#1a2060;font-weight:700;}
+.wi-qb{font-size:11px;color:#6a6a88;margin-top:4px;}
+@media (max-width:640px){.wi-mark{width:150px}}
+@media (prefers-reduced-motion:reduce){#wcsa-intro *{transition:none!important;animation:none!important}.wi-edge{stroke-dashoffset:0}}
+</style>
+<canvas id="wi-canvas"></canvas>
+<div class="wi-load"><div class="wi-pct"><span id="wi-pct">0</span><small>%</small></div><div class="wi-loadtx">読み込み中…</div></div>
+<button class="wi-skip" onclick="wiPhase2()">SKIP</button>
+<div class="wi-stage">
+  <div class="wi-brand">
+    <svg class="wi-mark" viewBox="0 0 200 200" aria-hidden="true">
+      <polygon class="wi-face f1" points="100,10 178,55 100,100 22,55" fill="#2563EB"/>
+      <polygon class="wi-face f2" points="22,55 100,100 100,190 22,145" fill="#1a2060"/>
+      <polygon class="wi-face f3" points="178,55 100,100 100,190 178,145" fill="#1e3a9a"/>
+      <g class="wi-txt">
+        <polygon points="100,18 130,100 70,100" fill="rgba(255,255,255,0.12)"/>
+        <polygon points="100,100 130,170 70,170" fill="rgba(255,255,255,0.06)"/>
+        <text x="100" y="72" text-anchor="middle" fill="#fff" font-family="Georgia,serif" font-size="22" font-weight="300" letter-spacing="1">One</text>
+        <text x="100" y="100" text-anchor="middle" fill="#fff" font-family="Georgia,serif" font-size="22" font-weight="300" letter-spacing="1">Table</text>
+        <text x="100" y="128" text-anchor="middle" fill="#fff" font-family="Georgia,serif" font-size="22" font-weight="300" letter-spacing="1">Design</text>
+        <g transform="translate(68,148) scale(0.55)" fill="#9aabb8"><ellipse cx="28" cy="8" rx="22" ry="7"/><polygon points="0,8 -12,2 -12,14"/><circle cx="42" cy="6" r="2" fill="#05061a"/></g>
+      </g>
+      <polygon class="wi-edge" points="100,10 178,55 178,145 100,190 22,145 22,55"/>
+    </svg>
+    <div class="wi-name">WCSA</div>
+  </div>
+</div>
+
+</div>
 
 <header id="main-header">
   <!-- 1行目: ロゴ + ホーム + PDF -->
@@ -6378,6 +6462,16 @@ function exportDayPDF(mode) {
 
 
 // ===== HOME SCREEN =====
+var HQ_LIST = [["失敗したところでやめてしまうから失敗になる。成功するところまで続ければ、それは成功になる。", "松下幸之助", "途中でやめた時点で失敗が決まる。うまくいくまで工夫を続ければ、それは成功への途中にすぎない。"], ["雨が降れば傘をさす。当たり前のことを当たり前にやる。", "松下幸之助", "特別なことより、当たり前のことを当たり前にやり切るのが商売の基本。"], ["好況よし、不況さらによし。", "松下幸之助", "景気が悪いときこそ、ムダを見直し工夫する好機になる。"], ["企業は社会の公器である。", "松下幸之助", "店は自分たちだけのものではなく、お客様や地域の役に立つためにある。"], ["人生・仕事の結果＝考え方×熱意×能力", "稲盛和夫", "能力より大事なのは考え方と熱意。考え方がマイナスなら、結果もマイナスになる。"], ["値決めは経営である。", "稲盛和夫", "値段の付け方ひとつで店の利益は決まる。お客様が喜んで払う一番高い値を探す。"], ["売上を最大に、経費を最小に。", "稲盛和夫", "売上を伸ばす工夫と、ムダを削る工夫。この二つを毎日同時にやる。"], ["楽観的に構想し、悲観的に計画し、楽観的に実行する。", "稲盛和夫", "夢は大きく描き、準備は最悪を想定して慎重に、やるときは明るく思い切って。"], ["チャレンジして失敗を恐れるよりも、何もしないことを恐れろ。", "本田宗一郎", "失敗は学びになるが、何もしなければ何も残らない。"], ["得手に帆あげて。", "本田宗一郎", "自分の得意なことに力を注げば、追い風に乗るように伸びていける。"], ["障子を開けてみよ、外は広いぞ。", "豊田佐吉", "目の前のことだけで考えず、外に目を向ければ可能性はいくらでもある。"], ["積小為大 ― 小を積んで大と為す。", "二宮尊徳", "大きな成果も、小さな積み重ねからしか生まれない。"], ["遠きをはかる者は富み、近くをはかる者は貧す。", "二宮尊徳", "先のことまで考えて動く人は豊かになり、目先の損得だけの人は貧しくなる。"], ["売り手よし、買い手よし、世間よし。", "近江商人「三方よし」", "店も、お客様も、地域も、みんなが良くなる商売が長く続く。"], ["為せば成る、為さねば成らぬ何事も。成らぬは人の為さぬなりけり。", "上杉鷹山", "やればできる。できないのは、やらないから。"], ["やってみせ、言って聞かせて、させてみせ、ほめてやらねば、人は動かじ。", "山本五十六", "人を育てるには、まず自分がやって見せ、説明し、やらせ、そして褒めること。"], ["初心忘るべからず。", "世阿弥『花鏡』", "慣れてきた頃こそ、始めたときの気持ちと未熟さを思い出すこと。"], ["秘すれば花なり。", "世阿弥『風姿花伝』", "全部を見せないことで、驚きや感動が生まれる。おもてなしにも通じる。"], ["千日の稽古を鍛とし、万日の稽古を錬とす。", "宮本武蔵『五輪書』", "千日の練習で基礎を鍛え、万日の練習で技を磨き上げる。技は一日にしてならず。"], ["我、事において後悔せず。", "宮本武蔵『独行道』", "自分で選んで決めたことは、結果がどうであれ悔やまない覚悟で臨む。"], ["稽古とは一より習い十を知り、十よりかえるもとのその一。", "千利休（利休道歌）", "一を学んで十を知っても、また基本の一に立ち返る。基本は何度でも見直す。"], ["夏は涼しく、冬暖かに。", "千利休（利休七則）", "季節に合わせて、お客様が心地よく過ごせるよう気を配ることがもてなしの基本。"], ["一期一会 ― この一席は二度とない。", "茶の湯の心得", "今日のお客様との時間は二度とない。一回一回を最高のものに。"], ["喜心・老心・大心 ― 喜んで、親のように、大らかに作る。", "道元『典座教訓』", "料理を作れることを喜び、親が子を思うように、偏りのない大らかな心で作る。"], ["他は是れ吾にあらず。更に何れの時をか待たん。", "道元『典座教訓』", "人に任せたら自分の修行にならない。今やらずに、いつやるのか。"], ["あやまちは、やすき所になりて、必ず仕る事に候ふ。", "吉田兼好『徒然草』", "事故やミスは、難しい所より「もう大丈夫」と気が緩んだ所で起きる。"], ["己の欲せざる所は人に施すこと勿れ。", "孔子『論語』", "自分がされて嫌なことは、人にもしない。"], ["過ちて改めざる、是を過ちと謂う。", "孔子『論語』", "失敗は誰にでもある。本当の失敗は、気づいても直さないこと。"], ["之を知る者は之を好む者に如かず。之を好む者は之を楽しむ者に如かず。", "孔子『論語』", "知っているより好きな人、好きな人より楽しんでいる人が一番強い。"], ["速やかならんと欲すれば則ち達せず。", "孔子『論語』", "早く結果を出そうと焦ると、かえって目的にたどり着けない。"], ["三人行えば、必ず我が師あり。", "孔子『論語』", "どんな人からも学べることがある。良い所は真似し、悪い所は自分を省みる。"], ["君子は義に喩り、小人は利に喩る。", "孔子『論語』", "立派な人は「正しいかどうか」で判断し、そうでない人は「得かどうか」で判断する。"], ["天の時は地の利に如かず、地の利は人の和に如かず。", "孟子", "タイミングより場所、場所より人の和。チームワークが何より強い。"], ["至誠にして動かざる者は、未だ之れ有らざるなり。", "孟子", "真心を尽くして人が動かなかった例はない。"], ["千里の行も足下に始まる。", "老子", "どんなに大きな目標も、目の前の一歩から始まる。"], ["彼を知り己を知れば、百戦殆うからず。", "孫子", "相手（お客様・競合）と自分の力をよく知れば、大きな失敗はしない。"], ["木を買わず、山を買え。", "法隆寺宮大工の口伝", "良い材料は、その育ちから知ることで生きる。食材も産地や育ちを知ってこそ。"], ["段取り八分、仕事二分。", "職人の言葉", "仕事の出来は準備で8割決まる。仕込みと段取りを大事に。"], ["企業の目的として有効な定義は一つしかない。顧客の創造である。", "P.F.ドラッカー", "商売の目的はお客様をつくること。売上はその結果としてついてくる。"], ["成果をあげる者は、仕事からスタートしない。時間からスタートする。", "P.F.ドラッカー『経営者の条件』", "まず自分が何に時間を使っているかを知ること。時間の使い方が成果を決める。"], ["Stay hungry, stay foolish.", "スティーブ・ジョブズ", "現状に満足せず貪欲に、常識にとらわれず愚かなほど挑戦し続けよ。"], ["先を見て点をつなぐことはできない。振り返ってつなぐことしかできない。", "スティーブ・ジョブズ", "今やっている一つ一つの経験が、後で必ずつながって意味を持つ。"]];
+// 今日の言葉（日替わり：日付で決まるので全員同じ言葉が出る）【R8.11.17 起動画面でも使うため関数に】
+function todayQuote(){
+  var d = new Date(), HQ = HQ_LIST;
+  var dayNo = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+  // 【R8.11.14修正】言葉の数と割り切れない飛び幅で、全部を一巡してから繰り返す
+  var gcdQ = function(a, b){ while (b) { var t = b; b = a % b; a = t; } return a; };
+  var stepQ = 7; while (gcdQ(stepQ, HQ.length) !== 1) stepQ++;
+  return HQ[((dayNo * stepQ) % HQ.length + HQ.length) % HQ.length];
+}
 function showHomeScreen() {
   var hs = document.getElementById('home-screen');
   if (!hs) return;
@@ -6399,12 +6493,7 @@ function showHomeScreen() {
   var dow = ['日','月','火','水','木','金','土'];
   document.getElementById('home-greet-text').textContent = greet;
   // 今日の言葉（日替わり：日付で決まるので全員同じ言葉が出る）
-  var HQ = [["失敗したところでやめてしまうから失敗になる。成功するところまで続ければ、それは成功になる。", "松下幸之助", "途中でやめた時点で失敗が決まる。うまくいくまで工夫を続ければ、それは成功への途中にすぎない。"], ["雨が降れば傘をさす。当たり前のことを当たり前にやる。", "松下幸之助", "特別なことより、当たり前のことを当たり前にやり切るのが商売の基本。"], ["好況よし、不況さらによし。", "松下幸之助", "景気が悪いときこそ、ムダを見直し工夫する好機になる。"], ["企業は社会の公器である。", "松下幸之助", "店は自分たちだけのものではなく、お客様や地域の役に立つためにある。"], ["人生・仕事の結果＝考え方×熱意×能力", "稲盛和夫", "能力より大事なのは考え方と熱意。考え方がマイナスなら、結果もマイナスになる。"], ["値決めは経営である。", "稲盛和夫", "値段の付け方ひとつで店の利益は決まる。お客様が喜んで払う一番高い値を探す。"], ["売上を最大に、経費を最小に。", "稲盛和夫", "売上を伸ばす工夫と、ムダを削る工夫。この二つを毎日同時にやる。"], ["楽観的に構想し、悲観的に計画し、楽観的に実行する。", "稲盛和夫", "夢は大きく描き、準備は最悪を想定して慎重に、やるときは明るく思い切って。"], ["チャレンジして失敗を恐れるよりも、何もしないことを恐れろ。", "本田宗一郎", "失敗は学びになるが、何もしなければ何も残らない。"], ["得手に帆あげて。", "本田宗一郎", "自分の得意なことに力を注げば、追い風に乗るように伸びていける。"], ["障子を開けてみよ、外は広いぞ。", "豊田佐吉", "目の前のことだけで考えず、外に目を向ければ可能性はいくらでもある。"], ["積小為大 ― 小を積んで大と為す。", "二宮尊徳", "大きな成果も、小さな積み重ねからしか生まれない。"], ["遠きをはかる者は富み、近くをはかる者は貧す。", "二宮尊徳", "先のことまで考えて動く人は豊かになり、目先の損得だけの人は貧しくなる。"], ["売り手よし、買い手よし、世間よし。", "近江商人「三方よし」", "店も、お客様も、地域も、みんなが良くなる商売が長く続く。"], ["為せば成る、為さねば成らぬ何事も。成らぬは人の為さぬなりけり。", "上杉鷹山", "やればできる。できないのは、やらないから。"], ["やってみせ、言って聞かせて、させてみせ、ほめてやらねば、人は動かじ。", "山本五十六", "人を育てるには、まず自分がやって見せ、説明し、やらせ、そして褒めること。"], ["初心忘るべからず。", "世阿弥『花鏡』", "慣れてきた頃こそ、始めたときの気持ちと未熟さを思い出すこと。"], ["秘すれば花なり。", "世阿弥『風姿花伝』", "全部を見せないことで、驚きや感動が生まれる。おもてなしにも通じる。"], ["千日の稽古を鍛とし、万日の稽古を錬とす。", "宮本武蔵『五輪書』", "千日の練習で基礎を鍛え、万日の練習で技を磨き上げる。技は一日にしてならず。"], ["我、事において後悔せず。", "宮本武蔵『独行道』", "自分で選んで決めたことは、結果がどうであれ悔やまない覚悟で臨む。"], ["稽古とは一より習い十を知り、十よりかえるもとのその一。", "千利休（利休道歌）", "一を学んで十を知っても、また基本の一に立ち返る。基本は何度でも見直す。"], ["夏は涼しく、冬暖かに。", "千利休（利休七則）", "季節に合わせて、お客様が心地よく過ごせるよう気を配ることがもてなしの基本。"], ["一期一会 ― この一席は二度とない。", "茶の湯の心得", "今日のお客様との時間は二度とない。一回一回を最高のものに。"], ["喜心・老心・大心 ― 喜んで、親のように、大らかに作る。", "道元『典座教訓』", "料理を作れることを喜び、親が子を思うように、偏りのない大らかな心で作る。"], ["他は是れ吾にあらず。更に何れの時をか待たん。", "道元『典座教訓』", "人に任せたら自分の修行にならない。今やらずに、いつやるのか。"], ["あやまちは、やすき所になりて、必ず仕る事に候ふ。", "吉田兼好『徒然草』", "事故やミスは、難しい所より「もう大丈夫」と気が緩んだ所で起きる。"], ["己の欲せざる所は人に施すこと勿れ。", "孔子『論語』", "自分がされて嫌なことは、人にもしない。"], ["過ちて改めざる、是を過ちと謂う。", "孔子『論語』", "失敗は誰にでもある。本当の失敗は、気づいても直さないこと。"], ["之を知る者は之を好む者に如かず。之を好む者は之を楽しむ者に如かず。", "孔子『論語』", "知っているより好きな人、好きな人より楽しんでいる人が一番強い。"], ["速やかならんと欲すれば則ち達せず。", "孔子『論語』", "早く結果を出そうと焦ると、かえって目的にたどり着けない。"], ["三人行えば、必ず我が師あり。", "孔子『論語』", "どんな人からも学べることがある。良い所は真似し、悪い所は自分を省みる。"], ["君子は義に喩り、小人は利に喩る。", "孔子『論語』", "立派な人は「正しいかどうか」で判断し、そうでない人は「得かどうか」で判断する。"], ["天の時は地の利に如かず、地の利は人の和に如かず。", "孟子", "タイミングより場所、場所より人の和。チームワークが何より強い。"], ["至誠にして動かざる者は、未だ之れ有らざるなり。", "孟子", "真心を尽くして人が動かなかった例はない。"], ["千里の行も足下に始まる。", "老子", "どんなに大きな目標も、目の前の一歩から始まる。"], ["彼を知り己を知れば、百戦殆うからず。", "孫子", "相手（お客様・競合）と自分の力をよく知れば、大きな失敗はしない。"], ["木を買わず、山を買え。", "法隆寺宮大工の口伝", "良い材料は、その育ちから知ることで生きる。食材も産地や育ちを知ってこそ。"], ["段取り八分、仕事二分。", "職人の言葉", "仕事の出来は準備で8割決まる。仕込みと段取りを大事に。"], ["企業の目的として有効な定義は一つしかない。顧客の創造である。", "P.F.ドラッカー", "商売の目的はお客様をつくること。売上はその結果としてついてくる。"], ["成果をあげる者は、仕事からスタートしない。時間からスタートする。", "P.F.ドラッカー『経営者の条件』", "まず自分が何に時間を使っているかを知ること。時間の使い方が成果を決める。"], ["Stay hungry, stay foolish.", "スティーブ・ジョブズ", "現状に満足せず貪欲に、常識にとらわれず愚かなほど挑戦し続けよ。"], ["先を見て点をつなぐことはできない。振り返ってつなぐことしかできない。", "スティーブ・ジョブズ", "今やっている一つ一つの経験が、後で必ずつながって意味を持つ。"]];
-  var dayNo = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
-  // 【R8.11.14修正】旧式は7飛び×42個で6個しか回らなかった。言葉の数と割り切れない飛び幅を自動で選び、全部を一巡してから繰り返す
-  var gcdQ = function(a, b){ while (b) { var t = b; b = a % b; a = t; } return a; };
-  var stepQ = 7; while (gcdQ(stepQ, HQ.length) !== 1) stepQ++;
-  var hq = HQ[((dayNo * stepQ) % HQ.length + HQ.length) % HQ.length];
+  var hq = todayQuote();
   var qt = document.getElementById('home-quote-text'), qb = document.getElementById('home-quote-by');
   if (qt) qt.textContent = '「' + hq[0] + '」';
   if (qb) qb.textContent = '― ' + hq[1];
@@ -6552,6 +6641,114 @@ function adminGoToday() {
   renderAdminCal();
 }
 
+// ===== 起動画面（イントロ）【R8.11.17】散らばった点 → 四角（平面）→ パタパタ折れて立方体ロゴ =====
+var WI = {raf:0, done:false, t0:0, p2:0, rect:null};
+function wiStart(){
+  var el = document.getElementById('wcsa-intro'); if (!el) { showHomeScreen(); return; }
+  var d = new Date(), h = d.getHours(), dow = '日月火水木金土';
+  var g = h < 5 ? 'お疲れ様です' : h < 11 ? 'おはようございます' : h < 15 ? 'こんにちは' : 'お疲れ様です';
+  var gt = document.getElementById('wi-greet'); if (gt) gt.textContent = g + '　' + (d.getMonth()+1) + '月' + d.getDate() + '日（' + dow[d.getDay()] + '）';
+  try { var q = todayQuote(); document.getElementById('wi-qt').textContent = '「' + q[0] + '」'; document.getElementById('wi-qb').textContent = '― ' + q[1]; } catch(e){}
+  var cv = document.getElementById('wi-canvas'), cx = cv.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1);
+  // 立方体の見える3面：上（明るい青）・左（紺）・右（青）。左右の面は最初、上の面に重なって折りたたまれている
+  var FACE = {top:{rgb:[37,99,235], wa:1.00}, left:{rgb:[26,32,96], wa:0.42}, right:{rgb:[30,58,154], wa:0.68}};
+  var N = (window.innerWidth < 640 ? 5000 : 9000), P = [], i;   // 【R8.11.17】点を細かく・多く
+  for (i = 0; i < N; i++) {
+    var r = Math.random(), f = r < 0.36 ? 'top' : r < 0.68 ? 'left' : 'right';
+    var u = Math.random(), w = Math.random(), edge = Math.random() < 0.14;
+    if (edge) { if (Math.random() < 0.5) u = Math.random() < 0.5 ? 0 : 1; else w = Math.random() < 0.5 ? 0 : 1; }
+    P.push({f:f, u:u, w:w, sx:(Math.random()*2-1), sy:(Math.random()*2-1), dl:Math.random()*0.4, ph:Math.random()*6.28, sz:0.7 + Math.random()*0.9, edge:edge});
+  }
+  function size(){ cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr; }
+  size(); window.addEventListener('resize', size);
+  // 宇宙の背景：動かない遠くの星（またたく）
+  var STARS = [], NS = window.innerWidth < 640 ? 160 : 320;
+  for (i = 0; i < NS; i++) STARS.push({x:Math.random(), y:Math.random(), r:Math.random() < 0.08 ? 1.6 : 0.6 + Math.random()*0.7, tw:Math.random()*6.28, sp:0.6 + Math.random()*1.8});
+  WI.t0 = performance.now();
+  var pctEl = document.getElementById('wi-pct');
+  // 時間割（ミリ秒）：集まる → 四角が傾く（パタ）→ 左の面が折れる（パタ）→ 右の面が折れる（パタ）
+  var T_GATHER = 1100, T_TILT0 = 1150, T_TILT1 = 1600, T_L0 = 1650, T_L1 = 2000, T_R0 = 1900, T_R1 = 2250, DUR = 2350;
+  var cl = function(x){ return Math.max(0, Math.min(1, x)); };
+  var ease = function(x){ x = cl(x); return 1 - Math.pow(1 - x, 3); };
+  var inout = function(x){ x = cl(x); return x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3)/2; };
+  var back = function(x){ x = cl(x); var c1 = 1.9, c3 = c1 + 1; return 1 + c3*Math.pow(x-1,3) + c1*Math.pow(x-1,2); };   // 少し行き過ぎて戻る＝パタッ
+  var ISO_A = -Math.PI/4, ISO_B = Math.atan(1/Math.SQRT2);
+  function frame(t){
+    var e = t - WI.t0, W = cv.width, H = cv.height;
+    var S0 = Math.min(W, H) * 0.46, ox = W/2, oy = H/2, S = S0, k2 = 0;
+    if (WI.p2) {   // 読み込み後：本物のロゴの位置へ移動
+      k2 = ease((t - WI.p2) / 750);
+      if (WI.rect) { var R = WI.rect; ox = W/2 + (R.cx*dpr - W/2) * k2; oy = H/2 + (R.cy*dpr - H/2) * k2; S = S0 + (R.w*dpr - S0) * k2; }
+    }
+    var L = 110.2 / 200 * S;   // 立方体の1辺（ロゴの六角形にぴったり合う大きさ）
+    var tl = WI.p2 ? 1 : inout((e - T_TILT0) / (T_TILT1 - T_TILT0));
+    var a = ISO_A * tl, b = Math.PI/2 + (ISO_B - Math.PI/2) * tl, ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+    var thL = (Math.PI/2) * (WI.p2 ? 1 : back((e - T_L0) / (T_L1 - T_L0)));
+    var thR = (Math.PI/2) * (WI.p2 ? 1 : back((e - T_R0) / (T_R1 - T_R0)));
+    var sL = Math.sin(thL), cL = Math.cos(thL), sR = Math.sin(thR), cR = Math.cos(thR);
+    cx.clearRect(0, 0, W, H);
+    var sa0 = 1 - k2;   // 星は読み込み後に消える
+    if (sa0 > 0) for (i = 0; i < STARS.length; i++) {
+      var st = STARS[i], tw = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(e * 0.001 * st.sp + st.tw));
+      cx.fillStyle = 'rgba(220,230,255,' + (tw * 0.55 * sa0).toFixed(3) + ')';
+      var rs = st.r * dpr; cx.fillRect(st.x * W - rs/2, st.y * H - rs/2, rs, rs);
+    }
+    for (i = 0; i < N; i++) {
+      var p = P[i], x, y, z;
+      if (p.f === 'top') { x = p.u; y = 1; z = p.w; }
+      else if (p.f === 'left') { x = p.u; y = 1 - p.w * sL; z = 1 - p.w * cL; }
+      else { x = 1 - p.w * cR; y = 1 - p.w * sR; z = p.u; }
+      x -= .5; y -= .5; z -= .5;
+      var x1 = x*ca + z*sa, z1 = -x*sa + z*ca, y2 = y*cb - z1*sb;
+      var tx = ox + x1 * L, ty = oy - y2 * L;
+      var gth = Math.max(ease((e / T_GATHER - p.dl) / (1 - p.dl)), k2);
+      var jig = (1 - k2) * gth * dpr * 0.5;
+      var px = (p.sx * W * 0.55 + W/2) * (1 - gth) + (tx + Math.sin(e*0.002 + p.ph) * jig) * gth;
+      var py = (p.sy * H * 0.55 + H/2) * (1 - gth) + (ty + Math.cos(e*0.0023 + p.ph) * jig) * gth;
+      var F = FACE[p.f];
+      // 面の濃さ：折れて立ち上がるほど、その面らしい濃さになる（平らなうちは全部同じ白）
+      var shade = p.f === 'top' ? 1 : (p.f === 'left' ? 1 + (F.wa - 1) * (thL / (Math.PI/2)) : 1 + (F.wa - 1) * (thR / (Math.PI/2)));
+      shade = Math.max(F.wa, Math.min(1, shade));
+      var a0 = (0.35 + 0.65 * gth) * (p.edge ? 1 : shade);
+      var rr = Math.round(255 + (F.rgb[0] - 255) * k2), gg = Math.round(255 + (F.rgb[1] - 255) * k2), bb = Math.round(255 + (F.rgb[2] - 255) * k2);
+      if (k2 > 0) a0 = a0 * (1 - k2) + (p.edge ? 0.9 : 0.75) * k2;
+      var s = p.sz * dpr * (p.edge ? 0.95 : 0.75) * (1 + (1 - gth) * 0.3);
+      cx.fillStyle = 'rgba(' + rr + ',' + gg + ',' + bb + ',' + a0.toFixed(3) + ')';
+      cx.fillRect(px - s/2, py - s/2, s, s);
+    }
+    if (!WI.done) {
+      var pc = Math.min(100, Math.round(100 * (1 - Math.pow(1 - cl(e / DUR), 1.3))));
+      if (pctEl) pctEl.textContent = pc;
+      if (e >= DUR + 250) wiPhase2();
+    }
+    if (document.getElementById('wcsa-intro') && !(WI.p2 && t - WI.p2 > 1600)) WI.raf = requestAnimationFrame(frame);
+  }
+  WI.raf = requestAnimationFrame(frame);
+  document.addEventListener('keydown', wiKey);
+}
+function wiKey(e){ if (e.key === 'Escape' || e.key === 'Enter') { WI.done ? wiEnter() : wiPhase2(); } }
+function wiPhase2(){
+  if (WI.done) return; WI.done = true;
+  var el = document.getElementById('wcsa-intro'); if (!el) return;
+  var pc = document.getElementById('wi-pct'); if (pc) pc.textContent = '100';
+  // 本物のロゴが出る位置を測る（点はそこへ移動してから本物に切り替わる）
+  var mk = el.querySelector('.wi-mark');
+  if (mk) { var b = mk.getBoundingClientRect(); WI.rect = {cx:b.left + b.width/2, cy:b.top + b.height/2, w:b.width}; }
+  WI.p2 = performance.now();
+  el.classList.add('ph2');
+  // ロゴとWCSAを見せたら、自動でホームへ（画面を押せばすぐ）
+  WI.auto = setTimeout(wiEnter, 2400);
+  el.addEventListener('click', function(ev){ if (!ev.target.closest('.wi-skip')) wiEnter(); });
+}
+function wiClose(after){
+  var el = document.getElementById('wcsa-intro'); if (!el) { if (after) after(); return; }
+  document.removeEventListener('keydown', wiKey);
+  el.classList.add('out');
+  setTimeout(function(){ cancelAnimationFrame(WI.raf); if (el.parentNode) el.parentNode.removeChild(el); if (after) after(); }, 600);
+}
+function wiEnter(){ if (WI.leaving) return; WI.leaving = true; clearTimeout(WI.auto); showHomeScreen(); wiClose(); }
+function wiGo(fn){ showHomeScreen(); wiClose(fn); }
+
 // ===== INIT =====
 window.onload = function() {
   loadS();
@@ -6562,24 +6759,10 @@ window.onload = function() {
     splash.style.position = 'fixed';
     splash.style.zIndex = '9999';
     document.body.appendChild(splash);
-    splash.style.display = 'flex';
-    var splashView = document.getElementById('msplash-view');
-    var loginCard = document.getElementById('mlogin-card');
-    if (splashView) splashView.style.display = 'flex';
-    if (loginCard) loginCard.style.display = 'none';
-    // スプラッシュ後にホーム画面へ
-    setTimeout(function() {
-      if (splashView) {
-        splashView.style.animation = 'msplash-up 0.5s ease forwards';
-        setTimeout(function() {
-          splashView.style.display = 'none';
-          splash.style.display = 'none';
-          showHomeScreen();
-        }, 500);
-      }
-    }, 2200);
+    splash.style.display = 'none';   // 【R8.11.17】旧スプラッシュの代わりに起動画面（イントロ）を出す
+    wiStart();
   } else {
-    setTimeout(function() { showHomeScreen(); }, 100);
+    wiStart();
   }
 };
 </script>
