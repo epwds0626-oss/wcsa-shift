@@ -6641,81 +6641,113 @@ function adminGoToday() {
   renderAdminCal();
 }
 
-// ===== 起動画面（イントロ）【R8.11.17】散らばった点 → 四角（平面）→ パタパタ折れて立方体ロゴ =====
+// ===== 起動画面（イントロ）【R8.11.18 大胆版】宇宙の奥から点が流れ込む → 四角 → 6面がパタパタ折れて箱 → 宙返りしてロゴの角度へ =====
 var WI = {raf:0, done:false, t0:0, p2:0, rect:null};
 function wiStart(){
   var el = document.getElementById('wcsa-intro'); if (!el) { showHomeScreen(); return; }
-  var d = new Date(), h = d.getHours(), dow = '日月火水木金土';
-  var g = h < 5 ? 'お疲れ様です' : h < 11 ? 'おはようございます' : h < 15 ? 'こんにちは' : 'お疲れ様です';
-  var gt = document.getElementById('wi-greet'); if (gt) gt.textContent = g + '　' + (d.getMonth()+1) + '月' + d.getDate() + '日（' + dow[d.getDay()] + '）';
-  try { var q = todayQuote(); document.getElementById('wi-qt').textContent = '「' + q[0] + '」'; document.getElementById('wi-qb').textContent = '― ' + q[1]; } catch(e){}
   var cv = document.getElementById('wi-canvas'), cx = cv.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1);
-  // 立方体の見える3面：上（明るい青）・左（紺）・右（青）。左右の面は最初、上の面に重なって折りたたまれている
-  var FACE = {top:{rgb:[37,99,235], wa:1.00}, left:{rgb:[26,32,96], wa:0.42}, right:{rgb:[30,58,154], wa:0.68}};
-  var N = (window.innerWidth < 640 ? 5000 : 9000), P = [], i;   // 【R8.11.17】点を細かく・多く
+  var small = window.innerWidth < 640;
+  // 面：top＝上、zf＝手前左、xr＝手前右（この3つがロゴ）、zb・xl＝奥の2面、bt＝底（最後に閉じる）
+  var FACE = {top:{rgb:[37,99,235], wa:1.00, vis:1}, zf:{rgb:[26,32,96], wa:0.42, vis:1}, xr:{rgb:[30,58,154], wa:0.68, vis:1},
+              zb:{rgb:[37,99,235], wa:0.5, vis:0}, xl:{rgb:[37,99,235], wa:0.5, vis:0}, bt:{rgb:[37,99,235], wa:0.5, vis:0}};
+  var FN = ['top','zf','xr','zb','xl','bt'], FW = [0.22,0.18,0.18,0.14,0.14,0.14];
+  var N = small ? 5200 : 9500, P = [], i;
   for (i = 0; i < N; i++) {
-    var r = Math.random(), f = r < 0.36 ? 'top' : r < 0.68 ? 'left' : 'right';
-    var u = Math.random(), w = Math.random(), edge = Math.random() < 0.14;
+    var r = Math.random(), k = 0, acc = FW[0]; while (r > acc && k < 5) { k++; acc += FW[k]; }
+    var u = Math.random(), w = Math.random(), edge = Math.random() < 0.13;
     if (edge) { if (Math.random() < 0.5) u = Math.random() < 0.5 ? 0 : 1; else w = Math.random() < 0.5 ? 0 : 1; }
-    P.push({f:f, u:u, w:w, sx:(Math.random()*2-1), sy:(Math.random()*2-1), dl:Math.random()*0.4, ph:Math.random()*6.28, sz:0.7 + Math.random()*0.9, edge:edge});
+    // 最初は宇宙の奥（遠く）に散らばっていて、こちらへ流れ込んでくる
+    P.push({f:FN[k], u:u, w:w, sx:(Math.random()*2-1), sy:(Math.random()*2-1), sd:-2 - Math.random()*7, dl:Math.random()*0.45, ph:Math.random()*6.28, sz:0.7 + Math.random()*0.9, edge:edge});
   }
+  var STARS = [], NS = small ? 180 : 360;
+  for (i = 0; i < NS; i++) STARS.push({x:Math.random(), y:Math.random(), r:Math.random() < 0.08 ? 1.6 : 0.6 + Math.random()*0.7, tw:Math.random()*6.28, sp:0.6 + Math.random()*1.8});
   function size(){ cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr; }
   size(); window.addEventListener('resize', size);
-  // 宇宙の背景：動かない遠くの星（またたく）
-  var STARS = [], NS = window.innerWidth < 640 ? 160 : 320;
-  for (i = 0; i < NS; i++) STARS.push({x:Math.random(), y:Math.random(), r:Math.random() < 0.08 ? 1.6 : 0.6 + Math.random()*0.7, tw:Math.random()*6.28, sp:0.6 + Math.random()*1.8});
   WI.t0 = performance.now();
   var pctEl = document.getElementById('wi-pct');
-  // 時間割（ミリ秒）：集まる → 四角が傾く（パタ）→ 左の面が折れる（パタ）→ 右の面が折れる（パタ）
-  var T_GATHER = 1100, T_TILT0 = 1150, T_TILT1 = 1600, T_L0 = 1650, T_L1 = 2000, T_R0 = 1900, T_R1 = 2250, DUR = 2350;
+  // 時間割（ミリ秒）
+  var T_GATHER = 1150, T_TILT0 = 1050, T_TILT1 = 1550,
+      FOLD = {zf:[1500,1850], xr:[1650,2000], zb:[1800,2150], xl:[1950,2300], bt:[2250,2600]},
+      T_SP0 = 1700, T_SP1 = 3500, DUR = 3550;
   var cl = function(x){ return Math.max(0, Math.min(1, x)); };
   var ease = function(x){ x = cl(x); return 1 - Math.pow(1 - x, 3); };
   var inout = function(x){ x = cl(x); return x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3)/2; };
-  var back = function(x){ x = cl(x); var c1 = 1.9, c3 = c1 + 1; return 1 + c3*Math.pow(x-1,3) + c1*Math.pow(x-1,2); };   // 少し行き過ぎて戻る＝パタッ
-  var ISO_A = -Math.PI/4, ISO_B = Math.atan(1/Math.SQRT2);
+  var back = function(x){ x = cl(x); var c1 = 2.2, c3 = c1 + 1; return 1 + c3*Math.pow(x-1,3) + c1*Math.pow(x-1,2); };
+  var ISO_A = -Math.PI/4, ISO_B = Math.atan(1/Math.SQRT2), H90 = Math.PI/2;
+  var LX = -0.35, LY = 0.75, LZ = 0.56;
   function frame(t){
     var e = t - WI.t0, W = cv.width, H = cv.height;
-    var S0 = Math.min(W, H) * 0.46, ox = W/2, oy = H/2, S = S0, k2 = 0;
-    if (WI.p2) {   // 読み込み後：本物のロゴの位置へ移動
-      k2 = ease((t - WI.p2) / 750);
+    var S0 = W < H ? Math.min(W * 0.92, H * 0.58) : Math.min(W * 0.6, H * 0.88), ox = W/2, oy = H/2, S = S0, k2 = 0;
+    if (WI.p2) {
+      k2 = ease((t - WI.p2) / 800);
       if (WI.rect) { var R = WI.rect; ox = W/2 + (R.cx*dpr - W/2) * k2; oy = H/2 + (R.cy*dpr - H/2) * k2; S = S0 + (R.w*dpr - S0) * k2; }
     }
-    var L = 110.2 / 200 * S;   // 立方体の1辺（ロゴの六角形にぴったり合う大きさ）
+    // 宙返り：大きく1回転半しながら、ロゴの角度でピタッと止まる
     var tl = WI.p2 ? 1 : inout((e - T_TILT0) / (T_TILT1 - T_TILT0));
-    var a = ISO_A * tl, b = Math.PI/2 + (ISO_B - Math.PI/2) * tl, ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
-    var thL = (Math.PI/2) * (WI.p2 ? 1 : back((e - T_L0) / (T_L1 - T_L0)));
-    var thR = (Math.PI/2) * (WI.p2 ? 1 : back((e - T_R0) / (T_R1 - T_R0)));
-    var sL = Math.sin(thL), cL = Math.cos(thL), sR = Math.sin(thR), cR = Math.cos(thR);
+    var sp = WI.p2 ? 1 : back((e - T_SP0) / (T_SP1 - T_SP0));
+    var spl = WI.p2 ? 1 : inout((e - T_SP0) / (T_SP1 - T_SP0));
+    var a = 0.7 * (1 - tl) + (-2.9 * Math.PI) * tl * (1 - sp) + ISO_A * sp;
+    var b = H90 * (1 - tl) + (1.15 + 0.5 * Math.sin(spl * Math.PI * 1.5)) * tl * (1 - sp) + ISO_B * sp;
+    var c = 0.55 * Math.sin(spl * Math.PI) * (1 - sp * 0.0) * (1 - spl);   // ひねり
+    var ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b), cc = Math.cos(c), sc = Math.sin(c);
+    var persp = WI.p2 ? 0 : 0.55 * (1 - sp);
+    var zoom = 1 + 0.18 * Math.sin(cl((e - T_SP0) / (T_SP1 - T_SP0)) * Math.PI) * (1 - k2);   // 回る途中で手前にグッと寄る
+    var L = 110.2 / 200 * S * zoom;
+    var bob = WI.p2 ? 0 : Math.sin(e * 0.0018) * 0.06 * (1 - sp);
+    var th = {}; FN.forEach(function(f){ th[f] = FOLD[f] ? H90 * (WI.p2 ? 1 : back((e - FOLD[f][0]) / (FOLD[f][1] - FOLD[f][0]))) : 0; });
+    var rotv = function(x, y, z){ var x1 = x*ca + z*sa, z1 = -x*sa + z*ca, y2 = y*cb - z1*sb, z2 = y*sb + z1*cb; return [x1*cc - y2*sc, x1*sc + y2*cc, z2]; };
+    var light = function(n){ var v = rotv(n[0], n[1], n[2]); return 0.25 + 0.75 * Math.abs(v[0]*LX + v[1]*LY + v[2]*LZ); };
+    var sL = Math.sin(th.zf), cL = Math.cos(th.zf), sR = Math.sin(th.xr), cR = Math.cos(th.xr), sB = Math.sin(th.zb), cB = Math.cos(th.zb), sX = Math.sin(th.xl), cX = Math.cos(th.xl);
+    var ph2 = Math.PI + th.zf + th.bt, s2 = Math.sin(ph2), c2 = Math.cos(ph2);   // 底は手前の面の先にくっついて、最後に閉じる
+    var LT = {top:light([0,1,0]), zf:light([0,cL,sL]), xr:light([sR,cR,0]), zb:light([0,cB,-sB]), xl:light([-sX,cX,0]), bt:light([0,-c2,s2])};
+    // 残像（流れ星のような尾）：読み込み中は前のコマを少し残す
     cx.clearRect(0, 0, W, H);
-    var sa0 = 1 - k2;   // 星は読み込み後に消える
+    var streak = !WI.p2 && e < T_GATHER + 150, gpv = function(pp){ return ease(((e - 70) / T_GATHER - pp.dl) / (1 - pp.dl)); };
+    if (streak) { cx.beginPath(); }
+    var sa0 = 1 - k2;
     if (sa0 > 0) for (i = 0; i < STARS.length; i++) {
       var st = STARS[i], tw = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(e * 0.001 * st.sp + st.tw));
-      cx.fillStyle = 'rgba(220,230,255,' + (tw * 0.55 * sa0).toFixed(3) + ')';
+      cx.fillStyle = 'rgba(220,230,255,' + (tw * 0.5 * sa0).toFixed(3) + ')';
       var rs = st.r * dpr; cx.fillRect(st.x * W - rs/2, st.y * H - rs/2, rs, rs);
     }
+    // 組み上がった瞬間の光の輪
+    var rg = (e - T_SP1 + 150) / 700;
+    if (!WI.p2 && rg > 0 && rg < 1) {
+      cx.strokeStyle = 'rgba(160,190,255,' + (0.5 * (1 - rg)).toFixed(3) + ')'; cx.lineWidth = dpr * (3 - 2 * rg);
+      cx.beginPath(); cx.arc(ox, oy, S * (0.45 + 0.75 * ease(rg)), 0, 6.2832); cx.stroke();
+    }
     for (i = 0; i < N; i++) {
-      var p = P[i], x, y, z;
+      var p = P[i], x, y, z, F = FACE[p.f];
+      var hide = F.vis ? 0 : Math.max(sp > 0.98 ? 1 : 0, k2) ;
+      var fadeHidden = F.vis ? 1 : (WI.p2 ? 1 - k2 : 1 - cl((e - (T_SP1 - 250)) / 300));
+      if (fadeHidden <= 0) continue;
       if (p.f === 'top') { x = p.u; y = 1; z = p.w; }
-      else if (p.f === 'left') { x = p.u; y = 1 - p.w * sL; z = 1 - p.w * cL; }
-      else { x = 1 - p.w * cR; y = 1 - p.w * sR; z = p.u; }
+      else if (p.f === 'zf') { x = p.u; y = 1 - p.w * sL; z = 1 - p.w * cL; }
+      else if (p.f === 'xr') { x = 1 - p.w * cR; y = 1 - p.w * sR; z = p.u; }
+      else if (p.f === 'zb') { x = p.u; y = 1 - p.w * sB; z = p.w * cB; }
+      else if (p.f === 'xl') { x = p.w * cX; y = 1 - p.w * sX; z = p.u; }
+      else { x = p.u; y = 1 - sL + p.w * (-Math.sin(ph2)); z = 1 - cL + p.w * (-Math.cos(ph2)); }
       x -= .5; y -= .5; z -= .5;
-      var x1 = x*ca + z*sa, z1 = -x*sa + z*ca, y2 = y*cb - z1*sb;
-      var tx = ox + x1 * L, ty = oy - y2 * L;
+      var v = rotv(x, y, z), pf = 1 / (1 - v[2] * persp), zn = (v[2] + 0.87) / 1.74;
+      var tx = ox + v[0] * L * pf, ty = oy - (v[1] + bob) * L * pf;
       var gth = Math.max(ease((e / T_GATHER - p.dl) / (1 - p.dl)), k2);
-      var jig = (1 - k2) * gth * dpr * 0.5;
-      var px = (p.sx * W * 0.55 + W/2) * (1 - gth) + (tx + Math.sin(e*0.002 + p.ph) * jig) * gth;
-      var py = (p.sy * H * 0.55 + H/2) * (1 - gth) + (ty + Math.cos(e*0.0023 + p.ph) * jig) * gth;
-      var F = FACE[p.f];
-      // 面の濃さ：折れて立ち上がるほど、その面らしい濃さになる（平らなうちは全部同じ白）
-      var shade = p.f === 'top' ? 1 : (p.f === 'left' ? 1 + (F.wa - 1) * (thL / (Math.PI/2)) : 1 + (F.wa - 1) * (thR / (Math.PI/2)));
-      shade = Math.max(F.wa, Math.min(1, shade));
-      var a0 = (0.35 + 0.65 * gth) * (p.edge ? 1 : shade);
-      var rr = Math.round(255 + (F.rgb[0] - 255) * k2), gg = Math.round(255 + (F.rgb[1] - 255) * k2), bb = Math.round(255 + (F.rgb[2] - 255) * k2);
-      if (k2 > 0) a0 = a0 * (1 - k2) + (p.edge ? 0.9 : 0.75) * k2;
-      var s = p.sz * dpr * (p.edge ? 0.95 : 0.75) * (1 + (1 - gth) * 0.3);
+      var ps = 1 / (1 - p.sd * 0.12);   // 奥（sd<0）ほど小さく中心寄り
+      var px = (p.sx * W * 0.7 * ps + W/2) * (1 - gth) + tx * gth;
+      var py = (p.sy * H * 0.7 * ps + H/2) * (1 - gth) + ty * gth;
+      if (streak && gth > 0.02 && gth < 0.97) {   // 流れ星のような尾（少し前の位置から線を引く）
+        var gp = gpv(p), qx = (p.sx * W * 0.7 * ps + W/2) * (1 - gp) + tx * gp, qy = (p.sy * H * 0.7 * ps + H/2) * (1 - gp) + ty * gp;
+        cx.moveTo(qx, qy); cx.lineTo(px, py);
+      }
+      var lt = LT[p.f], shade = lt * (1 - sp) + (p.f === 'top' ? 1 : F.wa) * sp;
+      var dep = 1 - (1 - (0.4 + 0.6 * zn)) * (1 - k2) * gth;
+      var a0 = (0.25 + 0.75 * gth) * (p.edge ? 1 : shade) * dep * fadeHidden;
+      var rr = 255, gg = 255, bb = 255;
+      if (k2 > 0) { rr = Math.round(255 + (F.rgb[0] - 255) * k2); gg = Math.round(255 + (F.rgb[1] - 255) * k2); bb = Math.round(255 + (F.rgb[2] - 255) * k2); a0 = a0 * (1 - k2) + (p.edge ? 0.9 : 0.75) * k2 * fadeHidden; }
+      var s = p.sz * dpr * (p.edge ? 1.05 : 0.85) * (0.6 + 0.6 * gth + (1 - gth) * ps * 0.5) * (1 + (pf - 1) * 2.0 * gth);
       cx.fillStyle = 'rgba(' + rr + ',' + gg + ',' + bb + ',' + a0.toFixed(3) + ')';
       cx.fillRect(px - s/2, py - s/2, s, s);
     }
+    if (streak) { cx.strokeStyle = 'rgba(200,215,255,0.22)'; cx.lineWidth = dpr * 0.8; cx.stroke(); }
     if (!WI.done) {
       var pc = Math.min(100, Math.round(100 * (1 - Math.pow(1 - cl(e / DUR), 1.3))));
       if (pctEl) pctEl.textContent = pc;
