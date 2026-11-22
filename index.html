@@ -2840,6 +2840,7 @@ function loadS() {
   initFirebase();
   if (!db) { S._loaded = true; renderCal(); return; }
   // Detach previous listener
+  _saveSnap = null; // 店が変わるので差分の基準をリセット
   if (dbListener) { try { db.ref(dbListener).off('value'); } catch(e) {} }
   dbListener = SHOPS[currentShop].dbKey;
   db.ref(SHOPS[currentShop].dbKey).on('value', function(snapshot) {
@@ -2880,26 +2881,49 @@ function loadS() {
       if (d.editedDays) S.editedDays = d.editedDays;
     }
     S._loaded = true; // 初回データ受信完了
+    _saveSnap = _flatS(); // サーバーと同じ状態を記録（差分保存の基準）
     renderCal();
     if (document.getElementById('page-admin').classList.contains('active')) renderAdmin();
     // Musubuログイン画面のスタッフリストを更新
     if (typeof MrenderLoginList === 'function') MrenderLoginList();
   });
 }
+// ===== 保存（差分だけ書き込む） =====
+// 以前は1か所の変更でも店のシフトデータ全体を set() で上書きしていた。
+// そのたびに開いている全端末へ全データが再送され、通信料が高額になっていた。
+// いまは「変わった日付・項目だけ」を update() で書き込む。
+var _saveSnap = null; // 最後にサーバーと一致していた状態（パス→JSON文字列）
+function _flatS() {
+  var f = {};
+  ['staff','positions','fixed','wishes','dayStatus','editedDays'].forEach(function(k){
+    f[k] = JSON.stringify(S[k] === undefined ? null : S[k]);
+  });
+  var sh = S.shifts || {};
+  Object.keys(sh).forEach(function(k){ f['shifts/' + k] = JSON.stringify(sh[k]); });
+  return f;
+}
 function saveS() {
   if (!S._loaded) { console.warn('saveS blocked: data not loaded yet'); return; }
   initFirebase();
   if (!db) return;
-  var data = {
-    staff: S.staff,
-    positions: S.positions,
-    fixed: S.fixed,
-    shifts: S.shifts,
-    wishes: S.wishes,
-    dayStatus: S.dayStatus,
-    editedDays: S.editedDays
-  };
-  db.ref(SHOPS[currentShop].dbKey).set(data);
+  var ref = db.ref(SHOPS[currentShop].dbKey);
+  var now = _flatS();
+  if (!_saveSnap) { // 基準がない場合だけ従来どおり全体保存
+    ref.set({
+      staff: S.staff, positions: S.positions, fixed: S.fixed, shifts: S.shifts,
+      wishes: S.wishes, dayStatus: S.dayStatus, editedDays: S.editedDays
+    });
+    _saveSnap = now; return;
+  }
+  var upd = {}, n = 0;
+  Object.keys(now).forEach(function(k){
+    if (now[k] !== _saveSnap[k]) { upd[k] = JSON.parse(now[k]); n++; }
+  });
+  Object.keys(_saveSnap).forEach(function(k){
+    if (!(k in now)) { upd[k] = null; n++; } // 消えた日付は削除
+  });
+  _saveSnap = now;
+  if (n) ref.update(upd);
 }
 // loadS called after window loads
 
@@ -3329,28 +3353,12 @@ function updateChallengUI(d, shopKey) {
   // 料理別 出数（日別・曜日平均）— 本店：日別CSVの food_daily ／ マルコ：差分取込で蓄積した food_daily_hist
   var fdWrap = document.getElementById('ch-fooddaily-wrap');
   if (fdWrap) {
-    var fdData = d.food_daily;
-    if (isMarco) {
-      // マルコ：差分取込で蓄積した food_daily_hist/marco から表示（月・8週とも）
-      fdWrap.style.display = 'block';
-      _fdMonthData = null;
-      fdSetMode(_fdState.mode || 'month');
-    } else if (true) {
-      // 今月分（food_daily）が無くても、蓄積済みの直近8週データがあれば表示する
-      fdWrap.style.display = 'block';
-      var hasMonth = !!(fdData && fdData.names && fdData.days && fdData.days.length);
-      _fdMonthData = hasMonth ? fdData : null;
-      if (_fdState.mode === '8w' || !hasMonth) {
-        _fdState.mode = '8w';
-        fdSetMode('8w');      // 直近8週表示中なら最新の保存データで読み直す
-      } else {
-        window._chFoodDaily = fdData;
-        _fdState.date = -1;   // 再描画時は最新日に戻す（料理の選択は保持）
-        renderFoodDaily();
-      }
-    } else {
-      fdWrap.style.display = 'none';
-    }
+    // 本店・マルコとも：food_daily_hist から表示（月・8週とも）
+    // 【変更 R8.11.23】本店の food_daily（料理×日の大きな表）をチャレンジのデータに置くと、
+    // 取込のたびに開いている全端末へ再送されて通信料が増えるため、蓄積データから読む形に統一
+    fdWrap.style.display = 'block';
+    _fdMonthData = null;
+    fdSetMode(_fdState.mode || 'month');
   }
 
   // 数量限定 出数の推移（曜日別・指定商品）— 本店のみ
@@ -4092,12 +4100,29 @@ function saveFoodDailyHist(shopKey, fd) {
     for (var i = 0; i < fd.names.length; i++) if (dy.q[i] > 0) { n.push(fd.names[i]); q.push(dy.q[i]); }
     upd[String(dy.k)] = { d: dy.d, wd: dy.wd, n: n, q: q };
   });
-  return db.ref('food_daily_hist/' + shopKey).update(upd).then(function(){ return fd.days.length; });
+  return db.ref('food_daily_hist/' + shopKey).update(upd).then(function(){
+    _fd8wCache = {};   // 保存したので読み込みのまとめを捨てる
+    // 表示中の店なら、保存後の最新データで料理別出数・仕込み目安を描き直す
+    if (getChShopKey() === shopKey && document.getElementById('ch-fooddaily')) {
+      fdSetMode(_fdState.mode || 'month');
+      renderPrep(shopKey);
+    }
+    return fd.days.length;
+  });
 }
 
 // 直近8週（最新の保存日から56日分）を読み込み、food_daily と同じ形に組み立てる
 // monthYm（例 '202610'）を渡すとその月だけ、省略すると直近8週
+var _fd8wCache = {};   // 同じ読み込みを30秒まとめる（取込直後に何度も再描画されるため）
 function loadFoodDaily8w(shopKey, monthYm) {
+  var ck = shopKey + '|' + (monthYm || '8w'), c = _fd8wCache[ck];
+  if (c && Date.now() - c.t < 30000) return c.p;
+  var p = _loadFoodDaily8wRaw(shopKey, monthYm);
+  _fd8wCache[ck] = { t: Date.now(), p: p };
+  p.catch(function(){ delete _fd8wCache[ck]; });
+  return p;
+}
+function _loadFoodDaily8wRaw(shopKey, monthYm) {
   var q = db.ref('food_daily_hist/' + shopKey).orderByKey();
   q = monthYm ? q.startAt(monthYm + '00').endAt(monthYm + '99') : q.limitToLast(70);
   return q.once('value').then(function(sn){
@@ -4127,11 +4152,12 @@ function loadFoodDaily8w(shopKey, monthYm) {
 function fdSetMode(mode) {
   _fdState.mode = mode;
   _fdState.date = -1;
-  if (mode === 'month' && getChShopKey() === 'marco') {
+  if (mode === 'month') {
     var elm = document.getElementById('ch-fooddaily');
     if (elm) elm.innerHTML = fdModeBar() + '<div style="font-size:11.5px;color:var(--text2);padding:8px 0">読み込み中…</div>';
-    loadFoodDaily8w('marco', getMonthKey().replace('-', '')).then(function(fd){
-      if (_fdState.mode !== 'month' || getChShopKey() !== 'marco') return;
+    var fdShopM = getChShopKey();
+    loadFoodDaily8w(fdShopM, getMonthKey().replace('-', '')).then(function(fd){
+      if (_fdState.mode !== 'month' || getChShopKey() !== fdShopM) return;
       if (!fd) { if (elm) elm.innerHTML = fdModeBar() + fdEmptyMsg(); return; }
       window._chFoodDaily = fd;
       renderFoodDaily();
@@ -4799,8 +4825,11 @@ function processCsvResults(results, shopKey) {
     }).catch(function(){});
   }
   // 数量限定リストなど既存データを先読みしてから本体を実行
-  prefetch.then(function(){ return getChRef(shopKey).once('value'); }).then(function(snap) {
-    var existingCh = snap.val() || {};
+  prefetch.then(function(){
+    var chr = getChRef(shopKey);
+    return Promise.all([chr.child('limited_names').once('value'), chr.child('big_base').once('value')]);
+  }).then(function(sn) {
+    var existingCh = { limited_names: sn[0].val(), big_base: sn[1].val() };
     processCsvResultsCore(results, shopKey, existingCh);
   }).catch(function() {
     processCsvResultsCore(results, shopKey, {});
@@ -4973,7 +5002,7 @@ function processCsvResultsCore(results, shopKey, existingCh) {
 
     // ── 料理別 日別出数（全フード品目・日付単位）── 【追加 R8.10.16】
     var fdBuilt = buildFoodDaily(dRows);
-    if (fdBuilt) upd.food_daily = { names: fdBuilt.names, days: fdBuilt.days, updated: ts };
+    if (fdBuilt) upd.food_daily = null; // 旧形式の大きな表は削除（表示は food_daily_hist から読む）
 
     // ── 数量限定 出数（曜日別・指定商品のみ） ──
     // 保存済みの limited_names（無ければ既定）にマッチする商品の曜日別出数を集計
