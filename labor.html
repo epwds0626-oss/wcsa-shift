@@ -109,6 +109,17 @@ tr.sep td{background:var(--bg);color:var(--sub);font-size:12px;font-weight:700;p
 .kbar{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--line)}
 .kbar i{display:flex;align-items:center;justify-content:center;min-width:0;overflow:hidden;font-style:normal}
 .kbar i span{font-size:11px;color:#fff;font-weight:700;white-space:nowrap;padding:0 4px}
+.cvbox{margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.cvh{font-weight:700;margin-bottom:8px;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.cvwrap{position:relative;--cvl:150px;--cvr:150px;display:grid;gap:8px;padding-top:18px}
+.cvrow{display:grid;grid-template-columns:var(--cvl) 1fr var(--cvr);align-items:center}
+.cvrow.cur .cvbar{box-shadow:0 0 0 2px var(--gold)}
+.cvlb{display:flex;flex-direction:column;line-height:1.3;padding-right:8px}
+.cvbar{height:32px} .cvbar i span{font-size:12px}
+.cvo{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;padding-left:8px}
+.cvtg{position:absolute;top:0;bottom:0;border-left:2px dashed var(--crit);pointer-events:none}
+.cvtg span{position:absolute;top:0;left:4px;font-size:11px;color:var(--crit);white-space:nowrap;font-weight:700}
+@media (max-width:640px){.cvwrap{--cvl:76px;--cvr:96px}.cvbar i span{font-size:10px}}
 .ktbl table td,.ktbl table th{padding:6px 10px;font-size:13px}
 b.gh{color:var(--honten)} b.gm{color:var(--marco)} b.gf{color:var(--fish)}
 .btn.sm{font-size:12px;padding:3px 10px;margin-top:6px}
@@ -1101,6 +1112,80 @@ function cmpAnnual(z){
   const days=Math.round((new Date(z)-new Date(first))/864e5)+1;
   return {sum,days,year:days>=365?sum:sum*365/days};
 }
+// ===== 比較のグラフ【追加 R8.11.23】 =====
+// ① 売上を100%にした内訳（人件費・食材費・固定費・営業利益）を列ごとに横棒で並べる
+// ② 営業利益の差を「売上の増減」「人件費率」「食材費率」「固定費」に分けた滝グラフ＋表
+//    営業利益＝売上×(1−人件費率−食材費率)−固定費 なので、差はぴったり次の4つの合計になる
+//      売上の増減の分＝(当−比)の売上×(1−比の人件費率−比の食材費率)
+//      人件費率の分＝−当の売上×(当の人件費率−比の人件費率)　食材費率の分も同じ
+//      固定費の分＝−(当の固定費−比の固定費)
+let cmpBr=1;
+function cmpBridge(c,p){
+  if(!(c.S>0)||!(p.S>0)||[c.L,c.F,c.X,p.L,p.F,p.X].some(v=>v==null))return null;
+  const rl=x=>x.L/x.S, rf=x=>x.F/x.S;
+  return {base:p.S-p.L-p.F-p.X, s:(c.S-p.S)*(1-rl(p)-rf(p)), l:-c.S*(rl(c)-rl(p)), f:-c.S*(rf(c)-rf(p)), x:-(c.X-p.X), end:c.S-c.L-c.F-c.X,
+    rl:[rl(c),rl(p)], rf:[rf(c),rf(p)]};
+}
+function cmpViz(cols,C){
+  const cs=getComputedStyle(document.documentElement), cv=(n,d)=>cs.getPropertyValue(n).trim()||d;
+  const K={L:cv("--honten","#1b2747"),F:cv("--marco","#b5532f"),X:cv("--sub","#5d6276"),O:cv("--ok","#2f6b47"),crit:cv("--crit","#b23a2e"),line:cv("--line","#ddd7c9"),ink:cv("--ink","#222"),gold:cv("--gold","#c9a24a")};
+  const pct=(v,S)=>(v/S*100).toFixed(1)+"%";
+  const pname=(c,i)=>i?c.lb:(cmpMode==="day"?"当日":"当月");
+  // ① 売上の内訳
+  let bars="";
+  cols.forEach((c,i)=>{const x=C[i];
+    if(!(x.S>0)||[x.L,x.F,x.X].some(v=>v==null)){bars+=`<div class="cvrow"><div class="cvlb"><b>${pname(c,i)}</b><span class="note">数字が足りません</span></div><div class="kbar cvbar"></div></div>`;return}
+    const O=x.S-x.L-x.F-x.X, seg=(v,col,lb)=>v>0?`<i style="flex:${v} 0 0;background:${col}" title="${lb} ${yen(v)}（${pct(v,x.S)}）"><span>${v/x.S>=0.06?lb+" ":""}${pct(v,x.S)}</span></i>`:"";
+    bars+=`<div class="cvrow${i?"":" cur"}"><div class="cvlb"><b>${pname(c,i)}</b><span class="note">売上 ${yen(x.S)}</span></div>
+      <div class="kbar cvbar">${seg(x.L,K.L,"人件費")}${seg(x.F,K.F,"食材費")}${seg(x.X,K.X,"固定費")}${O>0?seg(O,K.O,"営業利益"):""}</div>
+      <div class="cvo" style="color:${O>=0?K.O:K.crit}">${O<0?"赤字 −":"利益 "}${yen(Math.abs(O))}</div></div>`});
+  // 目標人件費率の線（売上の左端からの位置）
+  const tg=num(cfg.target||30);
+  const part1=`<div class="cvbox"><div class="cvh">売上100円の使い道 <span class="note">左から人件費・食材費・固定費、残りが営業利益（緑が長いほど良い）</span></div>
+    <div class="cvwrap">${bars}<div class="cvtg" style="left:calc(var(--cvl) + (100% - var(--cvl) - var(--cvr)) * ${tg/100})"><span>人件費の目標 ${tg}%</span></div></div>
+    <div class="legend" style="margin-top:4px"><span style="--c:${K.L}">人件費</span><span style="--c:${K.F}">食材費</span><span style="--c:${K.X}">固定費</span><span style="--c:${K.O}">営業利益</span></div></div>`;
+  // ② 営業利益の増減
+  const B=cols.slice(1).map((c,j)=>cmpBridge(C[0],C[j+1]));
+  if(cmpBr<1||cmpBr>=cols.length)cmpBr=1;
+  const b=B[cmpBr-1], pc=cols[cmpBr], cn=pname(cols[0],0);
+  const sy=v=>{const r=Math.round(v);return (r<0?"−":r>0?"+":"±")+yen(Math.abs(r))};
+  let svg="";
+  if(b){
+    const st=[{lb:[pc.lb+"の","営業利益"],v:b.base,base:1},
+      {lb:["売上の","増減"],v:b.s},
+      {lb:["人件費率",`${(b.rl[1]*100).toFixed(1)}→${(b.rl[0]*100).toFixed(1)}%`],v:b.l},
+      {lb:["食材費率",`${(b.rf[1]*100).toFixed(1)}→${(b.rf[0]*100).toFixed(1)}%`],v:b.f},
+      {lb:["固定費",""],v:b.x},
+      {lb:[cn+"の","営業利益"],v:b.end,base:1}];
+    let run=0;const seg=st.map(s=>{if(s.base){const r={a:0,z:s.v,...s};run=s.v;return r}const r={a:run,z:run+s.v,...s};run+=s.v;return r});
+    // 差が営業利益に比べて小さいと棒が見えないため、どの値もプラスなら下の変わらない部分を省略して差を大きく見せる
+    const vals=seg.flatMap(s=>s.base?[s.v]:[s.a,s.z]),mxv=Math.max(...vals),mnv=Math.min(...vals),sp=Math.max(mxv-mnv,Math.abs(mxv)*0.02,1);
+    const cut=mnv>0&&sp<mnv*0.6, lo=cut?mnv-sp*1.3:Math.min(0,mnv), hi=Math.max(0,mxv)+(cut?sp*0.12:0);
+    const W=960,H=300,pt=30,pb=46,pl=8,n=seg.length,cw=(W-pl*2)/n,bw=cw*0.5,y=v=>pt+(H-pt-pb)*(hi-v)/((hi-lo)||1),x=i=>pl+cw*i+cw/2;
+    seg.forEach(s=>{if(s.base&&cut)s.a=lo});
+    let g=`<line x1="${pl}" x2="${W-pl}" y1="${y(cut?lo:0)}" y2="${y(cut?lo:0)}" stroke="${K.line}"/>`;
+    seg.forEach((s,i)=>{const top=y(Math.max(s.a,s.z)),bot=y(Math.min(s.a,s.z)),col=s.base?(s.v>=0?K.ink:K.crit):s.v>=0?K.O:K.crit;
+      g+=`<rect x="${x(i)-bw/2}" y="${top}" width="${bw}" height="${Math.max(2,bot-top)}" rx="3" fill="${col}"${s.base&&i===0?' opacity=".45"':""}><title>${s.lb.join("")} ${s.base?yen(s.v):sy(s.v)}</title></rect>`;
+      if(s.base&&cut){const yb=y(lo)-16;g+=`<path d="M${x(i)-bw/2-3} ${yb+4} L${x(i)+bw/2+3} ${yb-4} M${x(i)-bw/2-3} ${yb+10} L${x(i)+bw/2+3} ${yb+2}" stroke="${cv("--panel","#fff")}" stroke-width="4"/>`}
+      if(i<n-1)g+=`<line x1="${x(i)+bw/2}" x2="${x(i+1)-bw/2}" y1="${y(s.z)}" y2="${y(s.z)}" stroke="${K.X}" stroke-dasharray="3 3"/>`;
+      const big=!s.base&&Math.abs(s.v)>=Math.max(...st.filter(q=>!q.base).map(q=>Math.abs(q.v)))*0.999;
+      g+=`<text x="${x(i)}" y="${top-7}" font-size="${big?15:13}" font-weight="700" text-anchor="middle" fill="${s.base?K.ink:s.v>=0?K.O:K.crit}">${s.base?yen(s.v):sy(s.v)}</text>`;
+      g+=`<text x="${x(i)}" y="${H-pb+17}" font-size="12" text-anchor="middle" fill="${K.ink}">${s.lb[0]}</text><text x="${x(i)}" y="${H-pb+32}" font-size="11" text-anchor="middle" fill="${K.X}">${s.lb[1]}</text>`});
+    svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:1000px;height:auto;display:block;margin:0 auto" role="img" aria-label="営業利益の増減の内訳">${g}</svg>`+(cut?`<div class="note" style="text-align:center">差を見やすくするため、両はしの営業利益の棒は下の部分を省略しています（白い切れ目）</div>`:"");
+    // ひとことで：いちばん大きく効いた理由
+    const parts=[["売上の増減",b.s],["人件費率の変化",b.l],["食材費率の変化",b.f],["固定費の増減",b.x]].sort((p,q)=>Math.abs(q[1])-Math.abs(p[1]));
+    const d=b.end-b.base;
+    svg=`<div class="al ${d>=0?"ok":"c"}" style="margin:6px 0">${pc.lb}より営業利益が <b>${sy(d)}</b>。いちばん効いたのは<b>${parts[0][0]}（${sy(parts[0][1])}）</b>、次は${parts[1][0]}（${sy(parts[1][1])}）です。</div>`+svg;
+  }else svg=`<p class="note">${pc.lb}は売上・人件費・食材費・固定費のどれかが出せないため、内訳を計算できません。</p>`;
+  const tb=cols.slice(1).map((c,j)=>`<button type="button" class="btn sm" data-cb="${j+1}" style="margin-top:0;${j+1===cmpBr?"background:var(--ink);color:var(--panel)":""}">${c.lb}と比べる</button>`).join("");
+  const cell=v=>v==null?"—":`<b style="color:${v>=0?K.O:K.crit}">${sy(v)}</b>`;
+  const rowsT=[["比較した期間の営業利益",x=>x?yen(x.base):"—"],["① 売上の増減による分",x=>x?cell(x.s):"—"],["② 人件費率の変化による分",x=>x?cell(x.l):"—"],["③ 食材費率の変化による分",x=>x?cell(x.f):"—"],["④ 固定費の増減による分",x=>x?cell(x.x):"—"],["営業利益の差（①〜④の合計）",x=>x?cell(x.end-x.base):"—"],[`${cn}の営業利益`,x=>x?yen(x.end):"—"]];
+  const table=`<div class="wrap ktbl" style="margin-top:8px"><table><thead><tr><th class="l">${cn}の営業利益との差</th>${cols.slice(1).map(c=>`<th>${c.lb}と比べて</th>`).join("")}</tr></thead><tbody>`+
+    rowsT.map(([lb,f],k)=>`<tr${k===5?' style="font-weight:700;border-top:2px solid var(--line)"':""}><td class="l">${lb}</td>${B.map(x=>`<td>${f(x)}</td>`).join("")}</tr>`).join("")+`</tbody></table></div>`;
+  const part2=`<div class="cvbox"><div class="cvh">営業利益の差はどこから来たか <span style="display:inline-flex;gap:4px;margin-left:8px">${tb}</span></div>${svg}${table}
+    <p class="note">①売上の増減＝比べた期間と同じ率で売れていたら増えた（減った）利益。②③＝率が変わった分（今の売上×率の差）。④＝固定費そのものの差。①〜④を足すと営業利益の差にぴったり一致します。緑は利益を増やした理由、赤は減らした理由です。</p></div>`;
+  return part1+part2;
+}
 function renderCmp(){
   const box=document.getElementById("cmpBox"); if(!box)return;
   const y=cmpYesterday(), isDay=cmpMode==="day", cols=cmpCols();
@@ -1168,6 +1253,7 @@ function renderCmp(){
     ${cmpMsg?`<div class="al w">${cmpMsg}</div>`:""}
     <div style="display:grid;gap:6px;margin:6px 0">${sumLine}</div>
     <div class="wrap ktbl"><table><thead><tr><th class="l">項目</th>${head}</tr></thead><tbody>${body}</tbody></table></div>
+    ${cmpViz(cols,C)}
     ${warns.length?`<div class="al w" style="margin-top:6px">${warns.join("<br>")}</div>`:""}
     <p class="note">${isDay?"差＝当日 − 比較日（緑＝当日のほうが良い、赤＝悪い）。先週＝7日前、先月＝4週前（28日前）、前年＝364日前で、どれも同じ曜日どうしで比べます。"
       :`差＝当月 − 比較月（緑＝当月のほうが良い、赤＝悪い）。${cols[0].partial?`今月は途中のため、先月・前年も同じ日付の範囲（1日〜${cols[0].ds.length}日）で比べます。`:""}月ごとに土日祝の日数が違うと売上も変わるので、見出しの日数も見てください。`}`+
@@ -1178,6 +1264,7 @@ function renderCmp(){
   box.querySelector("#cmpNext").onclick=()=>{if(isDay)cmpDay=cmpBack(cmpDay,-1);else cmpMonth=cmpYmAdd(cmpMonth,1);renderCmp()};
   box.querySelectorAll("[data-cm]").forEach(b=>b.onclick=()=>{cmpMode=b.dataset.cm;renderCmp()});
   box.querySelector("#cmpReload").onclick=()=>cmpLoad(true);
+  box.querySelectorAll("[data-cb]").forEach(b=>b.onclick=()=>{cmpBr=+b.dataset.cb;renderCmp()});
   box.querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>{cmpStore=b.dataset.cs;renderCmp()});
   cmpLoad();
 }
