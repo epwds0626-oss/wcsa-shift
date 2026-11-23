@@ -1084,6 +1084,9 @@ const CMP_COLS=[["当日",0],["先週",7],["先月",28],["前年",364]];
 function cmpBack(d,n){const x=new Date(d);x.setDate(x.getDate()-n);return dstr(x)}
 function payYMOf(d){const [y,m,dd]=d.split("/").map(Number);if(dd<21)return [y,m];return m===12?[y+1,1]:[y,m+1]}
 function cmpYesterday(){return cmpBack(dstr(new Date()),1)}
+// 選べる最後の日：今日の売上（本店・マルコ・FishHackのどれか）が入っていれば今日、まだなら昨日【修正 R8.11.23】
+function cmpLastDay(){const t=dstr(new Date());return (salesOf(t,"本店")!=null||salesOf(t,"マルコ")!=null||fhSales(t)>0)?t:cmpYesterday()}
+let cmpLiveToday=false;   // 今日、まだ勤務中（退勤の打刻がない）の人がいる → 今日の人件費は未確定
 async function cmpLoadFh(a,z){
   try{const A=a.replace(/\//g,"-"),Z=z.replace(/\//g,"-");
     const r=await fetch(`${FH_DB}/fishhack/deliveries.json?orderBy=${encodeURIComponent('"date"')}&startAt=${encodeURIComponent('"'+A+'"')}&endAt=${encodeURIComponent('"'+Z+'"')}`);
@@ -1101,7 +1104,7 @@ let cmpMode="day", cmpMonth=null;
 const cmpDim=ym=>new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
 const cmpYmAdd=(ym,n)=>{const x=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+n,1);return x.getFullYear()+"/"+String(x.getMonth()+1).padStart(2,"0")};
 function cmpCols(){
-  const y=cmpYesterday();
+  const y=cmpLastDay();
   if(cmpMode==="day"){
     if(!cmpDay||cmpDay>y)cmpDay=y;
     return CMP_COLS.map(([lb,n])=>{const d=cmpBack(cmpDay,n);return {lb,n,ds:[d]}});
@@ -1118,7 +1121,9 @@ async function cmpLoad(force){
   if(cmpBusy)return;
   if(force){cmpPer={};cmpLab={};cmpFhRange=null}
   const cols=cmpCols(), all=[].concat(...cols.map(c=>c.ds)), cur=curPayYM(), end=cols[0].ds[cols[0].ds.length-1];
-  const need=[...new Set(all.map(d=>payYMOf(d).join("-")))].filter(k=>{const [y,m]=k.split("-").map(Number);return !cmpPer[k]&&y*12+m<=cur[0]*12+cur[1]});
+  const tdy=dstr(new Date()), tdk=payYMOf(tdy).join("-");
+  const stale=k=>k===tdk&&all.includes(tdy)&&cmpPer[k]&&cmpPer[k].ok&&!cmpLab[tdy]&&Date.now()-(cmpPer[k].t||0)>60000;
+  const need=[...new Set(all.map(d=>payYMOf(d).join("-")))].filter(k=>{const [y,m]=k.split("-").map(Number);return (!cmpPer[k]||stale(k))&&y*12+m<=cur[0]*12+cur[1]});
   const lo=[cmpBack(end,364)].concat(all).sort()[0], hi=all.slice().sort().pop();
   const fhNeed=!cmpFhRange||lo<cmpFhRange[0]||hi>cmpFhRange[1];
   if(!need.length&&!fhNeed)return;
@@ -1133,10 +1138,13 @@ async function cmpLoad(force){
         const P=r.byPeriod[k];if(!P||!P.rows||!P.rows.length){cmpPer[k]={empty:true};continue}
         periodTG={};Object.entries(P.tg||{}).forEach(([n,v])=>periodTG[norm(n)]=num(v));
         setupRows(parseCSV(punchesToCSV(P.rows)));
-        const {res}=compute(), lp=rows.map(x=>x.date).sort().pop(), cH=closedSet("本店"), cM=closedSet("マルコ"), td=dstr(new Date());
-        dates.forEach(d=>{if(d>lp||d>=td)return;   // 打刻がまだない日・勤務中の今日は入れない
+        const {res,issues}=compute(), lp=rows.map(x=>x.date).sort().pop(), cH=closedSet("本店"), cM=closedSet("マルコ"), td=dstr(new Date());
+        const live=dates.includes(td)&&issuesToday(issues);   // 日別の表と同じ判定：勤務中の人がいれば今日の人件費は未確定
+        if(dates.includes(td))cmpLiveToday=live;
+        if(live)delete cmpLab[td];
+        dates.forEach(d=>{if(d>lp||d>td||(d===td&&live))return;   // 打刻がまだない日・勤務中の今日は入れない
           cmpLab[d]={本店:{c:res[d].本店.cost,h:res[d].本店.h},マルコ:{c:res[d].マルコ.cost,h:res[d].マルコ.h},cl:{本店:cH.has(d),マルコ:cM.has(d)}}});
-        cmpPer[k]={ok:true};
+        cmpPer[k]={ok:true,t:Date.now()};
       }
     }catch(e){console.error(e);need.forEach(k=>{if(!cmpPer[k])cmpPer[k]={err:String(e&&e.message||e)}})}
     finally{rows=save.rows;dates=save.dates;people=save.people;periodTG=save.periodTG;cfg.closed=JSON.parse(save.closedBak)}
@@ -1160,7 +1168,7 @@ function cmpCalc(d){
     if(sm==null&&lab&&!lab.cl.マルコ&&lab.マルコ.c>0)warn.push("マルコの売上が未入力")}
   else{S=sb==null&&sm==null&&!sf?null:(sb||0)+(sm||0)+sf;L=lab?lab.本店.c+lab.マルコ.c:null;h=lab?lab.本店.h+lab.マルコ.h:null;F=FS?FS.h+FS.m+FS.f:null;XX=X;cl=lab?lab.cl.本店&&lab.cl.マルコ:false;
     STORES.forEach(s=>{const v=s==="本店"?sb:sm;if(v==null&&lab&&!lab.cl[s]&&lab[s].c>0)warn.push(s+"の売上が未入力")})}
-  if(!lab)warn.push("打刻なし（人件費を出せません）");
+  if(!lab)warn.push(d===dstr(new Date())&&cmpLiveToday?"勤務中の人がいるため、今日の人件費は未確定です（全員が退勤したら「再取得」を押してください）":"打刻なし（人件費を出せません）");
   if(F==null)warn.push("食材費を出せません");
   if(XX==null)warn.push("固定費を出せません");
   const prov=(PC.provFood&&PC.provFood(ym))||fixedProv(ym);
@@ -1272,7 +1280,7 @@ function cmpViz(cols,C){
 }
 function renderCmp(){
   const box=document.getElementById("cmpBox"); if(!box)return;
-  const y=cmpYesterday(), isDay=cmpMode==="day", cols=cmpCols();
+  const y=cmpLastDay(), isDay=cmpMode==="day", cols=cmpCols();
   const C=cols.map(c=>cmpAgg(c.ds)), cur=C[0], endDay=cols[0].ds[cols[0].ds.length-1], A=cmpAnnual(endDay);
   const iso=d=>d.replace(/\//g,"-");
   const dl=d=>{const dw=DOW[new Date(d).getDay()],hol=HOLIDAYS[d];return `${d.slice(0,4)!==endDay.slice(0,4)?d.slice(0,4)+"/":""}${+d.slice(5,7)}/${+d.slice(8)}（<span class="dow-${hol?"日":dw}">${dw}</span>）${hol?`<span class="chip s">${hol}</span>`:""}`};
