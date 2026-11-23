@@ -165,8 +165,88 @@ tr.avg td{font-size:12.5px}
 .sub2{font-size:10.5px;font-weight:700;color:var(--sub);line-height:1.2} .sub2.ok{color:var(--ok)} .sub2.w{color:var(--warn)} .sub2.c{color:var(--crit)}
 .yoy{font-size:11px;font-weight:700;line-height:1.2}
 .yoy.up{color:var(--ok)} .yoy.down{color:var(--crit)}
+
+/* ===== 見やすさの改善【R8.11.23】：余白・文字の大きさ・区切りを整える（計算や機能は変えない） ===== */
+body{font-size:14.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
+header{padding:10px 20px;border-bottom-width:2px;box-shadow:0 2px 14px rgba(10,15,35,.22)}
+@media (min-width:900px){header{position:sticky;top:0;z-index:50}#toast{top:76px!important}}
+header .btn{background:transparent;color:#f3efe3;border-color:rgba(255,255,255,.28);font-size:13px;padding:7px 14px}
+header .btn:hover{background:rgba(255,255,255,.1)}
+header #anOpen{background:var(--gold);color:#1b2747;border-color:var(--gold)}
+header h1{font-size:21px}
+header select{background:rgba(255,255,255,.1)!important;color:#f3efe3!important;border:1px solid rgba(255,255,255,.28)!important}
+header select option{color:#1c2541}
+main{max-width:1320px;gap:22px;padding-block:18px 80px}
+main>*{min-width:0}
+main>section:not(.alerts):not(.grid2){background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:0 1px 2px rgba(28,37,65,.05),0 6px 20px rgba(28,37,65,.05);scroll-margin-top:96px}
+#sec-set{scroll-margin-top:96px}
+@media (max-width:640px){main{padding-inline:10px}main>section:not(.alerts):not(.grid2){padding:14px 12px;border-radius:12px}}
+h2{font-size:19px;display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;margin:0 0 14px}
+h2::before{content:"";width:5px;height:20px;border-radius:3px;background:var(--gold);flex:none}
+.panel h2{font-size:16px} .panel h2::before{height:16px}
+.h2s{font-family:var(--body);font-size:12.5px;font-weight:500;color:var(--sub);letter-spacing:0}
+.note{font-size:12.5px;line-height:1.75}
+.btn{border-radius:9px;transition:background .15s,border-color .15s}
+.btn:hover{border-color:var(--gold)}
+.btn.sm{padding:4px 12px}
+input[type=number],select,input[type=date],input[type=month]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+/* ページ内メニュー */
+.secnav{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:4px;margin:0 0 -6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;position:sticky;top:6px;z-index:40;box-shadow:0 2px 10px rgba(28,37,65,.06)}
+@media (min-width:900px){.secnav{top:calc(var(--hh,72px) + 6px)}main>section:not(.alerts):not(.grid2),#sec-set{scroll-margin-top:calc(var(--hh,72px) + 64px)}}
+em.kw{font-style:normal}
+.seg{max-width:100%;overflow-x:auto;scrollbar-width:none}
+.datenav{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}.datenav .pnav{margin-right:0}
+@media (max-width:640px){
+  em.kw{display:none}
+  .kbar i span{font-size:10.5px;padding:0 2px}
+  .cvwrap{--cvl:0px;--cvr:0px}
+  .cvrow{grid-template-columns:1fr auto;row-gap:3px}
+  .cvrow .cvlb{flex-direction:row;gap:8px;align-items:baseline}
+  .cvrow .cvbar{grid-column:1/-1;grid-row:2}
+  .cvrow .cvo{grid-row:1;grid-column:2}
+  .cmpsum{gap:8px}
+  .cmpcard{padding:8px 12px}
+  .cmpsum .cmpcard .cmpcard-b{flex-direction:row;flex-wrap:wrap;gap:0 14px}
+}
+.secnav::-webkit-scrollbar{display:none}
+.secnav a{flex:none;font-size:13px;font-weight:700;color:var(--sub);text-decoration:none;padding:6px 14px;border-radius:8px;white-space:nowrap}
+.secnav a:hover{background:var(--bg);color:var(--ink)}
+/* スイッチ型の切り替えボタン */
+.seg{display:inline-flex;padding:3px;gap:2px;background:var(--bg);border:1px solid var(--line);border-radius:10px;vertical-align:middle;flex:none}
+.seg button{font:inherit;font-size:13px;font-weight:700;border:0;background:transparent;color:var(--sub);padding:5px 14px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--ink);color:var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.toolbar{gap:10px 14px;margin-bottom:12px}
+/* 一番上の要約 */
+.khead{font-size:13.5px} .khead b{font-size:17px}
+.kpi{gap:12px}
+.kc{border-radius:14px;padding:16px 18px;border-top-width:5px}
+.kc .kl{font-size:13px}
+.kc .kv{font-size:clamp(22px,2.3vw,31px);margin:2px 0}
+.kc .ks{font-size:12.5px}
+.kbar{height:28px;border-radius:8px}
+.kbar i span{font-size:12px}
+/* 表 */
+.wrap{border-radius:12px}
+th,td{padding:9px 12px}
+th{background:color-mix(in srgb,var(--line) 32%,var(--panel));color:var(--sub);font-size:12px;letter-spacing:.03em}
+tbody tr:hover>td{background:color-mix(in srgb,var(--gold) 7%,transparent)}
+.ktbl table td,.ktbl table th{padding:9px 12px;font-size:13.5px}
+.sub2{font-size:11.5px;margin-top:2px}
+.pill{font-size:13px;padding:2px 10px}
+/* 比較：先週比・先月比・前年比のカード */
+.cmpsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin:4px 0 14px}
+.cmpcard{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.cmpcard-h{font-family:var(--display);font-weight:900;font-size:15px;margin-bottom:4px}
+.cmpcard-b{display:flex;flex-direction:column;gap:1px;font-size:13.5px;font-variant-numeric:tabular-nums}
+.cmpcard-b b{font-size:15px}
+.cvbox{border-radius:14px;padding:16px 18px;background:var(--bg)}
+.cvh{font-size:15px;font-family:var(--display);font-weight:900}
+.al{border-radius:10px;padding:10px 14px;font-size:13.5px}
+.panel{border-radius:14px;padding:18px 20px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
+<script>(function(){function hh(){var h=document.querySelector("header");if(h)document.documentElement.style.setProperty("--hh",h.offsetHeight+"px")}addEventListener("load",hh);addEventListener("resize",hh);document.addEventListener("DOMContentLoaded",hh)})();</script>
 </head><body>
 
 <div id="lock" class="lock"><div class="lock-in">
@@ -202,20 +282,21 @@ tr.avg td{font-size:12.5px}
   <div class="legend" style="margin-top:8px"><span style="--c:var(--honten)">本店</span><span style="--c:var(--marco)">マルコ</span><span style="--c:var(--fish)">FishHack</span></div>
 </section>
 <main id="app" hidden>
-  <section>
+  <nav class="secnav" aria-label="ページ内の移動"><a href="#sec-sum">概要</a><a href="#sec-cmp">比較</a><a href="#sec-trend">推移</a><a href="#sec-daily">日別</a><a href="#sec-dow">曜日区分</a><a href="#sec-prod">人時売上高</a><a href="#sec-set">設定</a></nav>
+  <section id="sec-sum">
     <div class="sum" id="sum"></div>
     <p class="note" id="sumNote"></p>
     <p class="note"><span id="tcStatus"></span> <button class="btn sm" id="tcReload" type="button">打刻を再取得</button></p>
   </section>
-  <section>
-    <h2>比較（1日：先週・先月・前年／月：先月・前年同月）</h2>
+  <section id="sec-cmp">
+    <h2>比較 <span class="h2s">1日：先週・先月・前年 ／ 月：先月・前年同月</span></h2>
     <div id="cmpBox"></div>
   </section>
-  <section>
+  <section id="sec-trend">
     <h2>日別の推移</h2>
     <div id="trendL"></div>
   </section>
-  <section>
+  <section id="sec-daily">
     <h2>日別</h2>
     <div class="toolbar"><span class="note">行をタップ → 人別の内訳と売上の手入力</span>
       <label for="target" class="note">目標人件費率 <input id="target" type="number" min="1" max="100" step="0.5" style="width:70px"> %</label>
@@ -248,13 +329,13 @@ tr.avg td{font-size:12.5px}
     <div class="wrap stick" id="dailyWrap"><table id="daily"></table></div>
     <p class="note" id="profitNote"></p>
   </section>
-  <section>
+  <section id="sec-dow">
     <h2>曜日区分の平均</h2>
     <div class="wrap"><table id="dayType"></table></div>
     <p class="note" id="dtNote"></p>
   </section>
-  <section>
-    <h2>人時売上高（売上 ÷ 実働時間）</h2>
+  <section id="sec-prod">
+    <h2>人時売上高 <span class="h2s">売上 ÷ 実働時間</span></h2>
     <div class="toolbar"><span class="note">スタッフ1人が1時間で稼いだ売上。高いほど少ない人数で回せている</span>
       <label for="prodTarget" class="note">目標 ¥<input id="prodTarget" type="number" min="500" step="100" style="width:80px"> ／h</label></div>
     <div class="wrap"><table id="prodTable"></table></div>
@@ -263,7 +344,7 @@ tr.avg td{font-size:12.5px}
   <section class="alerts" id="alerts"></section>
 
 
-  <section class="grid2">
+  <section class="grid2" id="sec-set">
     <div class="panel" style="grid-column:1/-1">
       <h2>人別の単価</h2>
       <p class="note"><span id="masterStatus"></span> <button class="btn sm" id="masterReload" type="button">再取得</button></p>
@@ -885,7 +966,7 @@ function renderDaily(){
   const tgt=num(cfg.target||30), lr=K.S>0?K.L/K.S*100:null;
   const lastUse=shown.filter(d=>!(inPg&&d===tdK)).pop()||lastPunch;
   const card=(cls,lb,v,sub,extra)=>`<div class="kc ${cls}"><div class="kl">${lb}</div><div class="kv">${v}</div><div class="ks">${sub}</div>${extra||""}</div>`;
-  const seg=(v,c,lb)=>K.S>0&&v>0?`<i style="flex:${v} 0 0;background:${c}" title="${lb} ${yen(v)}（${kp(v)}）"><span>${lb} ${kp(v)}</span></i>`:"";
+  const seg=(v,c,lb)=>K.S>0&&v>0?`<i style="flex:${v} 0 0;background:${c}" title="${lb} ${yen(v)}（${kp(v)}）"><span><em class="kw">${lb} </em>${kp(v)}</span></i>`:"";
   const yC=yy.本店.c+yy.マルコ.c, yP=yy.本店.p+yy.マルコ.p;
   const storeRow=(nm,cls,s,c,phk,yk,extra)=>`<tr><td class="l"><b class="${cls}">${nm}</b></td><td>${s!=null?yen(s):"—"}</td><td>${c!=null?yen(c):"—"}</td><td>${c!=null&&s>0?ratioCell(c,s).replace(/^<td class="rt">|<\/td>$/g,""):"—"}</td><td>${phk&&ph[phk].h>0?prodPill(ph[phk].s/ph[phk].h):"—"}</td><td>${yk&&yy[yk].p>0?(yy[yk].c/yy[yk].p*100).toFixed(1)+"%":"—"}</td><td class="l note">${extra||""}</td></tr>`;
   document.getElementById("sum").innerHTML=`
@@ -1135,7 +1216,7 @@ function cmpViz(cols,C){
   let bars="";
   cols.forEach((c,i)=>{const x=C[i];
     if(!(x.S>0)||[x.L,x.F,x.X].some(v=>v==null)){bars+=`<div class="cvrow"><div class="cvlb"><b>${pname(c,i)}</b><span class="note">数字が足りません</span></div><div class="kbar cvbar"></div></div>`;return}
-    const O=x.S-x.L-x.F-x.X, seg=(v,col,lb)=>v>0?`<i style="flex:${v} 0 0;background:${col}" title="${lb} ${yen(v)}（${pct(v,x.S)}）"><span>${v/x.S>=0.06?lb+" ":""}${pct(v,x.S)}</span></i>`:"";
+    const O=x.S-x.L-x.F-x.X, seg=(v,col,lb)=>v>0?`<i style="flex:${v} 0 0;background:${col}" title="${lb} ${yen(v)}（${pct(v,x.S)}）"><span>${v/x.S>=0.06?`<em class="kw">${lb} </em>`:""}${pct(v,x.S)}</span></i>`:"";
     bars+=`<div class="cvrow${i?"":" cur"}"><div class="cvlb"><b>${pname(c,i)}</b><span class="note">売上 ${yen(x.S)}</span></div>
       <div class="kbar cvbar">${seg(x.L,K.L,"人件費")}${seg(x.F,K.F,"食材費")}${seg(x.X,K.X,"固定費")}${O>0?seg(O,K.O,"営業利益"):""}</div>
       <div class="cvo" style="color:${O>=0?K.O:K.crit}">${O<0?"赤字 −":"利益 "}${yen(Math.abs(O))}</div></div>`});
@@ -1161,7 +1242,10 @@ function cmpViz(cols,C){
     // 差が営業利益に比べて小さいと棒が見えないため、どの値もプラスなら下の変わらない部分を省略して差を大きく見せる
     const vals=seg.flatMap(s=>s.base?[s.v]:[s.a,s.z]),mxv=Math.max(...vals),mnv=Math.min(...vals),sp=Math.max(mxv-mnv,Math.abs(mxv)*0.02,1);
     const cut=mnv>0&&sp<mnv*0.6, lo=cut?mnv-sp*1.3:Math.min(0,mnv), hi=Math.max(0,mxv)+(cut?sp*0.12:0);
-    const W=960,H=300,pt=30,pb=46,pl=8,n=seg.length,cw=(W-pl*2)/n,bw=cw*0.5,y=v=>pt+(H-pt-pb)*(hi-v)/((hi-lo)||1),x=i=>pl+cw*i+cw/2;
+    // 描く幅を画面の幅に合わせる（スマホで文字が小さくなりすぎないように）。狭い画面では金額を「万」で短く出す
+    const bxw=(document.getElementById("cmpBox")||{}).clientWidth||960, W=Math.max(320,Math.min(960,bxw-36)), nar=W<560;
+    const fy=v=>nar?(v<0?"−":"")+(Math.abs(v)/1e4).toFixed(1)+"万":yen(v), fs=v=>{const r=Math.round(v);return nar?(r<0?"−":r>0?"+":"±")+(Math.abs(r)/1e4).toFixed(1)+"万":sy(v)};
+    const H=nar?240:300,pt=30,pb=46,pl=8,n=seg.length,cw=(W-pl*2)/n,bw=cw*0.5,y=v=>pt+(H-pt-pb)*(hi-v)/((hi-lo)||1),x=i=>pl+cw*i+cw/2;
     seg.forEach(s=>{if(s.base&&cut)s.a=lo});
     let g=`<line x1="${pl}" x2="${W-pl}" y1="${y(cut?lo:0)}" y2="${y(cut?lo:0)}" stroke="${K.line}"/>`;
     seg.forEach((s,i)=>{const top=y(Math.max(s.a,s.z)),bot=y(Math.min(s.a,s.z)),col=s.base?(s.v>=0?K.ink:K.crit):s.v>=0?K.O:K.crit;
@@ -1169,20 +1253,20 @@ function cmpViz(cols,C){
       if(s.base&&cut){const yb=y(lo)-16;g+=`<path d="M${x(i)-bw/2-3} ${yb+4} L${x(i)+bw/2+3} ${yb-4} M${x(i)-bw/2-3} ${yb+10} L${x(i)+bw/2+3} ${yb+2}" stroke="${cv("--panel","#fff")}" stroke-width="4"/>`}
       if(i<n-1)g+=`<line x1="${x(i)+bw/2}" x2="${x(i+1)-bw/2}" y1="${y(s.z)}" y2="${y(s.z)}" stroke="${K.X}" stroke-dasharray="3 3"/>`;
       const big=!s.base&&Math.abs(s.v)>=Math.max(...st.filter(q=>!q.base).map(q=>Math.abs(q.v)))*0.999;
-      g+=`<text x="${x(i)}" y="${top-7}" font-size="${big?15:13}" font-weight="700" text-anchor="middle" fill="${s.base?K.ink:s.v>=0?K.O:K.crit}">${s.base?yen(s.v):sy(s.v)}</text>`;
-      g+=`<text x="${x(i)}" y="${H-pb+17}" font-size="12" text-anchor="middle" fill="${K.ink}">${s.lb[0]}</text><text x="${x(i)}" y="${H-pb+32}" font-size="11" text-anchor="middle" fill="${K.X}">${s.lb[1]}</text>`});
+      g+=`<text x="${x(i)}" y="${top-7}" font-size="${nar?(big?12.5:11.5):(big?15:13)}" font-weight="700" text-anchor="middle" fill="${s.base?K.ink:s.v>=0?K.O:K.crit}">${s.base?fy(s.v):fs(s.v)}</text>`;
+      g+=`<text x="${x(i)}" y="${H-pb+17}" font-size="${nar?11:12}" text-anchor="middle" fill="${K.ink}">${s.lb[0]}</text><text x="${x(i)}" y="${H-pb+32}" font-size="${nar?9.5:11}" text-anchor="middle" fill="${K.X}">${nar&&s.lb[1].includes("→")?"→"+s.lb[1].split("→")[1]:s.lb[1]}</text>`});
     svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:1000px;height:auto;display:block;margin:0 auto" role="img" aria-label="営業利益の増減の内訳">${g}</svg>`+(cut?`<div class="note" style="text-align:center">差を見やすくするため、両はしの営業利益の棒は下の部分を省略しています（白い切れ目）</div>`:"");
     // ひとことで：いちばん大きく効いた理由
     const parts=[["売上の増減",b.s],["人件費率の変化",b.l],["食材費率の変化",b.f],["固定費の増減",b.x]].sort((p,q)=>Math.abs(q[1])-Math.abs(p[1]));
     const d=b.end-b.base;
     svg=`<div class="al ${d>=0?"ok":"c"}" style="margin:6px 0">${pc.lb}より営業利益が <b>${sy(d)}</b>。いちばん効いたのは<b>${parts[0][0]}（${sy(parts[0][1])}）</b>、次は${parts[1][0]}（${sy(parts[1][1])}）です。</div>`+svg;
   }else svg=`<p class="note">${pc.lb}は売上・人件費・食材費・固定費のどれかが出せないため、内訳を計算できません。</p>`;
-  const tb=cols.slice(1).map((c,j)=>`<button type="button" class="btn sm" data-cb="${j+1}" style="margin-top:0;${j+1===cmpBr?"background:var(--ink);color:var(--panel)":""}">${c.lb}と比べる</button>`).join("");
+  const tb=`<span class="seg">${cols.slice(1).map((c,j)=>`<button type="button" data-cb="${j+1}"${j+1===cmpBr?' class="on"':""}>${c.lb}と比べる</button>`).join("")}</span>`;
   const cell=v=>v==null?"—":`<b style="color:${v>=0?K.O:K.crit}">${sy(v)}</b>`;
   const rowsT=[["比較した期間の営業利益",x=>x?yen(x.base):"—"],["① 売上の増減による分",x=>x?cell(x.s):"—"],["② 人件費率の変化による分",x=>x?cell(x.l):"—"],["③ 食材費率の変化による分",x=>x?cell(x.f):"—"],["④ 固定費の増減による分",x=>x?cell(x.x):"—"],["営業利益の差（①〜④の合計）",x=>x?cell(x.end-x.base):"—"],[`${cn}の営業利益`,x=>x?yen(x.end):"—"]];
   const table=`<div class="wrap ktbl" style="margin-top:8px"><table><thead><tr><th class="l">${cn}の営業利益との差</th>${cols.slice(1).map(c=>`<th>${c.lb}と比べて</th>`).join("")}</tr></thead><tbody>`+
     rowsT.map(([lb,f],k)=>`<tr${k===5?' style="font-weight:700;border-top:2px solid var(--line)"':""}><td class="l">${lb}</td>${B.map(x=>`<td>${f(x)}</td>`).join("")}</tr>`).join("")+`</tbody></table></div>`;
-  const part2=`<div class="cvbox"><div class="cvh">営業利益の差はどこから来たか <span style="display:inline-flex;gap:4px;margin-left:8px">${tb}</span></div>${svg}${table}
+  const part2=`<div class="cvbox"><div class="cvh">営業利益の差はどこから来たか ${tb}</div>${svg}${table}
     <p class="note">①売上の増減＝比べた期間と同じ率で売れていたら増えた（減った）利益。②③＝率が変わった分（今の売上×率の差）。④＝固定費そのものの差。①〜④を足すと営業利益の差にぴったり一致します。緑は利益を増やした理由、赤は減らした理由です。</p></div>`;
   return part1+part2;
 }
@@ -1237,21 +1321,21 @@ function renderCmp(){
     const s=cur.S>0&&x.S>0?`売上 ${(cur.S/x.S*100).toFixed(1)}%`:"売上 —";
     const lr=pc(cur.L,cur.S), lp=pc(x.L,x.S), l=lr!=null&&lp!=null?`人件費率 <b style="color:var(${(lr-lp)<=0?"--ok":"--crit"})">${lr-lp>=0?"+":"−"}${Math.abs((lr-lp)*100).toFixed(1)}pt</b>`:"人件費率 —";
     const o=cur.O!=null&&x.O!=null?`営業利益 <b style="color:var(${cur.O-x.O>=0?"--ok":"--crit"})">${cur.O-x.O>=0?"+":"−"}${yen(Math.abs(cur.O-x.O))}</b>`:"営業利益 —";
-    return `<div class="al" style="margin:0;background:var(--panel);border:1px solid var(--line)"><b>${c.lb}比</b>　${s}　${l}　${o}</div>`}).join("");
+    return `<div class="cmpcard"><div class="cmpcard-h">${c.lb}比</div><div class="cmpcard-b"><span>${s}</span><span>${l}</span><span>${o}</span></div></div>`}).join("");
   const warns=cols.map((c,i)=>C[i].warn.length?`${c.lb}（${isDay?c.ds[0].slice(5):+c.ds[0].slice(5,7)+"月"}）：${C[i].warn.join("・")}`:"").filter(Boolean);
-  const stBtn=["全社","本店","マルコ"].map(s=>`<button type="button" class="btn sm" data-cs="${s}" style="${s===cmpStore?"background:var(--ink);color:var(--panel)":""}">${s}</button>`).join("");
-  const mdBtn=[["day","1日"],["month","月"]].map(([k,t])=>`<button type="button" class="btn sm" data-cm="${k}" style="margin-top:0;${k===cmpMode?"background:var(--ink);color:var(--panel)":""}">${t}</button>`).join("");
+  const stBtn=["全社","本店","マルコ"].map(s=>`<button type="button" data-cs="${s}"${s===cmpStore?' class="on"':""}>${s}</button>`).join("");
+  const mdBtn=[["day","1日"],["month","月"]].map(([k,t])=>`<button type="button" data-cm="${k}"${k===cmpMode?' class="on"':""}>${t}</button>`).join("");
   const nextOff=isDay?cmpDay>=y:cmpMonth>=y.slice(0,7);
   box.innerHTML=`<div class="toolbar">
-      <span style="display:inline-flex;gap:4px">${mdBtn}</span>
-      <span class="pnav dark"><button type="button" id="cmpPrev" aria-label="${isDay?"前の日":"前の月"}">‹</button></span>
+      <span class="seg">${mdBtn}</span>
+      <span class="datenav"><span class="pnav dark"><button type="button" id="cmpPrev" aria-label="${isDay?"前の日":"前の月"}">‹</button></span>
       ${isDay?`<label class="note" for="cmpDate">比べる日 <input id="cmpDate" type="date" value="${iso(cmpDay)}" max="${iso(y)}" style="width:auto"></label>`
         :`<label class="note" for="cmpDate">比べる月 <input id="cmpDate" type="month" value="${cmpMonth.replace("/","-")}" max="${y.slice(0,7).replace("/","-")}" style="width:auto"></label>`}
-      <span class="pnav dark"><button type="button" id="cmpNext" aria-label="${isDay?"次の日":"次の月"}"${nextOff?" disabled":""}>›</button></span>
+      <span class="pnav dark"><button type="button" id="cmpNext" aria-label="${isDay?"次の日":"次の月"}"${nextOff?" disabled":""}>›</button></span></span>
       <button class="btn sm" type="button" id="cmpReload" style="margin-top:0">再取得</button>
-      <span style="display:inline-flex;gap:4px;margin-left:auto">${stBtn}</span></div>
+      <span class="seg" style="margin-left:auto">${stBtn}</span></div>
     ${cmpMsg?`<div class="al w">${cmpMsg}</div>`:""}
-    <div style="display:grid;gap:6px;margin:6px 0">${sumLine}</div>
+    <div class="cmpsum">${sumLine}</div>
     <div class="wrap ktbl"><table><thead><tr><th class="l">項目</th>${head}</tr></thead><tbody>${body}</tbody></table></div>
     ${cmpViz(cols,C)}
     ${warns.length?`<div class="al w" style="margin-top:6px">${warns.join("<br>")}</div>`:""}
@@ -1289,12 +1373,12 @@ function renderTrendL(res,shown,inProg){
     return {d,parts,S,L:live?null:L,F,X:XX,O:live||F==null||XX==null?null:S-L-F-XX,cl,live};
   });
   const seg=`<div class="toolbar"><span class="note">期間：上の期間と同じ（${shown.length?shown[0].slice(5)+"〜"+shown[shown.length-1].slice(5):""}）。グラフの日をタップするとその日の数字</span>
-    <span style="display:inline-flex;gap:4px;margin-left:auto">${["全社","本店","マルコ"].map(s=>`<button type="button" class="btn sm${s===st?" pri":""}" style="${s===st?"background:var(--ink);color:var(--panel)":""}" onclick="trendStore='${s}';trendSel=null;renderTrendL(trendLast.res,trendLast.shown,trendLast.inProg)">${s}</button>`).join("")}</span></div>`;
+    <span class="seg" style="margin-left:auto">${["全社","本店","マルコ"].map(s=>`<button type="button"${s===st?' class="on"':""} onclick="trendStore='${s}';trendSel=null;renderTrendL(trendLast.res,trendLast.shown,trendLast.inProg)">${s}</button>`).join("")}</span></div>`;
   if(!rws.some(r=>r.S>0||r.L)){box.innerHTML=seg+'<p class="note">この期間のデータがまだありません。</p>';return}
   if(trendSel==null||trendSel>=rws.length){trendSel=null;for(let j=rws.length-1;j>=0;j--)if(rws[j].S>0){trendSel=j;break}}
   const cs=getComputedStyle(document.documentElement), cv=n=>cs.getPropertyValue(n).trim();
   const C={本店:cv("--honten")||"#1b2747",マルコ:cv("--marco")||"#b5532f",FishHack:cv("--fish")||"#1f7a8c",ok:cv("--ok")||"#2f6b47",crit:cv("--crit")||"#b23a2e",sub:cv("--sub")||"#5d6276",line:cv("--line")||"#ddd7c9",L:cv("--warn")||"#a5660b",F:"#2c6fb0"};
-  const n=rws.length,W=760,pl=48,pr=8,cw=(W-pl-pr)/n,bw=Math.max(2,cw*.7),pt=8,pb=32,x=i=>pl+cw*i+cw/2;
+  const n=rws.length,W=Math.max(320,Math.round((box.clientWidth||950)/1.25)),pl=48,pr=8,cw=(W-pl-pr)/n,bw=Math.max(2,cw*.7),pt=8,pb=32,x=i=>pl+cw*i+cw/2;
   const nice=v=>{if(!(v>0))return 1;const p=Math.pow(10,Math.floor(Math.log10(v))),f=v/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p};
   const ys=v=>{const a=Math.abs(v);return (v<0?"−":"")+(a>=10000?(Math.round(a/1000)/10)+"万":Math.round(a).toLocaleString())};
   const xAxis=H=>rws.map((r,i)=>{const dw=new Date(r.d).getDay(),step=n>45?7:n>20?3:1;if(i%step&&i!==n-1)return "";const hol=HOLIDAYS[r.d];
