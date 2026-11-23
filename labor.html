@@ -197,7 +197,7 @@ tr.avg td{font-size:12.5px}
     <p class="note"><span id="tcStatus"></span> <button class="btn sm" id="tcReload" type="button">打刻を再取得</button></p>
   </section>
   <section>
-    <h2>1日の比較（先週・先月・前年）</h2>
+    <h2>比較（1日：先週・先月・前年／月：先月・前年同月）</h2>
     <div id="cmpBox"></div>
   </section>
   <section>
@@ -1004,16 +1004,35 @@ async function cmpLoadFh(a,z){
   cmpFhRange=[a,z];
 }
 function cmpFhDay(d){if(cmpFhRange&&!cmpFhErr&&d>=cmpFhRange[0]&&d<=cmpFhRange[1]){const v=cmpFh[d];return v?((cfg.tax||"税抜")==="税抜"?v.net:v.gross):0}return fhSales(d)}
+// 比べる列（1日：当日・先週・先月・前年／月：当月・先月・前年同月）。各列は集計する日の一覧を持つ
+let cmpMode="day", cmpMonth=null;
+const cmpDim=ym=>new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
+const cmpYmAdd=(ym,n)=>{const x=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+n,1);return x.getFullYear()+"/"+String(x.getMonth()+1).padStart(2,"0")};
+function cmpCols(){
+  const y=cmpYesterday();
+  if(cmpMode==="day"){
+    if(!cmpDay||cmpDay>y)cmpDay=y;
+    return CMP_COLS.map(([lb,n])=>{const d=cmpBack(cmpDay,n);return {lb,n,ds:[d]}});
+  }
+  const ymY=y.slice(0,7);
+  if(!cmpMonth||cmpMonth>ymY)cmpMonth=ymY;
+  // 途中の月（今月）は、先月・前年も同じ日付の範囲（1日〜昨日の日付）で比べる
+  const partial=cmpMonth===ymY&&+y.slice(8)<cmpDim(cmpMonth), last=partial?+y.slice(8):cmpDim(cmpMonth);
+  return [["当月",0],["先月",-1],["前年",-12]].map(([lb,k])=>{const ym=cmpYmAdd(cmpMonth,k), n=partial?Math.min(last,cmpDim(ym)):cmpDim(ym), ds=[];
+    for(let i=1;i<=n;i++)ds.push(ym+"/"+String(i).padStart(2,"0"));
+    return {lb,ym,ds,partial}});
+}
 async function cmpLoad(force){
-  if(cmpBusy||!cmpDay)return;
+  if(cmpBusy)return;
   if(force){cmpPer={};cmpLab={};cmpFhRange=null}
-  const ds=CMP_COLS.map(c=>cmpBack(cmpDay,c[1])), cur=curPayYM();
-  const need=[...new Set(ds.map(d=>payYMOf(d).join("-")))].filter(k=>{const [y,m]=k.split("-").map(Number);return !cmpPer[k]&&y*12+m<=cur[0]*12+cur[1]});
-  const fhA=cmpBack(cmpDay,364), fhNeed=!cmpFhRange||fhA<cmpFhRange[0]||cmpDay>cmpFhRange[1];
+  const cols=cmpCols(), all=[].concat(...cols.map(c=>c.ds)), cur=curPayYM(), end=cols[0].ds[cols[0].ds.length-1];
+  const need=[...new Set(all.map(d=>payYMOf(d).join("-")))].filter(k=>{const [y,m]=k.split("-").map(Number);return !cmpPer[k]&&y*12+m<=cur[0]*12+cur[1]});
+  const lo=[cmpBack(end,364)].concat(all).sort()[0], hi=all.slice().sort().pop();
+  const fhNeed=!cmpFhRange||lo<cmpFhRange[0]||hi>cmpFhRange[1];
   if(!need.length&&!fhNeed)return;
-  cmpBusy=true;cmpMsg="比較する日の打刻と売上を取得中…（少し時間がかかります）";renderCmp();
+  cmpBusy=true;cmpMsg="比較する期間の打刻と売上を取得中…（少し時間がかかります）";renderCmp();
   const jobs=[];
-  if(fhNeed)jobs.push(cmpLoadFh(fhA,cmpDay));
+  if(fhNeed)jobs.push(cmpLoadFh(cmpFhRange&&!force?[lo,cmpFhRange[0]].sort()[0]:lo,cmpFhRange&&!force?[hi,cmpFhRange[1]].sort().pop():hi));
   if(need.length)jobs.push(loadPunchesLive(need.map(k=>k.split("-").map(Number))).then(r=>{
     if(!r.ok||!r.byPeriod){need.forEach(k=>cmpPer[k]={err:r.err||"取得できませんでした"});return}
     const save={rows,dates,people,periodTG,closedBak:JSON.stringify(cfg.closed)};
@@ -1035,7 +1054,6 @@ async function cmpLoad(force){
   cmpMsg=bad.length?`打刻を取得できませんでした（${bad[0][1].err}）。「再取得」を押してください`:"";
   cmpBusy=false;renderCmp();
 }
-// その日の数字（cmpStore の範囲で）
 function cmpCalc(d){
   const net=(cfg.tax||"税抜")==="税抜", ym=d.slice(0,7), PC=window.PCTX||{fxDay:()=>null};
   const sb=salesOf(d,"本店"), sm=salesOf(d,"マルコ"), sf=cmpFhDay(d), lab=cmpLab[d];
@@ -1058,8 +1076,23 @@ function cmpCalc(d){
   return {d,S,L,h,F,X:XX,O,cl,warn,prov};
 }
 // 直近1年の売上（選んだ範囲）→「1pt＝年間いくら」の基準
-function cmpAnnual(){
-  const z=cmpDay, a=cmpBack(z,364);let sum=0,first=null;
+// 複数日の合計（月の比較用）。人件費・食材費・固定費が1日でも出せない場合は、その項目と営業利益を出さない（少なく出るのを防ぐ）
+function cmpAgg(ds){
+  if(ds.length===1)return cmpCalc(ds[0]);
+  const xs=ds.map(cmpCalc), sum=k=>xs.reduce((a,x)=>a+(x[k]||0),0), any=k=>xs.some(x=>x[k]==null);
+  const noLab=xs.filter(x=>x.warn.some(w=>/打刻なし/.test(w))).length, noS=xs.filter(x=>x.warn.some(w=>/売上が未入力/.test(w))).length;
+  const S=xs.every(x=>x.S==null)?null:sum("S"), L=noLab?null:sum("L"), h=noLab?null:sum("h"), F=any("F")?null:sum("F"), X=any("X")?null:sum("X");
+  const warn=[];
+  if(noLab)warn.push(`打刻がない日 ${noLab}日（人件費・営業利益を出せません）`);
+  if(noS)warn.push(`売上が未入力の営業日 ${noS}日`);
+  if(F==null)warn.push("食材費を出せない日があります");
+  if(X==null)warn.push("固定費を出せない日があります");
+  return {S,L,h,F,X,O:S==null||L==null||F==null||X==null?null:S-L-F-X,warn,prov:xs.some(x=>x.prov),
+    hol:ds.filter(d=>dayKind(d)!=="平").length, cln:xs.filter(x=>x.cl).length, n:ds.length};
+}
+// 直近1年の売上（選んだ範囲・endの日まで）→「1pt＝年間いくら」の基準
+function cmpAnnual(z){
+  const a=cmpBack(z,364);let sum=0,first=null;
   for(let x=new Date(a);dstr(x)<=z;x.setDate(x.getDate()+1)){const d=dstr(x);
     const sb=salesOf(d,"本店")||0, sm=salesOf(d,"マルコ")||0, sf=cmpFhRange&&!cmpFhErr?cmpFhDay(d):0;
     const v=cmpStore==="本店"?sb+sf:cmpStore==="マルコ"?sm:sb+sm+sf;
@@ -1070,12 +1103,10 @@ function cmpAnnual(){
 }
 function renderCmp(){
   const box=document.getElementById("cmpBox"); if(!box)return;
-  if(!cmpDay)cmpDay=cmpYesterday();
-  const y=cmpYesterday(); if(cmpDay>y)cmpDay=y;
-  const cols=CMP_COLS.map(([lb,n])=>({lb,n,d:cmpBack(cmpDay,n)}));
-  const C=cols.map(c=>cmpCalc(c.d)), cur=C[0], A=cmpAnnual();
+  const y=cmpYesterday(), isDay=cmpMode==="day", cols=cmpCols();
+  const C=cols.map(c=>cmpAgg(c.ds)), cur=C[0], endDay=cols[0].ds[cols[0].ds.length-1], A=cmpAnnual(endDay);
   const iso=d=>d.replace(/\//g,"-");
-  const dl=d=>{const dw=DOW[new Date(d).getDay()],hol=HOLIDAYS[d];return `${d.slice(0,4)!==cmpDay.slice(0,4)?d.slice(0,4)+"/":""}${+d.slice(5,7)}/${+d.slice(8)}（<span class="dow-${hol?"日":dw}">${dw}</span>）${hol?`<span class="chip s">${hol}</span>`:""}`};
+  const dl=d=>{const dw=DOW[new Date(d).getDay()],hol=HOLIDAYS[d];return `${d.slice(0,4)!==endDay.slice(0,4)?d.slice(0,4)+"/":""}${+d.slice(5,7)}/${+d.slice(8)}（<span class="dow-${hol?"日":dw}">${dw}</span>）${hol?`<span class="chip s">${hol}</span>`:""}`};
   const pc=(v,S)=>S>0&&v!=null?v/S:null;
   // 項目：[名前, 値の出し方, 種類, 良い向き（+1 増えると良い／−1 減ると良い／0 どちらでもない）, 年間の利益への影響を出すか]
   // 固定費率・営業利益率は売上の増減でも動くため、年間換算すると売上の影響を二重に数える → 出さない
@@ -1099,15 +1130,18 @@ function renderCmp(){
   const diffHTML=(a,b,t,dir,yr)=>{
     if(a==null||b==null)return "";
     const df=a-b;
-    if(t==="pct"){const pt=df*100, cls=tone(Math.round(pt*10),dir);
-      let s=`<div class="sub2 ${cls}">${pt>=0?"+":"−"}${Math.abs(pt).toFixed(1)}pt</div>`;
+    if(t==="pct"){const pt=Math.abs(df*100)<0.05?0:df*100, cls=tone(Math.round(pt*10),dir);
+      let s=`<div class="sub2 ${cls}">${pt>0?"+":pt<0?"−":"±"}${Math.abs(pt).toFixed(1)}pt</div>`;
       if(yr&&A&&Math.abs(pt)>=0.05)s+=`<div class="sub2 ${cls}" style="font-weight:400">年間の利益 ${man(dir*pt/100*A.year)}相当</div>`;
       return s}
     if(t==="h")return `<div class="sub2">${df>=0?"+":"−"}${Math.abs(df).toFixed(1)}h</div>`;
     const cls=tone(Math.round(df),dir), rel=b!==0&&t==="yen"&&b>0&&a>=0?`（${(a/b*100).toFixed(1)}%）`:"";
     return `<div class="sub2 ${cls}">${df>=0?"+":"−"}${yen(Math.abs(df))}${rel}</div>`};
-  const head=cols.map((c,i)=>{const x=C[i], kd=dayKind(c.d)!==dayKind(cmpDay);
-    return `<th${i?"":` style="background:color-mix(in srgb,var(--gold) 18%,transparent)"`}><div>${c.lb}${c.n?`<span class="note">（${c.n===364?"364日前":c.n===28?"4週前":"7日前"}）</span>`:""}</div><div style="font-weight:400">${dl(c.d)}</div>`+
+  const head=cols.map((c,i)=>{const x=C[i], bg=i?"":` style="background:color-mix(in srgb,var(--gold) 18%,transparent)"`, pv=x.prov?'<span class="chip w" title="食材費または固定費が未確定の月のため仮の率で計算">仮</span>':"";
+    if(!isDay){const a=c.ds[0], z=c.ds[c.ds.length-1];
+      return `<th${bg}><div>${c.lb}</div><div style="font-weight:400">${a.slice(0,4)}年${+a.slice(5,7)}月</div><div class="note" style="font-weight:400">${+a.slice(8)}〜${+z.slice(8)}日（${x.n}日・土日祝 ${x.hol}日${x.cln?`・定休 ${x.cln}日`:""}）</div>${pv}</th>`}
+    const d=c.ds[0], kd=dayKind(d)!==dayKind(endDay);
+    return `<th${bg}><div>${c.lb}${c.n?`<span class="note">（${c.n===364?"364日前":c.n===28?"4週前":"7日前"}）</span>`:""}</div><div style="font-weight:400">${dl(d)}</div>`+
       `${x.cl?'<span class="chip s">定休</span>':""}${i&&kd?'<span class="chip w" title="平日・土日・祝日の区分が当日と違います">区分違い</span>':""}${x.prov?'<span class="chip w" title="食材費または固定費が未確定の月のため仮の率で計算">仮</span>':""}</th>`}).join("");
   let body="";
   M.forEach(([lb,get,t,dir,yr])=>{const a=get(cur);
@@ -1119,24 +1153,30 @@ function renderCmp(){
     const lr=pc(cur.L,cur.S), lp=pc(x.L,x.S), l=lr!=null&&lp!=null?`人件費率 <b style="color:var(${(lr-lp)<=0?"--ok":"--crit"})">${lr-lp>=0?"+":"−"}${Math.abs((lr-lp)*100).toFixed(1)}pt</b>`:"人件費率 —";
     const o=cur.O!=null&&x.O!=null?`営業利益 <b style="color:var(${cur.O-x.O>=0?"--ok":"--crit"})">${cur.O-x.O>=0?"+":"−"}${yen(Math.abs(cur.O-x.O))}</b>`:"営業利益 —";
     return `<div class="al" style="margin:0;background:var(--panel);border:1px solid var(--line)"><b>${c.lb}比</b>　${s}　${l}　${o}</div>`}).join("");
-  const warns=cols.map((c,i)=>C[i].warn.length?`${c.lb}（${c.d.slice(5)}）：${C[i].warn.join("・")}`:"").filter(Boolean);
+  const warns=cols.map((c,i)=>C[i].warn.length?`${c.lb}（${isDay?c.ds[0].slice(5):+c.ds[0].slice(5,7)+"月"}）：${C[i].warn.join("・")}`:"").filter(Boolean);
   const stBtn=["全社","本店","マルコ"].map(s=>`<button type="button" class="btn sm" data-cs="${s}" style="${s===cmpStore?"background:var(--ink);color:var(--panel)":""}">${s}</button>`).join("");
+  const mdBtn=[["day","1日"],["month","月"]].map(([k,t])=>`<button type="button" class="btn sm" data-cm="${k}" style="margin-top:0;${k===cmpMode?"background:var(--ink);color:var(--panel)":""}">${t}</button>`).join("");
+  const nextOff=isDay?cmpDay>=y:cmpMonth>=y.slice(0,7);
   box.innerHTML=`<div class="toolbar">
-      <span class="pnav dark"><button type="button" id="cmpPrev" aria-label="前の日">‹</button></span>
-      <label class="note" for="cmpDate">比べる日 <input id="cmpDate" type="date" value="${iso(cmpDay)}" max="${iso(y)}" style="width:auto"></label>
-      <span class="pnav dark"><button type="button" id="cmpNext" aria-label="次の日"${cmpDay>=y?" disabled":""}>›</button></span>
+      <span style="display:inline-flex;gap:4px">${mdBtn}</span>
+      <span class="pnav dark"><button type="button" id="cmpPrev" aria-label="${isDay?"前の日":"前の月"}">‹</button></span>
+      ${isDay?`<label class="note" for="cmpDate">比べる日 <input id="cmpDate" type="date" value="${iso(cmpDay)}" max="${iso(y)}" style="width:auto"></label>`
+        :`<label class="note" for="cmpDate">比べる月 <input id="cmpDate" type="month" value="${cmpMonth.replace("/","-")}" max="${y.slice(0,7).replace("/","-")}" style="width:auto"></label>`}
+      <span class="pnav dark"><button type="button" id="cmpNext" aria-label="${isDay?"次の日":"次の月"}"${nextOff?" disabled":""}>›</button></span>
       <button class="btn sm" type="button" id="cmpReload" style="margin-top:0">再取得</button>
       <span style="display:inline-flex;gap:4px;margin-left:auto">${stBtn}</span></div>
     ${cmpMsg?`<div class="al w">${cmpMsg}</div>`:""}
     <div style="display:grid;gap:6px;margin:6px 0">${sumLine}</div>
     <div class="wrap ktbl"><table><thead><tr><th class="l">項目</th>${head}</tr></thead><tbody>${body}</tbody></table></div>
     ${warns.length?`<div class="al w" style="margin-top:6px">${warns.join("<br>")}</div>`:""}
-    <p class="note">差＝当日 − 比較日（緑＝当日のほうが良い、赤＝悪い）。先週＝7日前、先月＝4週前（28日前）、前年＝364日前で、どれも同じ曜日どうしで比べます。`+
+    <p class="note">${isDay?"差＝当日 − 比較日（緑＝当日のほうが良い、赤＝悪い）。先週＝7日前、先月＝4週前（28日前）、前年＝364日前で、どれも同じ曜日どうしで比べます。"
+      :`差＝当月 − 比較月（緑＝当月のほうが良い、赤＝悪い）。${cols[0].partial?`今月は途中のため、先月・前年も同じ日付の範囲（1日〜${cols[0].ds.length}日）で比べます。`:""}月ごとに土日祝の日数が違うと売上も変わるので、見出しの日数も見てください。`}`+
     (A?`「年間の利益 ○万円相当」は、人件費率・食材費率・FL比率の差が1年続いた場合の営業利益への影響です（FL比率は人件費率と食材費率の合計なので、足し合わせないでください。直近1年の売上 ${yen(A.year)}${A.days<365?`・${A.days}日分から年換算`:""}で計算。1pt＝約${Math.round(A.year/100/1e4).toLocaleString()}万円）。`:"")+
-    `${cmpStore==="本店"?"本店の売上・率は本店＋FishHackで計算。":""}${cmpStore==="マルコ"?"マルコの人件費には本店から出向している2名分は入っていません。":""}人件費は打刻から日別の表と同じ方法で計算し、月給者は営業日で日割りです。1日だけの比較は天気や予約で大きくぶれるため、同じ傾向が何日も続くかを見てください。</p>`;
-  box.querySelector("#cmpDate").onchange=e=>{const v=e.target.value;if(v){cmpDay=v.replace(/-/g,"/");renderCmp()}};
-  box.querySelector("#cmpPrev").onclick=()=>{cmpDay=cmpBack(cmpDay,1);renderCmp()};
-  box.querySelector("#cmpNext").onclick=()=>{cmpDay=cmpBack(cmpDay,-1);renderCmp()};
+    `${cmpStore==="本店"?"本店の売上・率は本店＋FishHackで計算。":""}${cmpStore==="マルコ"?"マルコの人件費には本店から出向している2名分は入っていません。":""}人件費は打刻から日別の表と同じ方法で計算し、月給者は営業日で日割りです。${isDay?"1日だけの比較は天気や予約で大きくぶれるため、同じ傾向が何日も続くかを見てください。":"人件費・食材費・固定費が1日でも出せない月は、少なく出るのを防ぐため、その項目と営業利益を「—」にします。"}</p>`;
+  box.querySelector("#cmpDate").onchange=e=>{const v=e.target.value;if(!v)return;if(isDay)cmpDay=v.replace(/-/g,"/");else cmpMonth=v.replace("-","/");renderCmp()};
+  box.querySelector("#cmpPrev").onclick=()=>{if(isDay)cmpDay=cmpBack(cmpDay,1);else cmpMonth=cmpYmAdd(cmpMonth,-1);renderCmp()};
+  box.querySelector("#cmpNext").onclick=()=>{if(isDay)cmpDay=cmpBack(cmpDay,-1);else cmpMonth=cmpYmAdd(cmpMonth,1);renderCmp()};
+  box.querySelectorAll("[data-cm]").forEach(b=>b.onclick=()=>{cmpMode=b.dataset.cm;renderCmp()});
   box.querySelector("#cmpReload").onclick=()=>cmpLoad(true);
   box.querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>{cmpStore=b.dataset.cs;renderCmp()});
   cmpLoad();
