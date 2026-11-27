@@ -893,7 +893,9 @@ async function renderList(){
   var all=db?await db.ref('nippo/'+state.shop).orderByKey().limitToLast(45).once('value').then(function(s){return s.val()}).catch(function(){return null}):null;
   all=all||{};
   var ks=Object.keys(all).sort().reverse();
-  var h='<div class="card"><h2>📚 '+SHOP[state.shop].name+'のこれまでの日報</h2><div class="lead">タップするとその日の日報を開きます。</div>';
+  // 改善の記録（スタッフ向け・数字なし）への入口【追加 R8.11.27】
+  var h='<div class="card" style="display:flex;gap:10px;align-items:center;cursor:pointer" onclick="openKaizen()"><span style="font-size:22px">📈</span><div style="flex:1"><b>改善の記録</b><div class="note">提案がその後どうなったか（試している・効果あり など）を両店まとめて見られます。スタッフも見られるページです（数字は出ません）。</div></div><span class="note" style="color:var(--accent);font-weight:800">開く ›</span></div>';
+  h+='<div class="card"><h2>📚 '+SHOP[state.shop].name+'のこれまでの日報</h2><div class="lead">タップするとその日の日報を開きます。</div>';
   if(!ks.length)h+='<div class="note">まだ日報がありません。</div>';
   ks.forEach(function(k){var r=all[k]||{},ps=(r.proposals&&(Array.isArray(r.proposals)?r.proposals:Object.values(r.proposals)))||[];
     var d=new Date(+k.slice(0,4),+k.slice(4,6)-1,+k.slice(6,8));
@@ -907,6 +909,7 @@ async function renderList(){
   if(state.admin)h+=adminCfgHTML();
   $('main').innerHTML=h;
 }
+function openKaizen(){try{if(window.parent&&window.parent!==window&&typeof window.parent.switchMode==='function'){window.parent.switchMode('kaizen');return}}catch(e){}location.href='kaizen.html?shop='+state.shop}
 function openDate(k){state.date=k.slice(0,4)+'-'+k.slice(4,6)+'-'+k.slice(6,8);state.view='write';segActive('viewSeg','view','write');load()}
 
 // ===== 学ぶ（店づくりの土台・マーケティングの基本） =====
