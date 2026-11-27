@@ -245,6 +245,18 @@ tbody tr:hover>td{background:color-mix(in srgb,var(--gold) 7%,transparent)}
 .al{border-radius:10px;padding:10px 14px;font-size:13.5px}
 .panel{border-radius:14px;padding:18px 20px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* ===== 日別の表を横スクロールなしで全体表示【R8.11.28】 =====
+   画面が広いときは「日別」の枠だけ画面の幅いっぱいに広げ、表の文字・余白を詰めて18列を1画面に収める */
+@media (min-width:1100px){
+  main>section#sec-daily{--dw:min(1880px,calc(100vw - 32px));width:var(--dw);max-width:none;margin-left:calc((100% - var(--dw)) / 2);justify-self:start;padding-inline:14px}
+}
+#daily{font-size:clamp(10.5px,.7vw,13px)}
+.stick>table#daily th,.stick>table#daily td{padding:5px 4px;font-size:inherit}
+.stick>table#daily thead th{font-size:clamp(10px,.66vw,11.5px);white-space:normal;line-height:1.3;letter-spacing:0}
+#daily>tbody>tr:not(.det):not(.sep)>td:first-child{white-space:normal;min-width:62px;max-width:92px;line-height:1.35}
+#daily .chip{margin-left:0;font-size:10px;padding:0 5px;white-space:nowrap}
+#daily .pill{min-width:0;padding:1px 6px;font-size:inherit}
+#daily .sub2,#daily .yoy{font-size:.86em;white-space:nowrap}
 </style>
 <script>(function(){function hh(){var h=document.querySelector("header");if(h)document.documentElement.style.setProperty("--hh",h.offsetHeight+"px")}addEventListener("load",hh);addEventListener("resize",hh);document.addEventListener("DOMContentLoaded",hh)})();</script>
 </head><body>
