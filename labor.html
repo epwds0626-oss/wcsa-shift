@@ -245,6 +245,10 @@ tbody tr:hover>td{background:color-mix(in srgb,var(--gold) 7%,transparent)}
 .al{border-radius:10px;padding:10px 14px;font-size:13.5px}
 .panel{border-radius:14px;padding:18px 20px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* 年間まとめの比較の枠【R8.11.28】 */
+.ancmp{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:0 1px 2px rgba(28,37,65,.05),0 6px 20px rgba(28,37,65,.05);min-width:0}
+@media (max-width:640px){.ancmp{padding:14px 12px;border-radius:12px}}
+
 /* ===== 日別の表を横スクロールなしで全体表示【R8.11.28】 =====
    画面が広いときは「日別」の枠だけ画面の幅いっぱいに広げ、表の文字・余白を詰めて18列を1画面に収める */
 @media (min-width:1100px){
@@ -292,6 +296,7 @@ tbody tr:hover>td{background:color-mix(in srgb,var(--gold) 7%,transparent)}
   <p class="note" id="anStatus"></p>
   <div class="wrap" id="anWrap"><table id="anTable"></table></div>
   <div class="legend" style="margin-top:8px"><span style="--c:var(--honten)">本店</span><span style="--c:var(--marco)">マルコ</span><span style="--c:var(--fish)">FishHack</span></div>
+  <div class="ancmp"><h2>比較 <span class="h2s">年度：前年度の同じ期間 ／ 四半期：前の四半期・前年の同じ四半期</span></h2><div id="anCmpBox"></div></div>
 </section>
 <main id="app" hidden>
   <nav class="secnav" aria-label="ページ内の移動"><a href="#sec-sum">概要</a><a href="#sec-cmp">比較</a><a href="#sec-trend">推移</a><a href="#sec-daily">日別</a><a href="#sec-dow">曜日区分</a><a href="#sec-prod">人時売上高</a><a href="#sec-set">設定</a></nav>
@@ -698,6 +703,7 @@ async function openAnnual(fy){
     if(fhm&&fhm[pk])pv.fh=(cfg.tax||"税抜")==="税抜"?fhm[pk].net:fhm[pk].gross;
     M[k].prev=pv});
   renderAnnual(fy,months,M,!!fhm,labNote);annualBusy=false;
+  try{renderCmp()}catch(e){console.error("年間の比較の描画に失敗",e)}
 }
 function renderAnnual(fy,months,M,fhOk,labNote){
   const T={本店:{c:0,s:0,sl:0,cm:0},マルコ:{c:0,s:0,sl:0,cm:0},fh:0,fhl:0,lab:0,h:0};
@@ -760,7 +766,7 @@ function renderAnnual(fy,months,M,fhOk,labNote){
     ((cfg.foodMode||"rate")==="rate"?" 食材費は売上×原価率（本店 "+(foodRateH()*100)+"%・マルコ "+(foodRateM()*100)+"%・FishHack "+num(cfg.fhRate!=null?cfg.fhRate:55)+"%）。台帳の仕入から計算するには日別の画面で切替。":"")+
     " 台帳方式の食材費は預金台帳・現金出納帳から「仕入れた月」で集計した全社の仕入（ドリンク込み・FishHackの仕入・本店の小口現金・市場の支払い（別口座・12か月均等割）も含む）を"+(cfg.tax||"税抜")+"に換算（税込÷1.08）。FL比率＝（人件費＋食材費）÷売上、目安60%以内。固定費は預金台帳の水道光熱費・リース・通信・燃料・雑費・手数料等（年払いの保険・税・修繕は12か月に均等割、"+(cfg.tax||"税抜")+"換算は÷1.1）。営業利益＝利益−固定費（消費税・借入返済・社用車の購入代は含まない）。食材費の月ごとの波は、まとめ払い（水戸中央水産・清水商店など）の影響が大きいため、年間・四半期の合計で見るのが確実です。日別の画面で入力した月は入力値を使います。"+" 売上が「—」の月は、その月のPOSの売上CSVを読み込むと入ります。昨対は前年同月の売上と比べています（本店の前年分は売上実績CSVの「前年実績」から保存。全社はマルコ開店前の月は本店＋FishHackで比較）。";
 }
-function closeAnnual(){document.body.classList.remove("annual-mode")}
+function closeAnnual(){document.body.classList.remove("annual-mode");try{renderCmp()}catch(e){console.error(e)}}
 
 function renderMasterStatus(){const el=document.getElementById("masterStatus");if(el)el.textContent=masterStatus}
 const norm=n=>n.replace(/【.*?】/g,"").replace(/[\s　]+/g," ").trim();
@@ -1115,7 +1121,31 @@ function cmpFhDay(d){if(cmpFhRange&&!cmpFhErr&&d>=cmpFhRange[0]&&d<=cmpFhRange[1
 let cmpMode="day", cmpMonth=null;
 const cmpDim=ym=>new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
 const cmpYmAdd=(ym,n)=>{const x=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+n,1);return x.getFullYear()+"/"+String(x.getMonth()+1).padStart(2,"0")};
+// ── 年間まとめの比較【追加 R8.11.28】：年度（今年度 vs 前年度の同じ期間）／四半期（当四半期 vs 前四半期・前年同期） ──
+// 日の一覧を作って、1日・月の比較と同じ計算（cmpAgg）で合計する。途中の期間は、比べる側も同じ日付の範囲にそろえる。
+let anCmpMode="fy", anCmpQ=null;
+const cmpIsAn=()=>document.body.classList.contains("annual-mode");
+const cmpBoxEl=()=>document.getElementById(cmpIsAn()?"anCmpBox":"cmpBox");
+function cmpShiftM(d,k){const [y,m,dd]=d.split("/").map(Number), x=new Date(y,m-1+k,1), n=new Date(x.getFullYear(),x.getMonth()+1,0).getDate();
+  return x.getFullYear()+"/"+String(x.getMonth()+1).padStart(2,"0")+"/"+String(Math.min(dd,n)).padStart(2,"0")}
+const cmpMonthEnd=d=>d.slice(0,8)+String(cmpDim(d.slice(0,7))).padStart(2,"0");
+function cmpRange(a,z){const o=[];for(let x=new Date(a);dstr(x)<=z;x.setDate(x.getDate()+1))o.push(dstr(x));return o}
+// 年度の四半期：Q1＝10〜12月、Q2＝1〜3月、Q3＝4〜6月、Q4＝7〜9月
+const anQStart=(fy,q)=>dstr(new Date(fy-1,9+3*(q-1),1));
+function anCmpCols(){
+  const y=cmpLastDay(), fy=annualFY||fyOf();
+  let A,Z,offs;
+  if(anCmpMode==="fy"){A=`${fy-1}/10/01`;Z=`${fy}/09/30`;offs=[["今年度",0],["前年度",-12]]}
+  else{
+    if(!anCmpQ||anQStart(fy,anCmpQ)>y){anCmpQ=4;while(anCmpQ>1&&anQStart(fy,anCmpQ)>y)anCmpQ--}
+    A=anQStart(fy,anCmpQ);Z=cmpMonthEnd(cmpShiftM(A,2));offs=[["当四半期",0],["前四半期",-3],["前年同期",-12]]}
+  if(A>y)return null;
+  const E=Z<y?Z:y, partial=E<Z;
+  return offs.map(([lb,k])=>{const a=cmpShiftM(A,k), zf=cmpMonthEnd(cmpShiftM(Z,k)), e=partial?[zf,cmpShiftM(E,k)].sort()[0]:zf;
+    return {lb,ds:cmpRange(a,e),partial}});
+}
 function cmpCols(){
+  if(cmpIsAn())return anCmpCols();
   const y=cmpLastDay();
   if(cmpMode==="day"){
     if(!cmpDay||cmpDay>y)cmpDay=y;
@@ -1132,7 +1162,8 @@ function cmpCols(){
 async function cmpLoad(force){
   if(cmpBusy)return;
   if(force){cmpPer={};cmpLab={};cmpFhRange=null}
-  const cols=cmpCols(), all=[].concat(...cols.map(c=>c.ds)), cur=curPayYM(), end=cols[0].ds[cols[0].ds.length-1];
+  const cols=cmpCols(); if(!cols)return;
+  const all=[].concat(...cols.map(c=>c.ds)), cur=curPayYM(), end=cols[0].ds[cols[0].ds.length-1];
   const tdy=dstr(new Date()), tdk=payYMOf(tdy).join("-");
   const stale=k=>k===tdk&&all.includes(tdy)&&cmpPer[k]&&cmpPer[k].ok&&!cmpLab[tdy]&&Date.now()-(cmpPer[k].t||0)>60000;
   const need=[...new Set(all.map(d=>payYMOf(d).join("-")))].filter(k=>{const [y,m]=k.split("-").map(Number);return (!cmpPer[k]||stale(k))&&y*12+m<=cur[0]*12+cur[1]});
@@ -1231,7 +1262,7 @@ function cmpViz(cols,C){
   const cs=getComputedStyle(document.documentElement), cv=(n,d)=>cs.getPropertyValue(n).trim()||d;
   const K={L:cv("--honten","#1b2747"),F:cv("--marco","#b5532f"),X:cv("--sub","#5d6276"),O:cv("--ok","#2f6b47"),crit:cv("--crit","#b23a2e"),line:cv("--line","#ddd7c9"),ink:cv("--ink","#222"),gold:cv("--gold","#c9a24a")};
   const pct=(v,S)=>(v/S*100).toFixed(1)+"%";
-  const pname=(c,i)=>i?c.lb:(cmpMode==="day"?"当日":"当月");
+  const pname=c=>c.lb;
   // ① 売上の内訳
   let bars="";
   cols.forEach((c,i)=>{const x=C[i];
@@ -1263,7 +1294,7 @@ function cmpViz(cols,C){
     const vals=seg.flatMap(s=>s.base?[s.v]:[s.a,s.z]),mxv=Math.max(...vals),mnv=Math.min(...vals),sp=Math.max(mxv-mnv,Math.abs(mxv)*0.02,1);
     const cut=mnv>0&&sp<mnv*0.6, lo=cut?mnv-sp*1.3:Math.min(0,mnv), hi=Math.max(0,mxv)+(cut?sp*0.12:0);
     // 描く幅を画面の幅に合わせる（スマホで文字が小さくなりすぎないように）。狭い画面では金額を「万」で短く出す
-    const bxw=(document.getElementById("cmpBox")||{}).clientWidth||960, W=Math.max(320,Math.min(960,bxw-36)), nar=W<560;
+    const bxw=(cmpBoxEl()||{}).clientWidth||960, W=Math.max(320,Math.min(960,bxw-36)), nar=W<560;
     const fy=v=>nar?(v<0?"−":"")+(Math.abs(v)/1e4).toFixed(1)+"万":yen(v), fs=v=>{const r=Math.round(v);return nar?(r<0?"−":r>0?"+":"±")+(Math.abs(r)/1e4).toFixed(1)+"万":sy(v)};
     const H=nar?240:300,pt=30,pb=46,pl=8,n=seg.length,cw=(W-pl*2)/n,bw=cw*0.5,y=v=>pt+(H-pt-pb)*(hi-v)/((hi-lo)||1),x=i=>pl+cw*i+cw/2;
     seg.forEach(s=>{if(s.base&&cut)s.a=lo});
@@ -1291,8 +1322,9 @@ function cmpViz(cols,C){
   return part1+part2;
 }
 function renderCmp(){
-  const box=document.getElementById("cmpBox"); if(!box)return;
-  const y=cmpLastDay(), isDay=cmpMode==="day", cols=cmpCols();
+  const box=cmpBoxEl(); if(!box)return;
+  const an=cmpIsAn(), y=cmpLastDay(), isDay=!an&&cmpMode==="day", cols=cmpCols();
+  if(!cols){box.innerHTML=`<p class="note">この年度はまだ始まっていません。</p>`;return}
   const C=cols.map(c=>cmpAgg(c.ds)), cur=C[0], endDay=cols[0].ds[cols[0].ds.length-1], A=cmpAnnual(endDay);
   const iso=d=>d.replace(/\//g,"-");
   const dl=d=>{const dw=DOW[new Date(d).getDay()],hol=HOLIDAYS[d];return `${d.slice(0,4)!==endDay.slice(0,4)?d.slice(0,4)+"/":""}${+d.slice(5,7)}/${+d.slice(8)}（<span class="dow-${hol?"日":dw}">${dw}</span>）${hol?`<span class="chip s">${hol}</span>`:""}`};
@@ -1327,6 +1359,8 @@ function renderCmp(){
     const cls=tone(Math.round(df),dir), rel=b!==0&&t==="yen"&&b>0&&a>=0?`（${(a/b*100).toFixed(1)}%）`:"";
     return `<div class="sub2 ${cls}">${df>=0?"+":"−"}${yen(Math.abs(df))}${rel}</div>`};
   const head=cols.map((c,i)=>{const x=C[i], bg=i?"":` style="background:color-mix(in srgb,var(--gold) 18%,transparent)"`, pv=x.prov?'<span class="chip w" title="食材費または固定費が未確定の月のため仮の率で計算">仮</span>':"";
+    if(an){const a=c.ds[0], z=c.ds[c.ds.length-1], f=d=>`${d.slice(0,4)}/${+d.slice(5,7)}/${+d.slice(8)}`;
+      return `<th${bg}><div>${c.lb}</div><div style="font-weight:400">${f(a)}〜${f(z)}</div><div class="note" style="font-weight:400">${x.n}日・土日祝 ${x.hol}日${x.cln?`・定休 ${x.cln}日`:""}</div>${pv}</th>`}
     if(!isDay){const a=c.ds[0], z=c.ds[c.ds.length-1];
       return `<th${bg}><div>${c.lb}</div><div style="font-weight:400">${a.slice(0,4)}年${+a.slice(5,7)}月</div><div class="note" style="font-weight:400">${+a.slice(8)}〜${+z.slice(8)}日（${x.n}日・土日祝 ${x.hol}日${x.cln?`・定休 ${x.cln}日`:""}）</div>${pv}</th>`}
     const d=c.ds[0], kd=dayKind(d)!==dayKind(endDay);
@@ -1342,16 +1376,19 @@ function renderCmp(){
     const lr=pc(cur.L,cur.S), lp=pc(x.L,x.S), l=lr!=null&&lp!=null?`人件費率 <b style="color:var(${(lr-lp)<=0?"--ok":"--crit"})">${lr-lp>=0?"+":"−"}${Math.abs((lr-lp)*100).toFixed(1)}pt</b>`:"人件費率 —";
     const o=cur.O!=null&&x.O!=null?`営業利益 <b style="color:var(${cur.O-x.O>=0?"--ok":"--crit"})">${cur.O-x.O>=0?"+":"−"}${yen(Math.abs(cur.O-x.O))}</b>`:"営業利益 —";
     return `<div class="cmpcard"><div class="cmpcard-h">${c.lb}比</div><div class="cmpcard-b"><span>${s}</span><span>${l}</span><span>${o}</span></div></div>`}).join("");
-  const warns=cols.map((c,i)=>C[i].warn.length?`${c.lb}（${isDay?c.ds[0].slice(5):+c.ds[0].slice(5,7)+"月"}）：${C[i].warn.join("・")}`:"").filter(Boolean);
+  const warns=cols.map((c,i)=>C[i].warn.length?`${c.lb}（${isDay?c.ds[0].slice(5):an?c.ds[0].slice(0,7)+"〜"+c.ds[c.ds.length-1].slice(0,7):+c.ds[0].slice(5,7)+"月"}）：${C[i].warn.join("・")}`:"").filter(Boolean);
   const stBtn=["全社","本店","マルコ"].map(s=>`<button type="button" data-cs="${s}"${s===cmpStore?' class="on"':""}>${s}</button>`).join("");
   const mdBtn=[["day","1日"],["month","月"]].map(([k,t])=>`<button type="button" data-cm="${k}"${k===cmpMode?' class="on"':""}>${t}</button>`).join("");
-  const nextOff=isDay?cmpDay>=y:cmpMonth>=y.slice(0,7);
+  const nextOff=an?true:isDay?cmpDay>=y:cmpMonth>=y.slice(0,7);
+  const fyA=annualFY||fyOf();
+  const anBtn=[["fy","年度"],["q","四半期"]].map(([k,t])=>`<button type="button" data-am="${k}"${k===anCmpMode?' class="on"':""}>${t}</button>`).join("");
+  const qBtn=[1,2,3,4].map(q=>{const a=anQStart(fyA,q), m=+a.slice(5,7);return `<button type="button" data-aq="${q}"${q===anCmpQ?' class="on"':""}${a>y?" disabled":""}>Q${q}（${m}〜${(m+1)%12+1}月）</button>`}).join("");
   box.innerHTML=`<div class="toolbar">
-      <span class="seg">${mdBtn}</span>
+      ${an?`<span class="seg">${anBtn}</span>${anCmpMode==="q"?`<span class="seg">${qBtn}</span>`:`<span class="note">${fyA}年度（${fyA-1}年10月〜${fyA}年9月）。年度は上の ‹ › で切り替え</span>`}`:`<span class="seg">${mdBtn}</span>
       <span class="datenav"><span class="pnav dark"><button type="button" id="cmpPrev" aria-label="${isDay?"前の日":"前の月"}">‹</button></span>
       ${isDay?`<label class="note" for="cmpDate">比べる日 <input id="cmpDate" type="date" value="${iso(cmpDay)}" max="${iso(y)}" style="width:auto"></label>`
         :`<label class="note" for="cmpDate">比べる月 <input id="cmpDate" type="month" value="${cmpMonth.replace("/","-")}" max="${y.slice(0,7).replace("/","-")}" style="width:auto"></label>`}
-      <span class="pnav dark"><button type="button" id="cmpNext" aria-label="${isDay?"次の日":"次の月"}"${nextOff?" disabled":""}>›</button></span></span>
+      <span class="pnav dark"><button type="button" id="cmpNext" aria-label="${isDay?"次の日":"次の月"}"${nextOff?" disabled":""}>›</button></span></span>`}
       <button class="btn sm" type="button" id="cmpReload" style="margin-top:0">再取得</button>
       <span class="seg" style="margin-left:auto">${stBtn}</span></div>
     ${cmpMsg?`<div class="al w">${cmpMsg}</div>`:""}
@@ -1359,14 +1396,18 @@ function renderCmp(){
     <div class="wrap ktbl"><table><thead><tr><th class="l">項目</th>${head}</tr></thead><tbody>${body}</tbody></table></div>
     ${cmpViz(cols,C)}
     ${warns.length?`<div class="al w" style="margin-top:6px">${warns.join("<br>")}</div>`:""}
-    <p class="note">${isDay?"差＝当日 − 比較日（緑＝当日のほうが良い、赤＝悪い）。先週＝7日前、先月＝4週前（28日前）、前年＝364日前で、どれも同じ曜日どうしで比べます。"
+    <p class="note">${an?`差＝${cols[0].lb} − 比較した期間（緑＝${cols[0].lb}のほうが良い、赤＝悪い）。${cols[0].partial?`${cols[0].lb}は途中のため、比べる側も同じ日付の範囲（${cols[0].ds[0].slice(5)}〜${cols[0].ds[cols[0].ds.length-1].slice(5)}を${anCmpMode==="fy"?"1年前":"ずらした範囲"}）で比べます。`:""}前年度の打刻が給与システムにない日は人件費・営業利益を「—」にします。期間が長いため、取得に少し時間がかかります。`:isDay?"差＝当日 − 比較日（緑＝当日のほうが良い、赤＝悪い）。先週＝7日前、先月＝4週前（28日前）、前年＝364日前で、どれも同じ曜日どうしで比べます。"
       :`差＝当月 − 比較月（緑＝当月のほうが良い、赤＝悪い）。${cols[0].partial?`今月は途中のため、先月・前年も同じ日付の範囲（1日〜${cols[0].ds.length}日）で比べます。`:""}月ごとに土日祝の日数が違うと売上も変わるので、見出しの日数も見てください。`}`+
     (A?`「年間の利益 ○万円相当」は、人件費率・食材費率・FL比率の差が1年続いた場合の営業利益への影響です（FL比率は人件費率と食材費率の合計なので、足し合わせないでください。直近1年の売上 ${yen(A.year)}${A.days<365?`・${A.days}日分から年換算`:""}で計算。1pt＝約${Math.round(A.year/100/1e4).toLocaleString()}万円）。`:"")+
     `${cmpStore==="本店"?"本店の売上・率は本店＋FishHackで計算。":""}${cmpStore==="マルコ"?"マルコの人件費には本店から出向している2名分は入っていません。":""}人件費は打刻から日別の表と同じ方法で計算し、月給者は営業日で日割りです。${isDay?"1日だけの比較は天気や予約で大きくぶれるため、同じ傾向が何日も続くかを見てください。":"人件費・食材費・固定費が1日でも出せない月は、少なく出るのを防ぐため、その項目と営業利益を「—」にします。"}</p>`;
+  box.querySelectorAll("[data-am]").forEach(b=>b.onclick=()=>{anCmpMode=b.dataset.am;renderCmp()});
+  box.querySelectorAll("[data-aq]").forEach(b=>b.onclick=()=>{anCmpQ=+b.dataset.aq;renderCmp()});
+  if(!an){
   box.querySelector("#cmpDate").onchange=e=>{const v=e.target.value;if(!v)return;if(isDay)cmpDay=v.replace(/-/g,"/");else cmpMonth=v.replace("-","/");renderCmp()};
   box.querySelector("#cmpPrev").onclick=()=>{if(isDay)cmpDay=cmpBack(cmpDay,1);else cmpMonth=cmpYmAdd(cmpMonth,-1);renderCmp()};
   box.querySelector("#cmpNext").onclick=()=>{if(isDay)cmpDay=cmpBack(cmpDay,-1);else cmpMonth=cmpYmAdd(cmpMonth,1);renderCmp()};
   box.querySelectorAll("[data-cm]").forEach(b=>b.onclick=()=>{cmpMode=b.dataset.cm;renderCmp()});
+  }
   box.querySelector("#cmpReload").onclick=()=>cmpLoad(true);
   box.querySelectorAll("[data-cb]").forEach(b=>b.onclick=()=>{cmpBr=+b.dataset.cb;renderCmp()});
   box.querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>{cmpStore=b.dataset.cs;renderCmp()});
@@ -1732,9 +1773,9 @@ function renderProfit(res,shown,todayOpen){
   //   売上×原価率（既定）：本店の売上×本店の率＋マルコの売上×マルコの率＋FishHackの売上×FishHackの率
   //   台帳の仕入から：月の仕入合計を売上に比例して日に割り振る（従来の方式）
   const rateMode=(cfg.foodMode||"rate")==="rate", rH=foodRateH(), rM=foodRateM();
-  const foodDay=(sb,sm,sf,ym)=>{if(rateMode)return sb*rH+sm*rM+sf*fr;const R=RM[ym];return R?(sb+sm)*R.rate+sf*fr:null};
+  const foodDay=(sb,sm,sf,ym)=>{if(rateMode)return sb*rH+sm*rM+sf*fr;const R=RM[ym]||foodRateOf(ym);return R?(sb+sm)*R.rate+sf*fr:null};
   const provFood=ym=>rateMode?false:!!(RM[ym]&&RM[ym].prov);
-  const foodSplit=(sb,sm,sf,ym)=>{if(rateMode)return {h:sb*rH,m:sm*rM,f:sf*fr};const R=RM[ym];return R?{h:sb*R.rate,m:sm*R.rate,f:sf*fr}:null};
+  const foodSplit=(sb,sm,sf,ym)=>{if(rateMode)return {h:sb*rH,m:sm*rM,f:sf*fr};const R=RM[ym]||foodRateOf(ym);return R?{h:sb*R.rate,m:sm*R.rate,f:sf*fr}:null};
   window.PCTX={RM,fr,fxDay,foodDay,foodSplit,provFood,rateMode};
   const wrapI=document.getElementById("foodInputsWrap");if(wrapI)wrapI.style.display=rateMode?"none":"inline";
   let h=`<thead><tr><th class="l">日付</th><th>売上（全社）</th><th>人件費</th><th>食材費</th><th>利益<div class="note">固定費前</div></th><th>利益率</th><th>固定費<div class="note">日割</div></th><th class="rt">営業利益</th></tr></thead><tbody>`;
